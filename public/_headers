@@ -1,0 +1,6 @@
+/*.webp
+  Cache-Control: public, max-age=31536000, immutable
+/cards.json
+  Cache-Control: public, max-age=86400
+/api/*
+  Cache-Control: no-store
