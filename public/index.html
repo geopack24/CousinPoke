@@ -225,7 +225,7 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const TYPES=['Grass','Fire','Water','Lightning','Psychic','Fighting','Colorless'];
 const TCOL={Grass:'#4caf50',Fire:'#f4511e',Water:'#2196f3',Lightning:'#fdd835',Psychic:'#9c27b0',Fighting:'#a1887f',Colorless:'#e0e0e0'};
-const DEFAULT_RULES={deckSize:60,prizes:6,handSize:7,benchSize:5,maxCopies:4,firstTurnAttack:true,autoDraw:true,mulliganDraw:1,colorlessCosts:true,noAttackAfterRetreat:true,unlimitedTrainers:true,banned:["Imposter Oak's Revenge",'Lass','Scoop Up'],limits:{'Energy Removal':2,'Super Energy Removal':2},notes:''};
+const DEFAULT_RULES={deckSize:60,prizes:6,handSize:7,benchSize:5,maxCopies:4,firstTurnAttack:true,autoDraw:true,mulliganDraw:1,colorlessCosts:true,noAttackAfterRetreat:true,unlimitedTrainers:true,conditionsPersist:true,banned:["Imposter Oak's Revenge",'Lass','Scoop Up'],limits:{'Energy Removal':2,'Super Energy Removal':2},notes:''};
 const R=r=>Object.assign({},DEFAULT_RULES,r||{});
 const STATUS=[['SLP','Asleep'],['CNF','Confused'],['PAR','Paralyzed'],['PSN','Poisoned']];
 
@@ -386,6 +386,7 @@ function rulesForm(r,prefix='r'){
     <label class="chk"><input type="checkbox" id="${prefix}-colorlessCosts" ${r.colorlessCosts?'checked':''}>Energy types don't matter: any energy pays any attack cost</label>
     <label class="chk"><input type="checkbox" id="${prefix}-noAttackAfterRetreat" ${r.noAttackAfterRetreat?'checked':''}>No attacking on the turn you retreat</label>
     <label class="chk"><input type="checkbox" id="${prefix}-unlimitedTrainers" ${r.unlimitedTrainers?'checked':''}>No limit on Trainer cards per turn</label>
+    <label class="chk"><input type="checkbox" id="${prefix}-conditionsPersist" ${r.conditionsPersist?'checked':''}>Special conditions stay on a Pokémon when it is benched</label>
   </div>
   <div class="grid2" style="margin-top:10px;gap:10px">
     <div><label class="lbl" for="${prefix}-banned" style="display:block">Banned cards (one per line)</label><textarea id="${prefix}-banned" style="min-height:80px">${esc((r.banned||[]).join('\n'))}</textarea></div>
@@ -398,9 +399,9 @@ function canonName(s){s=s.trim().toLowerCase();if(!s)return null;const hit=DATA.
 function readRulesForm(root,prefix='r'){const g=id=>root.querySelector('#'+prefix+'-'+id);const n=(id,d)=>{const v=parseInt(g(id).value,10);return isNaN(v)?d:v};
   const banned=[...new Set(g('banned').value.split(/\r?\n/).map(canonName).filter(Boolean))];
   const limits={};g('limits').value.split(/\r?\n/).forEach(line=>{const m=line.match(/^\s*(.+?)\s*[=:]\s*(\d+)\s*$/);if(m){const nm=canonName(m[1]);if(nm)limits[nm]=parseInt(m[2],10)}});
-  return {deckSize:n('deckSize',60),prizes:n('prizes',6),handSize:n('handSize',7),benchSize:n('benchSize',5),maxCopies:n('maxCopies',4),mulliganDraw:n('mulliganDraw',1),firstTurnAttack:g('firstTurnAttack').checked,autoDraw:g('autoDraw').checked,colorlessCosts:g('colorlessCosts').checked,noAttackAfterRetreat:g('noAttackAfterRetreat').checked,unlimitedTrainers:g('unlimitedTrainers').checked,banned,limits,notes:g('notes').value.trim()}}
+  return {deckSize:n('deckSize',60),prizes:n('prizes',6),handSize:n('handSize',7),benchSize:n('benchSize',5),maxCopies:n('maxCopies',4),mulliganDraw:n('mulliganDraw',1),firstTurnAttack:g('firstTurnAttack').checked,autoDraw:g('autoDraw').checked,colorlessCosts:g('colorlessCosts').checked,noAttackAfterRetreat:g('noAttackAfterRetreat').checked,unlimitedTrainers:g('unlimitedTrainers').checked,conditionsPersist:g('conditionsPersist').checked,banned,limits,notes:g('notes').value.trim()}}
 function rulesSummary(r){r=R(r);const bits=[`${r.deckSize}-card decks`,`${r.prizes} prizes`,`${r.handSize}-card hand`,`bench ${r.benchSize}`,`max ${r.maxCopies} copies`,r.firstTurnAttack?'turn-1 attacks allowed':'no turn-1 attack',r.autoDraw?'auto-draw':'manual draw'];
-  if(r.colorlessCosts)bits.push('energy types ignored (all costs colorless)');if(r.noAttackAfterRetreat)bits.push('no attack after retreating');if(r.unlimitedTrainers)bits.push('unlimited Trainers per turn');
+  if(r.colorlessCosts)bits.push('energy types ignored (all costs colorless)');if(r.noAttackAfterRetreat)bits.push('no attack after retreating');if(r.unlimitedTrainers)bits.push('unlimited Trainers per turn');if(r.conditionsPersist)bits.push('conditions stay when benched');
   const lim=Object.entries(r.limits||{});if(lim.length)bits.push('limits: '+lim.map(([k,v])=>`${k} ×${v}`).join(', '));if((r.banned||[]).length)bits.push('banned: '+r.banned.join(', '));return bits.join(' · ')}
 
 function renderLobby(main){
@@ -676,7 +677,7 @@ function monMenu(g,seat,pid,anchor){
   if(own){
     items.push({sep:true});
     const isActive=f.p.active&&f.p.active.id===pid;
-    const doSwitch=(g,benchId)=>{const p=P(g,seat);const i=p.bench.findIndex(x=>x.id===benchId);if(i<0||!p.active)return;const old=p.active;old.st=[];p.active=p.bench[i];p.bench[i]=old;let note='';if(R(g.rules).noAttackAfterRetreat){if(!p.active.st.includes('RTR'))p.active.st.push('RTR');note=' (house rule: no attack this turn)'}pushLog(g,`${me} switched ${nm(old)} out for ${nm(p.active)}${note}`)};
+    const doSwitch=(g,benchId)=>{const p=P(g,seat);const i=p.bench.findIndex(x=>x.id===benchId);if(i<0||!p.active)return;const old=p.active;if(!R(g.rules).conditionsPersist)old.st=[];else old.st=old.st.filter(x=>x!=='RTR');p.active=p.bench[i];p.bench[i]=old;let note='';if(R(g.rules).noAttackAfterRetreat){if(!p.active.st.includes('RTR'))p.active.st.push('RTR');note=' (house rule: no attack this turn)'}pushLog(g,`${me} switched ${nm(old)} out for ${nm(p.active)}${note}`)};
     if(isActive)items.push({label:'Retreat: switch with a benched Pokémon…',fn:()=>pickMon(g,[seat],'Switch with…',bid=>commit(g=>doSwitch(g,bid)),(x)=>x.id!==pid)});
     else if(f.p.active)items.push({label:'Switch with the Active Pokémon',fn:()=>commit(g=>doSwitch(g,pid))});
     else items.push({label:'Move to Active',fn:()=>commit(g=>{const p=P(g,seat);const i=p.bench.findIndex(x=>x.id===pid);if(i<0)return;p.active=p.bench.splice(i,1)[0];pushLog(g,`${me} moved ${c.name} to Active`)})});
