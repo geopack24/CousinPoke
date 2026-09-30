@@ -96,6 +96,9 @@ textarea{width:100%;min-height:60px;resize:vertical}
 .cdgrid .tile .nm{font-size:12px;font-weight:700;text-align:center;line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cdgrid .tile .ct{display:flex;gap:4px;align-items:center}
 .cdgrid .tile .ct b{min-width:1.6em;text-align:center;font-variant-numeric:tabular-nums}
+.cd .ban{position:absolute;left:4px;top:4px;background:var(--danger);color:var(--danger-fg);font-size:10px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;padding:1px 6px;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.cd .ban.lim{background:var(--warn);color:#1f1b16}
+.mon .sts span.RTR{background:#333;color:#fff}
 
 /* deck builder */
 .builder{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
@@ -222,7 +225,8 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const TYPES=['Grass','Fire','Water','Lightning','Psychic','Fighting','Colorless'];
 const TCOL={Grass:'#4caf50',Fire:'#f4511e',Water:'#2196f3',Lightning:'#fdd835',Psychic:'#9c27b0',Fighting:'#a1887f',Colorless:'#e0e0e0'};
-const DEFAULT_RULES={deckSize:60,prizes:6,handSize:7,benchSize:5,maxCopies:4,firstTurnAttack:true,autoDraw:true,mulliganDraw:1,notes:''};
+const DEFAULT_RULES={deckSize:60,prizes:6,handSize:7,benchSize:5,maxCopies:4,firstTurnAttack:true,autoDraw:true,mulliganDraw:1,colorlessCosts:true,noAttackAfterRetreat:true,unlimitedTrainers:true,banned:["Imposter Oak's Revenge",'Lass','Scoop Up'],limits:{'Energy Removal':2,'Super Energy Removal':2},notes:''};
+const R=r=>Object.assign({},DEFAULT_RULES,r||{});
 const STATUS=[['SLP','Asleep'],['CNF','Confused'],['PAR','Paralyzed'],['PSN','Poisoned']];
 
 let DATA=null,CARDS={},SETS=[],SETIDX={};
@@ -242,7 +246,8 @@ function backHTML(scale,attrs=''){return `<div class="cd back" style="--s:${scal
 function energyType(c){if(c.st!=='Energy')return null;if(c.types&&c.types[0])return c.types[0];const t=TYPES.find(t=>c.name.startsWith(t));if(t)return t;if(/Colorless/.test(c.name))return 'Colorless';return 'Colorless'}
 function isBasicLike(c){return (c.st==='Pokémon'&&c.sub==='Basic')||(c.st==='Trainer'&&/as if it were a Basic/i.test(c.txt||''))}
 function setName(id){return (SETIDX[id]||{}).name||id}
-function dotsHTML(cost){return (cost||[]).map(t=>`<i style="background:${TCOL[t]||'#999'}" title="${esc(t)}"></i>`).join('')}
+function dotsHTML(cost,colorless){return (cost||[]).map(t=>{const tt=colorless?'Colorless':t;return `<i style="background:${TCOL[tt]||'#999'}" title="${esc(tt)}"></i>`}).join('')}
+function activeRules(){return R(S.game&&S.game.rules)}
 
 /* ---------- ui helpers ---------- */
 let toastT=null;
@@ -270,8 +275,9 @@ function showModal(title,body,foot,bind){
 }
 function askNumber(title,def,cb){showModal(title,`<input type="number" id="askn" value="${def}" min="0" step="1" style="width:8em">`,`<button class="pri" id="askok" type="button">OK</button>`,m=>{const i=m.querySelector('#askn');i.focus();i.select();const ok=()=>{const v=parseInt(i.value,10);closeModal();if(!isNaN(v))cb(v)};m.querySelector('#askok').onclick=ok;i.onkeydown=e=>{if(e.key==='Enter')ok()}})}
 function viewCard(cid){
-  const c=C(cid);
-  const atk=(c.atk||[]).map(a=>`<div class="atk"><div class="row"><span class="cost">${dotsHTML(a.c)}</span><b>${esc(a.n)}</b><span class="grow"></span><b>${esc(a.d)}</b></div>${a.t?`<div class="small">${esc(a.t)}</div>`:''}</div>`).join('');
+  const c=C(cid);const rules=activeRules();const cl=!!rules.colorlessCosts;
+  const banned=(rules.banned||[]).includes(c.name);const lim=rules.limits&&rules.limits[c.name];
+  const atk=(c.atk||[]).map(a=>`<div class="atk"><div class="row"><span class="cost">${dotsHTML(a.c,cl)}</span><b>${esc(a.n)}</b><span class="grow"></span><b>${esc(a.d)}</b></div>${a.t?`<div class="small">${esc(a.t)}</div>`:''}</div>`).join('')+(cl&&(c.atk||[]).length?`<div class="small muted" style="margin-top:6px">House rule: energy types don't matter. Any energy pays these costs.</div>`:'')+(banned?`<div class="notice small" style="margin-top:8px;border-left-color:var(--danger)"><b>Banned</b> under the current rules.</div>`:lim!=null?`<div class="notice small" style="margin-top:8px">Limited to ${lim} per deck under the current rules.</div>`:'');
   const pw=(c.pw||[]).map(p=>`<div class="atk"><b>Pokémon Power: ${esc(p.n)}</b><div class="small">${esc(p.t)}</div></div>`).join('');
   const meta=[];if(c.hp)meta.push(`${c.hp} HP`);if(c.types)meta.push(c.types.join('/'));if(c.sub)meta.push(c.sub);if(c.ev)meta.push('Evolves from '+c.ev);
   const foot=[];if(c.wk)foot.push('Weakness: '+c.wk.join(', '));if(c.rs)foot.push('Resistance: '+c.rs.join(', '));if(c.st==='Pokémon')foot.push('Retreat: '+c.rc);
@@ -327,11 +333,15 @@ function go(screen){S.screen=screen;if(screen!=='game'){ls.set('view',{screen})}
 /* ---------- decks ---------- */
 function deckCount(d){return Object.values(d.cards||{}).reduce((a,b)=>a+b,0)}
 function validateDeck(d,rules){
-  rules=rules||DEFAULT_RULES;const out=[];const n=deckCount(d);
+  rules=R(rules);const out=[];const n=deckCount(d);
   if(n!==rules.deckSize)out.push({bad:true,m:`${n} of ${rules.deckSize} cards`});else out.push({good:true,m:`${n} cards`});
-  const byName={};let basics=0;
-  for(const [cid,k] of Object.entries(d.cards||{})){const c=C(cid);if(c.st==='Energy'&&c.sub==='Basic')continue;byName[c.name]=(byName[c.name]||0)+k;if(isBasicLike(c))basics+=k}
-  for(const [nm,k] of Object.entries(byName))if(k>rules.maxCopies)out.push({bad:true,m:`${k}× ${nm} (max ${rules.maxCopies})`});
+  const byName={};let basics=0;const banned=rules.banned||[];const limits=rules.limits||{};
+  for(const [cid,k] of Object.entries(d.cards||{})){const c=C(cid);if(isBasicLike(c))basics+=k;if(c.st==='Energy'&&c.sub==='Basic')continue;byName[c.name]=(byName[c.name]||0)+k}
+  for(const [nm,k] of Object.entries(byName)){
+    if(banned.includes(nm)){out.push({bad:true,m:`${nm} is banned`});continue}
+    const max=limits[nm]!=null?Math.min(limits[nm],rules.maxCopies):rules.maxCopies;
+    if(k>max)out.push({bad:true,m:`${k}× ${nm} (max ${max})`});
+  }
   if(!basics)out.push({bad:true,m:'No Basic Pokémon'});
   return out;
 }
@@ -363,6 +373,7 @@ function render(){
 
 /* ---------- lobby ---------- */
 function rulesForm(r,prefix='r'){
+  r=R(r);
   return `<div class="rules-grid">
     <label>Deck size<input type="number" id="${prefix}-deckSize" value="${r.deckSize}" min="10" max="120"></label>
     <label>Prize cards<input type="number" id="${prefix}-prizes" value="${r.prizes}" min="0" max="12"></label>
@@ -372,12 +383,25 @@ function rulesForm(r,prefix='r'){
     <label>Extra draws per opponent mulligan<input type="number" id="${prefix}-mulliganDraw" value="${r.mulliganDraw}" min="0" max="7"></label>
     <label class="chk"><input type="checkbox" id="${prefix}-firstTurnAttack" ${r.firstTurnAttack?'checked':''}>First player may attack on turn 1</label>
     <label class="chk"><input type="checkbox" id="${prefix}-autoDraw" ${r.autoDraw?'checked':''}>Ending a turn draws a card for the next player</label>
+    <label class="chk"><input type="checkbox" id="${prefix}-colorlessCosts" ${r.colorlessCosts?'checked':''}>Energy types don't matter: any energy pays any attack cost</label>
+    <label class="chk"><input type="checkbox" id="${prefix}-noAttackAfterRetreat" ${r.noAttackAfterRetreat?'checked':''}>No attacking on the turn you retreat</label>
+    <label class="chk"><input type="checkbox" id="${prefix}-unlimitedTrainers" ${r.unlimitedTrainers?'checked':''}>No limit on Trainer cards per turn</label>
+  </div>
+  <div class="grid2" style="margin-top:10px;gap:10px">
+    <div><label class="lbl" for="${prefix}-banned" style="display:block">Banned cards (one per line)</label><textarea id="${prefix}-banned" style="min-height:80px">${esc((r.banned||[]).join('\n'))}</textarea></div>
+    <div><label class="lbl" for="${prefix}-limits" style="display:block">Per-deck limits (Card = number, one per line)</label><textarea id="${prefix}-limits" style="min-height:80px">${esc(Object.entries(r.limits||{}).map(([k,v])=>`${k} = ${v}`).join('\n'))}</textarea></div>
   </div>
   <label class="lbl" for="${prefix}-notes" style="display:block;margin-top:10px">House rules and notes</label>
   <textarea id="${prefix}-notes" placeholder="Anything you have agreed on: banned cards, Sudden Death, no first-turn Trainers...">${esc(r.notes||'')}</textarea>`;
 }
-function readRulesForm(root,prefix='r'){const g=id=>root.querySelector('#'+prefix+'-'+id);const n=(id,d)=>{const v=parseInt(g(id).value,10);return isNaN(v)?d:v};return {deckSize:n('deckSize',60),prizes:n('prizes',6),handSize:n('handSize',7),benchSize:n('benchSize',5),maxCopies:n('maxCopies',4),mulliganDraw:n('mulliganDraw',1),firstTurnAttack:g('firstTurnAttack').checked,autoDraw:g('autoDraw').checked,notes:g('notes').value.trim()}}
-function rulesSummary(r){const bits=[`${r.deckSize}-card decks`,`${r.prizes} prizes`,`${r.handSize}-card hand`,`bench ${r.benchSize}`,`max ${r.maxCopies} copies`,r.firstTurnAttack?'turn-1 attacks allowed':'no turn-1 attack',r.autoDraw?'auto-draw':'manual draw'];return bits.join(' · ')}
+function canonName(s){s=s.trim().toLowerCase();if(!s)return null;const hit=DATA.cards.find(c=>c.name.toLowerCase()===s)||DATA.cards.find(c=>c.name.toLowerCase().replace(/[^a-z0-9]/g,'')===s.replace(/[^a-z0-9]/g,''));return hit?hit.name:s.trim()}
+function readRulesForm(root,prefix='r'){const g=id=>root.querySelector('#'+prefix+'-'+id);const n=(id,d)=>{const v=parseInt(g(id).value,10);return isNaN(v)?d:v};
+  const banned=[...new Set(g('banned').value.split(/\r?\n/).map(canonName).filter(Boolean))];
+  const limits={};g('limits').value.split(/\r?\n/).forEach(line=>{const m=line.match(/^\s*(.+?)\s*[=:]\s*(\d+)\s*$/);if(m){const nm=canonName(m[1]);if(nm)limits[nm]=parseInt(m[2],10)}});
+  return {deckSize:n('deckSize',60),prizes:n('prizes',6),handSize:n('handSize',7),benchSize:n('benchSize',5),maxCopies:n('maxCopies',4),mulliganDraw:n('mulliganDraw',1),firstTurnAttack:g('firstTurnAttack').checked,autoDraw:g('autoDraw').checked,colorlessCosts:g('colorlessCosts').checked,noAttackAfterRetreat:g('noAttackAfterRetreat').checked,unlimitedTrainers:g('unlimitedTrainers').checked,banned,limits,notes:g('notes').value.trim()}}
+function rulesSummary(r){r=R(r);const bits=[`${r.deckSize}-card decks`,`${r.prizes} prizes`,`${r.handSize}-card hand`,`bench ${r.benchSize}`,`max ${r.maxCopies} copies`,r.firstTurnAttack?'turn-1 attacks allowed':'no turn-1 attack',r.autoDraw?'auto-draw':'manual draw'];
+  if(r.colorlessCosts)bits.push('energy types ignored (all costs colorless)');if(r.noAttackAfterRetreat)bits.push('no attack after retreating');if(r.unlimitedTrainers)bits.push('unlimited Trainers per turn');
+  const lim=Object.entries(r.limits||{});if(lim.length)bits.push('limits: '+lim.map(([k,v])=>`${k} ×${v}`).join(', '));if((r.banned||[]).length)bits.push('banned: '+r.banned.join(', '));return bits.join(' · ')}
 
 function renderLobby(main){
   const online=S.online;
@@ -440,7 +464,7 @@ function filteredCards(){
 }
 function renderBuilder(main){
   const d=currentDeck();const list=filteredCards();const v=validateDeck(d);
-  const ae=document.activeElement;const focusId=(ae&&(ae.id==='q'||ae.id==='dname'))?ae.id:null;
+  const ae=document.activeElement;const focusId=(ae&&(ae.id==='q'||ae.id==='dname'))?ae.id:null;const bannedSet=new Set(DEFAULT_RULES.banned);
   const groups={'Pokémon':[],'Trainer':[],'Energy':[]};for(const [cid,k] of Object.entries(d.cards)){const c=C(cid);(groups[c.st]||groups.Trainer).push([cid,k,c])}
   const gsum=Object.fromEntries(Object.entries(groups).map(([g,a])=>[g,a.reduce((s,x)=>s+x[1],0)]));
   const sortMon=(a,b)=>{const sa=['Basic','Stage 1','Stage 2'].indexOf(a[2].sub),sb=['Basic','Stage 1','Stage 2'].indexOf(b[2].sub);return a[2].name.localeCompare(b[2].name)||sa-sb};
@@ -454,7 +478,7 @@ function renderBuilder(main){
       <div class="filters"><div class="chips">${SETS.map(s=>`<button type="button" class="tag ${B.sets.has(s.id)?'on':''}" data-set="${s.id}">${esc(s.name)}</button>`).join('')}</div>
         <div class="chips">${TYPES.map(t=>`<button type="button" class="tag ty ${B.type===t?'on':''}" data-type="${t}"><i style="background:${TCOL[t]}"></i>${t}</button>`).join('')}</div></div>
       <div class="small muted" style="margin-bottom:8px">${list.length} cards</div>
-      <div class="cdgrid">${list.map(c=>{const k=d.cards[c.id]||0;return `<div class="tile"><div class="cd click" style="${cardStyle(c.id)}" data-cid="${c.id}" data-view="${c.id}" role="img" aria-label="${esc(c.name)}"></div><div class="nm" title="${esc(c.name)}">${esc(c.name)}</div><div class="ct"><button class="sm" type="button" data-dec="${c.id}" ${k?'':'disabled'}>−</button><b>${k}</b><button class="sm" type="button" data-inc="${c.id}">+</button></div></div>`}).join('')}</div>
+      <div class="cdgrid">${list.map(c=>{const k=d.cards[c.id]||0;const isBan=bannedSet.has(c.name);const lim=DEFAULT_RULES.limits[c.name];return `<div class="tile"><div class="cd click" style="${cardStyle(c.id)}" data-cid="${c.id}" data-view="${c.id}" role="img" aria-label="${esc(c.name)}">${isBan?'<span class="ban">Banned</span>':lim!=null?`<span class="ban lim">Max ${lim}</span>`:''}</div><div class="nm" title="${esc(c.name)}">${esc(c.name)}</div><div class="ct"><button class="sm" type="button" data-dec="${c.id}" ${k?'':'disabled'}>−</button><b>${k}</b><button class="sm" type="button" data-inc="${c.id}">+</button></div></div>`}).join('')}</div>
     </div>
     <div class="deckpane panel">
       <div class="row"><input type="text" id="dname" value="${esc(d.name)}" maxlength="40" class="grow" aria-label="Deck name"><button class="pri" id="dsave" type="button">Save</button></div>
@@ -652,8 +676,9 @@ function monMenu(g,seat,pid,anchor){
   if(own){
     items.push({sep:true});
     const isActive=f.p.active&&f.p.active.id===pid;
-    if(isActive)items.push({label:'Retreat: switch with a benched Pokémon…',fn:()=>pickMon(g,[seat],'Switch with…',bid=>commit(g=>{const p=P(g,seat);const i=p.bench.findIndex(x=>x.id===bid);if(i<0||!p.active)return;const old=p.active;old.st=[];p.active=p.bench[i];p.bench[i]=old;pushLog(g,`${me} switched ${nm(old)} out for ${nm(p.active)}`)}),(x)=>x.id!==pid)});
-    else if(f.p.active)items.push({label:'Switch with the Active Pokémon',fn:()=>commit(g=>{const p=P(g,seat);const i=p.bench.findIndex(x=>x.id===pid);if(i<0)return;const old=p.active;old.st=[];p.active=p.bench[i];p.bench[i]=old;pushLog(g,`${me} switched ${nm(old)} out for ${nm(p.active)}`)})});
+    const doSwitch=(g,benchId)=>{const p=P(g,seat);const i=p.bench.findIndex(x=>x.id===benchId);if(i<0||!p.active)return;const old=p.active;old.st=[];p.active=p.bench[i];p.bench[i]=old;let note='';if(R(g.rules).noAttackAfterRetreat){if(!p.active.st.includes('RTR'))p.active.st.push('RTR');note=' (house rule: no attack this turn)'}pushLog(g,`${me} switched ${nm(old)} out for ${nm(p.active)}${note}`)};
+    if(isActive)items.push({label:'Retreat: switch with a benched Pokémon…',fn:()=>pickMon(g,[seat],'Switch with…',bid=>commit(g=>doSwitch(g,bid)),(x)=>x.id!==pid)});
+    else if(f.p.active)items.push({label:'Switch with the Active Pokémon',fn:()=>commit(g=>doSwitch(g,pid))});
     else items.push({label:'Move to Active',fn:()=>commit(g=>{const p=P(g,seat);const i=p.bench.findIndex(x=>x.id===pid);if(i<0)return;p.active=p.bench.splice(i,1)[0];pushLog(g,`${me} moved ${c.name} to Active`)})});
     if(m.en.length)items.push({label:'Move or discard an attached card…',fn:()=>attachedMenu(g,seat,pid)});
     if(m.un.length)items.push({label:'Devolve (top card to hand)',fn:()=>devolve(seat,pid,'hand')},{label:'Devolve (top card to discard)',fn:()=>devolve(seat,pid,'discard')});
@@ -720,7 +745,7 @@ function coinMenu(anchor){
   const flip=n=>commit(g=>{const r=[];for(let i=0;i<n;i++)r.push(Math.random()<.5?'Heads':'Tails');const heads=r.filter(x=>x==='Heads').length;pushLog(g,n===1?`${whoDo()} flipped a coin: ${r[0]}`:`${whoDo()} flipped ${n} coins: ${r.join(', ')} (${heads} heads)`)});
   showMenu([{label:'Flip 1 coin',fn:()=>flip(1)},{label:'Flip 2 coins',fn:()=>flip(2)},{label:'Flip 3 coins',fn:()=>flip(3)},{label:'Flip…',fn:()=>askNumber('How many coins?',4,flip)}],anchor,'Coin');
 }
-function endTurn(){commit(g=>{const s=g.state;const from=s.turn;const to=other(from);s.turn=to;s.turnNo++;let extra='';if(g.rules.autoDraw){const p=P(g,to);const cd=p.deck.shift();if(cd){p.hand.push(cd);extra=` ${who(g,to)} drew a card.`}else extra=` ${who(g,to)} has no cards left to draw.`}pushLog(g,`${who(g,from)} ended the turn. Turn ${s.turnNo}: ${who(g,to)}.${extra}`)})}
+function endTurn(){commit(g=>{const s=g.state;const from=s.turn;const to=other(from);s.turn=to;s.turnNo++;let extra='';for(const sd of ['a','b'])for(const m of mons(P(g,sd)))m.st=m.st.filter(x=>x!=='RTR');if(g.rules.autoDraw){const p=P(g,to);const cd=p.deck.shift();if(cd){p.hand.push(cd);extra=` ${who(g,to)} drew a card.`}else extra=` ${who(g,to)} has no cards left to draw.`}pushLog(g,`${who(g,from)} ended the turn. Turn ${s.turnNo}: ${who(g,to)}.${extra}`)})}
 function moreMenu(anchor){
   const g=S.game;const my=mySeat(g);const host=g.host===uid;
   const items=[
