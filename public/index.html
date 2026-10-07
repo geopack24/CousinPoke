@@ -564,6 +564,7 @@ async function startGame(){
     g.state={turn:first,turnNo:1,stadium:null,p,winner:null};g.status='playing';g.startedAt=Date.now();g.log=[];
     pushLog(g,`Game on. Decks shuffled, ${r.handSize} cards dealt, ${r.prizes} prizes set aside.`);
     pushLog(g,`Coin flip: ${who(g,first)} goes first.${r.firstTurnAttack?'':' No attacking on the first turn.'}`);
+    if(r.autoDraw){const fp=p[first];const cd=fp.deck.shift();if(cd){fp.hand.push(cd);pushLog(g,`${who(g,first)} drew a card to start turn 1.`)}}
   });
 }
 function mulligan(seat){commit(g=>{const p=P(g,seat);const r=g.rules;p.deck.push(...p.hand,...p.prizes);p.hand=[];p.prizes=[];shuffle(p.deck);p.hand=p.deck.splice(0,Math.min(r.handSize,p.deck.length));p.prizes=p.deck.splice(0,Math.min(r.prizes,p.deck.length));pushLog(g,`${who(g,seat)} had no Basic Pokémon and mulliganed (reshuffled, redrew ${r.handSize}, reset prizes).${r.mulliganDraw?` ${who(g,other(seat))} may draw ${r.mulliganDraw} extra card${r.mulliganDraw>1?'s':''}.`:''}`)})}
