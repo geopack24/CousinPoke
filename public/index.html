@@ -225,7 +225,7 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const TYPES=['Grass','Fire','Water','Lightning','Psychic','Fighting','Colorless'];
 const TCOL={Grass:'#4caf50',Fire:'#f4511e',Water:'#2196f3',Lightning:'#fdd835',Psychic:'#9c27b0',Fighting:'#a1887f',Colorless:'#e0e0e0'};
-const DEFAULT_RULES={deckSize:60,prizes:6,handSize:7,benchSize:5,maxCopies:4,firstTurnAttack:true,autoDraw:true,mulliganDraw:1,colorlessCosts:true,noAttackAfterRetreat:true,unlimitedTrainers:true,conditionsPersist:true,banned:["Imposter Oak's Revenge",'Lass','Scoop Up'],limits:{'Energy Removal':2,'Super Energy Removal':2},notes:''};
+const DEFAULT_RULES={deckSize:60,prizes:6,handSize:7,benchSize:5,maxCopies:4,firstTurnAttack:true,autoDraw:true,mulliganDraw:1,colorlessCosts:true,noAttackAfterRetreat:true,unlimitedTrainers:true,conditionsPersist:true,banned:["Imposter Oak's Revenge",'Lass','Scoop Up','Gust of Wind'],limits:{'Energy Removal':2,'Super Energy Removal':2},notes:''};
 const R=r=>Object.assign({},DEFAULT_RULES,r||{});
 const STATUS=[['SLP','Asleep'],['CNF','Confused'],['PAR','Paralyzed'],['PSN','Poisoned']];
 
