@@ -229,7 +229,7 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const TYPES=['Grass','Fire','Water','Lightning','Psychic','Fighting','Colorless'];
 const TCOL={Grass:'#4caf50',Fire:'#f4511e',Water:'#2196f3',Lightning:'#fdd835',Psychic:'#9c27b0',Fighting:'#a1887f',Colorless:'#e0e0e0'};
-const DEFAULT_RULES={deckSize:60,prizes:6,handSize:7,benchSize:5,maxCopies:4,firstTurnAttack:true,autoDraw:true,mulliganDraw:1,colorlessCosts:true,noAttackAfterRetreat:true,unlimitedTrainers:true,conditionsPersist:true,deckOutDamage:true,banned:["Imposter Oak's Revenge",'Lass','Scoop Up','Gust of Wind'],limits:{'Energy Removal':2,'Super Energy Removal':2},notes:''};
+const DEFAULT_RULES={deckSize:60,prizes:6,handSize:7,benchSize:5,maxCopies:4,firstTurnAttack:true,autoDraw:true,mulliganDraw:1,colorlessCosts:true,noAttackAfterRetreat:true,unlimitedTrainers:true,conditionsPersist:true,deckOutDamage:true,multiEvolve:true,banned:["Imposter Oak's Revenge",'Lass','Scoop Up','Gust of Wind'],limits:{'Energy Removal':2,'Super Energy Removal':2},notes:''};
 const R=r=>Object.assign({},DEFAULT_RULES,r||{});
 const STATUS=[['SLP','Asleep'],['CNF','Confused'],['PAR','Paralyzed'],['PSN','Poisoned']];
 
@@ -392,6 +392,7 @@ function rulesForm(r,prefix='r'){
     <label class="chk"><input type="checkbox" id="${prefix}-unlimitedTrainers" ${r.unlimitedTrainers?'checked':''}>No limit on Trainer cards per turn</label>
     <label class="chk"><input type="checkbox" id="${prefix}-conditionsPersist" ${r.conditionsPersist?'checked':''}>Special conditions stay on a Pokémon when it is benched</label>
     <label class="chk"><input type="checkbox" id="${prefix}-deckOutDamage" ${r.deckOutDamage?'checked':''}>Running out of cards doesn't lose: take 10 damage on your Active each turn instead</label>
+    <label class="chk"><input type="checkbox" id="${prefix}-multiEvolve" ${r.multiEvolve?'checked':''}>A Pokémon may evolve more than once in the same turn</label>
   </div>
   <div class="grid2" style="margin-top:10px;gap:10px">
     <div><label class="lbl" for="${prefix}-banned" style="display:block">Banned cards (one per line)</label><textarea id="${prefix}-banned" style="min-height:80px">${esc((r.banned||[]).join('\n'))}</textarea></div>
@@ -404,9 +405,9 @@ function canonName(s){s=s.trim().toLowerCase();if(!s)return null;const hit=DATA.
 function readRulesForm(root,prefix='r'){const g=id=>root.querySelector('#'+prefix+'-'+id);const n=(id,d)=>{const v=parseInt(g(id).value,10);return isNaN(v)?d:v};
   const banned=[...new Set(g('banned').value.split(/\r?\n/).map(canonName).filter(Boolean))];
   const limits={};g('limits').value.split(/\r?\n/).forEach(line=>{const m=line.match(/^\s*(.+?)\s*[=:]\s*(\d+)\s*$/);if(m){const nm=canonName(m[1]);if(nm)limits[nm]=parseInt(m[2],10)}});
-  return {deckSize:n('deckSize',60),prizes:n('prizes',6),handSize:n('handSize',7),benchSize:n('benchSize',5),maxCopies:n('maxCopies',4),mulliganDraw:n('mulliganDraw',1),firstTurnAttack:g('firstTurnAttack').checked,autoDraw:g('autoDraw').checked,colorlessCosts:g('colorlessCosts').checked,noAttackAfterRetreat:g('noAttackAfterRetreat').checked,unlimitedTrainers:g('unlimitedTrainers').checked,conditionsPersist:g('conditionsPersist').checked,deckOutDamage:g('deckOutDamage').checked,banned,limits,notes:g('notes').value.trim()}}
+  return {deckSize:n('deckSize',60),prizes:n('prizes',6),handSize:n('handSize',7),benchSize:n('benchSize',5),maxCopies:n('maxCopies',4),mulliganDraw:n('mulliganDraw',1),firstTurnAttack:g('firstTurnAttack').checked,autoDraw:g('autoDraw').checked,colorlessCosts:g('colorlessCosts').checked,noAttackAfterRetreat:g('noAttackAfterRetreat').checked,unlimitedTrainers:g('unlimitedTrainers').checked,conditionsPersist:g('conditionsPersist').checked,deckOutDamage:g('deckOutDamage').checked,multiEvolve:g('multiEvolve').checked,banned,limits,notes:g('notes').value.trim()}}
 function rulesSummary(r){r=R(r);const bits=[`${r.deckSize}-card decks`,`${r.prizes} prizes`,`${r.handSize}-card hand`,`bench ${r.benchSize}`,`max ${r.maxCopies} copies`,r.firstTurnAttack?'turn-1 attacks allowed':'no turn-1 attack',r.autoDraw?'auto-draw':'manual draw'];
-  if(r.colorlessCosts)bits.push('energy types ignored (all costs colorless)');if(r.noAttackAfterRetreat)bits.push('no attack after retreating');if(r.unlimitedTrainers)bits.push('unlimited Trainers per turn');if(r.conditionsPersist)bits.push('conditions stay when benched');if(r.deckOutDamage)bits.push('deck-out deals 10 to your Active instead of losing');
+  if(r.colorlessCosts)bits.push('energy types ignored (all costs colorless)');if(r.noAttackAfterRetreat)bits.push('no attack after retreating');if(r.unlimitedTrainers)bits.push('unlimited Trainers per turn');if(r.conditionsPersist)bits.push('conditions stay when benched');if(r.deckOutDamage)bits.push('deck-out deals 10 to your Active instead of losing');if(r.multiEvolve)bits.push('multiple evolutions per turn allowed');
   const lim=Object.entries(r.limits||{});if(lim.length)bits.push('limits: '+lim.map(([k,v])=>`${k} ×${v}`).join(', '));if((r.banned||[]).length)bits.push('banned: '+r.banned.join(', '));return bits.join(' · ')}
 
 function renderLobby(main){
