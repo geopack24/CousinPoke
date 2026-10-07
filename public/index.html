@@ -681,7 +681,8 @@ function monMenu(g,seat,pid,anchor){
   const items=[{label:'View card',fn:()=>viewCard(m.c)},{label:'Set damage…',fn:()=>askNumber(`Damage on ${c.name}`,m.dmg,v=>commit(g=>{const f=findMon(g,pid);if(!f)return;f.m.dmg=Math.max(0,Math.round(v/10)*10);pushLog(g,`${me} set ${owner}'s ${c.name} to ${f.m.dmg} damage`)}))},{sep:true}];
   STATUS.forEach(([code,label])=>items.push({label:(m.st.includes(code)?'✓ ':'')+label,fn:()=>commit(g=>{const f=findMon(g,pid);if(!f)return;const has=f.m.st.includes(code);if(has)f.m.st=f.m.st.filter(x=>x!==code);else{if(code!=='PSN')f.m.st=f.m.st.filter(x=>x==='PSN');f.m.st.push(code)}pushLog(g,`${owner}'s ${c.name} is ${has?'no longer':'now'} ${label}`)})}));
   if(m.st.length)items.push({label:'Clear all conditions',fn:()=>commit(g=>{const f=findMon(g,pid);if(!f)return;f.m.st=[];pushLog(g,`${owner}'s ${c.name} recovered from all special conditions`)})});
-  if(!own&&m.en.length)items.push({sep:true},{label:'Discard an attached card… (Energy Removal)',fn:()=>attachedMenu(g,f.seat,pid,true)});
+  if(!own){items.push({sep:true});if(m.en.length)items.push({label:'Discard an attached card… (Energy Removal)',fn:()=>attachedMenu(g,f.seat,pid,true)});
+    items.push({label:'Knocked Out (everything to their discard)',danger:true,fn:()=>commit(g=>{const r=removeMon(g,pid);if(!r)return;P(g,r.seat).discard.push(...monCards(r.m));pushLog(g,`${owner}'s ${c.name} was Knocked Out (marked by ${whoDo()}). ${owner} takes a prize.`)})});}
   if(own){
     items.push({sep:true});
     const isActive=f.p.active&&f.p.active.id===pid;
