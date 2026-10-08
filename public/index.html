@@ -147,7 +147,10 @@ textarea{width:100%;min-height:60px;resize:vertical}
 .mon .poke{position:relative}
 .mon .attn{font-size:10px;font-weight:800;text-align:center;opacity:.8;margin-top:3px}
 .mon .sts{position:absolute;left:2px;bottom:6px;display:flex;flex-direction:column;gap:2px}
-.mon .sts span{background:#fff;color:#111;border-radius:4px;padding:0 4px;font-size:9px;font-weight:900;letter-spacing:.04em;box-shadow:0 1px 2px rgba(0,0,0,.4)}
+.mon .sts span{background:#fff;color:#111;border-radius:5px;padding:2px 6px;font-size:11px;font-weight:900;letter-spacing:.03em;box-shadow:0 1px 3px rgba(0,0,0,.5);white-space:nowrap}
+.legend{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:6px 4px 0;color:var(--felt-fg)}
+.legend span{border-radius:5px;padding:2px 8px;font-weight:800;background:#fff;color:#111}
+.legend span.PSN{background:#b04bd6;color:#fff}.legend span.SLP{background:#4b6fd6;color:#fff}.legend span.PAR{background:#f2c200}.legend span.CNF{background:#e8642d;color:#fff}.legend span.FX{background:#1f2a44;color:#cfe3ff}.legend span.muted{background:transparent;color:var(--felt-fg);opacity:.8;font-weight:600}
 .mon .sts span.PSN{background:#b04bd6;color:#fff}.mon .sts span.SLP{background:#4b6fd6;color:#fff}.mon .sts span.PAR{background:#f2c200}.mon .sts span.CNF{background:#e8642d;color:#fff}
 .mon .att{display:flex;gap:3px;flex-wrap:wrap;justify-content:center;margin-top:3px;max-width:calc(240px*var(--s) + 20px)}
 .mon .att i{width:14px;height:14px;border-radius:50%;border:1px solid rgba(0,0,0,.4);display:inline-block;box-shadow:0 1px 2px rgba(0,0,0,.3)}
@@ -634,7 +637,7 @@ function renderGame(main){
 function monHTML(m,seat,active,canTouch){const c=C(m.c);const hp=c.hp;const sc=active?.42:.34;
   const step=Math.round(330*sc*0.13);const n=m.en.length;
   const stack=m.en.map((x,i)=>`<div class="attc" style="top:${i*step}px;z-index:${i+1}">${cardHTML(x.c,sc)}</div>`).join('');
-  return `<div class="mon ${active?'active':''}" data-mon="${m.id}" tabindex="0"><div class="cdwrap" style="padding-top:${n*step}px">${stack}<div class="poke" style="z-index:${n+1}">${cardHTML(m.c,sc)}${hp?`<span class="hp">${Math.max(0,hp-m.dmg)}/${hp}</span>`:''}${m.dmg?`<span class="dmg">${m.dmg}</span>`:''}${m.st.length?`<div class="sts">${m.st.map(s=>`<span class="${s}">${s}</span>`).join('')}</div>`:''}${m.un.length?`<span class="stk">+${m.un.length} under</span>`:''}${canTouch?`<div class="dbtn"><button type="button" data-d="-${m.id}" title="Remove 10 damage">−</button><button type="button" data-d="+${m.id}" title="Add 10 damage">+</button></div>`:''}</div></div>${n?`<div class="attn">${n} attached</div>`:''}</div>`}
+  return `<div class="mon ${active?'active':''}" data-mon="${m.id}" tabindex="0"><div class="cdwrap" style="padding-top:${n*step}px">${stack}<div class="poke" style="z-index:${n+1}">${cardHTML(m.c,sc)}${hp?`<span class="hp">${Math.max(0,hp-m.dmg)}/${hp}</span>`:''}${m.dmg?`<span class="dmg">${m.dmg}</span>`:''}${m.st.length?`<div class="sts">${m.st.map(s=>`<span class="${s}" title="${({SLP:'Asleep',CNF:'Confused',PAR:'Paralyzed',PSN:'Poisoned',RTR:'Retreated this turn'})[s]||s}">${({SLP:'Zz',CNF:'?!',PAR:'⚡',PSN:'☠',RTR:'↩'})[s]||''} ${active?({SLP:'Asleep',CNF:'Confused',PAR:'Paralyzed',PSN:'Poisoned',RTR:'Retreated'})[s]||s:s}</span>`).join('')}</div>`:''}${m.un.length?`<span class="stk">+${m.un.length} under</span>`:''}${canTouch?`<div class="dbtn"><button type="button" data-d="-${m.id}" title="Remove 10 damage">−</button><button type="button" data-d="+${m.id}" title="Add 10 damage">+</button></div>`:''}</div></div>${n?`<div class="attn">${n} attached</div>`:''}</div>`}
 
 function renderSetup(main,g){
   const my=mySeat(g);const host=g.host===uid;const both=g.seats.a.uid&&g.seats.b.uid;const ready=both&&g.seats.a.deckId&&g.seats.b.deckId;

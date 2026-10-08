@@ -122,7 +122,8 @@ export function render(main, doc) {
     <button type="button" data-act="more">More…</button>` : '<span class="small">Watching</span>';
   main.innerHTML = `<div class="tablewrap"><div class="board auto">${sideHTML(top, true)}
     <div class="midbar"><span class="turn ${myTurn ? 'mine' : ''}">${statusLine}</span>${doc.inflight && !inflightMine ? `<span class="chip">Waiting for ${esc(g.seats[doc.inflight.prompt.seat].name)}…</span>` : ''}<span class="grow"></span>${buttons}</div>
-    ${sideHTML(bottom, false)}</div>
+    ${sideHTML(bottom, false)}
+    <div class="legend small"><span class="SLP">Zz Asleep</span><span class="CNF">?! Confused</span><span class="PAR">⚡ Paralyzed</span><span class="PSN">☠ Poisoned</span><span class="FX">SHIELD / BARRIER / DEF: protection in effect</span><span class="muted">Badges show only while a condition is on that Pokémon.</span></div></div>
     <aside class="logpane panel"><div class="row"><h3 class="grow">${esc(doc.name)}</h3><span class="chip">Auto rules</span><button class="sm" type="button" data-act="rules">Rules</button></div>
     <div class="entries" id="logentries">${g.log.slice().reverse().map((e) => `<div class="e ${e.k === 'chat' ? 'chat' : ''}">${e.k === 'chat' ? `<b>${esc(e.n)}:</b> ${esc(e.m)}` : esc(e.m)}<span class="t">${e.turn != null ? 'T' + e.turn : ''}</span></div>`).join('')}</div>
     ${me ? `<form id="chat"><input type="text" id="chatin" placeholder="Say something" maxlength="200" class="grow" autocomplete="off"><button class="sm" type="submit">Send</button></form>` : ''}</aside></div>`;
@@ -145,8 +146,9 @@ function monHTML(m, seat, active, promoteClick) {
   const c = C(m.c); const hp = c.hp; const sc = active ? .42 : .34; const step = Math.round(330 * sc * 0.13);
   const att = [...m.en, ...m.tools]; const n = att.length;
   const stack = att.map((x, i) => `<div class="attc" style="top:${i * step}px;z-index:${i + 1}">${PT.cardHTML(x.c, sc)}</div>`).join('');
+  const GL = { SLP: 'Zz', CNF: '?!', PAR: '⚡', PSN: '☠' }; const stChips = m.st.map((s) => `<span class="${s}" title="${STATUS_NAMES[s]}">${GL[s]} ${active ? STATUS_NAMES[s] : s}</span>`).join('');
   const fxChips = m.fx.filter((f) => ['preventDamage', 'preventAll', 'preventSmall', 'defender', 'plusPower', 'destinyBond', 'sandAttack', 'noAttack'].includes(f.k)).map((f) => `<span class="FX">${{ preventDamage: 'SHIELD', preventAll: 'BARRIER', preventSmall: 'HARDEN', defender: 'DEF', plusPower: '+10', destinyBond: 'BOND', sandAttack: 'SAND', noAttack: 'AMNESIA' }[f.k]}</span>`).join('');
-  return `<div class="mon ${active ? 'active' : ''} ${promoteClick ? 'glow' : ''}" data-mon="${m.id}" tabindex="0"><div class="cdwrap" style="padding-top:${n * step}px">${stack}<div class="poke" style="z-index:${n + 1}">${PT.cardHTML(m.c, sc)}${hp ? `<span class="hp">${Math.max(0, hp - m.dmg)}/${hp}</span>` : ''}${m.dmg ? `<span class="dmg">${m.dmg}</span>` : ''}${m.st.length || fxChips ? `<div class="sts">${m.st.map((s) => `<span class="${s}">${s}</span>`).join('')}${fxChips}</div>` : ''}${m.un.length ? `<span class="stk">+${m.un.length} under</span>` : ''}</div></div>${n ? `<div class="attn">${n} attached</div>` : ''}</div>`;
+  return `<div class="mon ${active ? 'active' : ''} ${promoteClick ? 'glow' : ''}" data-mon="${m.id}" tabindex="0"><div class="cdwrap" style="padding-top:${n * step}px">${stack}<div class="poke" style="z-index:${n + 1}">${PT.cardHTML(m.c, sc)}${hp ? `<span class="hp">${Math.max(0, hp - m.dmg)}/${hp}</span>` : ''}${m.dmg ? `<span class="dmg">${m.dmg}</span>` : ''}${m.st.length || fxChips ? `<div class="sts">${stChips}${fxChips}</div>` : ''}${m.un.length ? `<span class="stk">+${m.un.length} under</span>` : ''}</div></div>${n ? `<div class="attn">${n} attached</div>` : ''}</div>`;
 }
 
 /* ---------- menus ---------- */
