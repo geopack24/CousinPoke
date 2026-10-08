@@ -155,7 +155,7 @@ test('Energy Removal, PlusPower, Defender, Scrunch', () => {
   assert.equal(g.p.a.active.dmg, 0, '10 damage minus Defender 20');
   assert.equal(g.p.a.active.tools.length, 0, 'Defender discarded at the end of the opponent turn');
   // Scrunch heads prevents Jab next turn
-  let h = setup({ a: { active: { c: N['Chansey'], en: [N['Double Colorless Energy']] } }, b: { active: { c: N['Hitmonchan'], en: [N['Fighting Energy']] }, deck: [N['Bill']] } });
+  let h = setup({ a: { active: { c: N['Chansey'], en: [N['Double Colorless Energy']] }, deck: [N['Bill']] }, b: { active: { c: N['Hitmonchan'], en: [N['Fighting Energy']] }, deck: [N['Bill']] } });
   h = act(h, { type: 'attack', index: 0 }, { seed: HEADS });
   h = act(h, { type: 'attack', index: 0 }, { seat: 'b' });
   assert.equal(h.p.a.active.dmg, 0, 'Scrunch prevented the damage');
