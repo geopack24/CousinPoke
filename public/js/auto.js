@@ -37,8 +37,19 @@ export async function submit(action, answers = []) {
     if (r.prompt.seat === mySeat(doc)) { const ans = await promptModal(r.prompt); if (ans == null) return; return submit(action, [...answers, ans]); }
     doc.inflight = { action, prompt: r.prompt }; await PT.saveGame(doc); PT.render(); return;
   }
+  doc.prev = undoable(action, r.events) ? { state: doc.state, seat, label: action.type } : null;
   doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner;
   playEvents(r.events, doc); await PT.saveGame(doc); PT.render();
+}
+/** A move can be undone only if it revealed nothing: no flip, draw, search, prize, and it didn't hand the turn over. */
+function undoable(action, events) {
+  if (['chat', 'endTurn', 'attack', 'takePrize', 'mulligan', 'mulliganDraw', 'concede', 'override', 'setupDone'].includes(action.type)) return false;
+  return !events.some((e) => ['flip', 'draw', 'shuffle', 'prize', 'turn', 'ko', 'win'].includes(e.t));
+}
+async function undo(doc) {
+  if (!doc.prev || doc.prev.seat !== mySeat(doc)) { PT.toast('Nothing to undo'); return; }
+  const g = doc.prev.state; g.log.push({ t: Date.now(), turn: g.turnNo, m: `${g.seats[doc.prev.seat].name} undid their last move (${doc.prev.label})` });
+  doc.state = g; doc.prev = null; doc.inflight = null; await PT.saveGame(doc); PT.render();
 }
 
 /* ---------- prompts ---------- */
@@ -105,6 +116,7 @@ export function render(main, doc) {
     ${g.phase === 'setup' && legal.some((a) => a.type === 'mulligan') ? '<button type="button" data-act="mulligan">Mulligan (no Basic)</button>' : ''}
     ${g.phase === 'setup' && legal.some((a) => a.type === 'setupDone') ? '<button type="button" class="pri" data-act="setupDone">Ready</button>' : ''}
     ${pending && pending.t === 'mulliganDraw' && pending.seat === me ? `<button type="button" class="pri" data-act="mulliganDraw1">Draw ${pending.n} extra</button><button type="button" data-act="mulliganDraw0">Skip</button>` : ''}
+    ${doc.prev && doc.prev.seat === me && !g.winner ? '<button type="button" data-act="undo" title="Undo your last move (only moves that revealed nothing)">Undo</button>' : ''}
     ${myTurn ? '<button type="button" class="pri" data-act="end">End turn</button>' : ''}
     ${inflightMine ? '<button type="button" class="pri" data-act="answer">Answer the prompt</button>' : ''}
     <button type="button" data-act="more">More…</button>` : '<span class="small">Watching</span>';
@@ -141,6 +153,7 @@ function monHTML(m, seat, active, promoteClick) {
 function onButton(act, btn, doc, legal, me) {
   const g = doc.state;
   if (act === 'end') return submit({ type: 'endTurn' });
+  if (act === 'undo') return undo(doc);
   if (act === 'setupDone') return submit({ type: 'setupDone' });
   if (act === 'mulligan') return submit({ type: 'mulligan' });
   if (act === 'mulliganDraw1') return submit({ type: 'mulliganDraw', n: g.pending[0].n });
@@ -162,7 +175,7 @@ async function answerInflight(doc) {
   const r = apply(doc.state, action, PT.CARDS);
   if (r.error) { PT.toast(r.error); return; }
   if (r.prompt) { if (r.prompt.seat === mySeat(doc)) { doc.inflight = { action, prompt: r.prompt }; return answerInflight(doc); } doc.inflight = { action, prompt: r.prompt }; await PT.saveGame(doc); PT.render(); return; }
-  doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner; playEvents(r.events, doc); await PT.saveGame(doc); PT.render();
+  doc.prev = null; doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner; playEvents(r.events, doc); await PT.saveGame(doc); PT.render();
 }
 function handMenu(doc, legal, iid, anchor) {
   const g = doc.state; const me = mySeat(doc); const card = g.p[me].hand.find((c) => c.id === iid); if (!card) return; const c = C(card.c);
