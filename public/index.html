@@ -200,7 +200,18 @@ textarea{width:100%;min-height:60px;resize:vertical}
 #hover{position:fixed;z-index:70;pointer-events:none;display:none}
 #hover .cd{--s:1;box-shadow:0 6px 24px rgba(0,0,0,.5)}
 @media (pointer:coarse){#hover{display:none!important}}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+#menu button:disabled{opacity:.45;cursor:not-allowed}
+.cd.can{outline:3px solid var(--accent);outline-offset:-3px}
+.glow{box-shadow:0 0 0 3px var(--accent),0 0 18px var(--accent);border-radius:8px}
+.mon.hit .poke{animation:shake .5s}
+.mon.lunge .poke{animation:lunge .45s}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+@keyframes lunge{0%,100%{transform:translateY(0)}40%{transform:translateY(-14px) scale(1.06)}}
+.float-dmg{position:absolute;left:50%;top:10%;transform:translateX(-50%);font-family:var(--display);font-size:26px;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.7),0 0 2px var(--danger);animation:floatup .9s forwards;pointer-events:none;z-index:9}
+.float-dmg.heal{text-shadow:0 2px 6px rgba(0,0,0,.7),0 0 2px var(--ok)}
+@keyframes floatup{0%{opacity:0;transform:translate(-50%,10px)}20%{opacity:1}100%{opacity:0;transform:translate(-50%,-40px)}}
+.mon .sts span.FX{background:#1f2a44;color:#cfe3ff}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
@@ -261,8 +272,8 @@ function showMenu(items,anchor,title){
   closeMenu();const m=document.createElement('div');m.id='menu';
   if(title)m.innerHTML=`<div class="mh">${esc(title)}</div>`;
   items.forEach(it=>{if(it.sep){m.appendChild(document.createElement('hr'));return}
-    const b=document.createElement('button');b.type='button';b.textContent=it.label;if(it.danger)b.className='dng';
-    b.onclick=e=>{e.stopPropagation();closeMenu();it.fn()};m.appendChild(b)});
+    const b=document.createElement('button');b.type='button';b.textContent=it.label;if(it.danger)b.className='dng';if(it.disabled)b.disabled=true;
+    b.onclick=e=>{e.stopPropagation();if(it.disabled)return;closeMenu();it.fn()};m.appendChild(b)});
   document.body.appendChild(m);
   const r=anchor&&anchor.getBoundingClientRect?anchor.getBoundingClientRect():{left:innerWidth/2,right:innerWidth/2,top:innerHeight/2,bottom:innerHeight/2};
   let x=r.left,y=r.bottom+4;const mw=m.offsetWidth,mh=m.offsetHeight;
@@ -271,10 +282,10 @@ function showMenu(items,anchor,title){
   setTimeout(()=>{if($('#menu')===m)document.addEventListener('click',closeMenu)},0);
 }
 function closeModal(){const m=$('#modal-bg');if(m)m.remove()}
-function showModal(title,body,foot,bind){
-  closeModal();const bg=document.createElement('div');bg.id='modal-bg';
+function showModal(title,body,foot,bind,opts){
+  closeModal();const bg=document.createElement('div');bg.id='modal-bg';opts=opts||{};
   bg.innerHTML=`<div id="modal" role="dialog" aria-label="${esc(title)}"><div class="mh"><h3 class="grow">${esc(title)}</h3><button type="button" class="sm" data-close>Close</button></div><div class="mb">${body}</div>${foot?`<div class="mf">${foot}</div>`:''}</div>`;
-  bg.addEventListener('click',e=>{if(e.target===bg||e.target.hasAttribute('data-close'))closeModal()});
+  bg.addEventListener('click',e=>{if((e.target===bg&&!opts.noBackdropClose)||e.target.hasAttribute('data-close'))closeModal()});
   document.body.appendChild(bg);if(bind)bind(bg.querySelector('#modal'));
 }
 function askNumber(title,def,cb){showModal(title,`<input type="number" id="askn" value="${def}" min="0" step="1" style="width:8em">`,`<button class="pri" id="askok" type="button">OK</button>`,m=>{const i=m.querySelector('#askn');i.focus();i.select();const ok=()=>{const v=parseInt(i.value,10);closeModal();if(!isNaN(v))cb(v)};m.querySelector('#askok').onclick=ok;i.onkeydown=e=>{if(e.key==='Enter')ok()}})}
@@ -302,7 +313,7 @@ async function api(method,path,body){
   if(!r.ok&&!(r.status===409&&d&&d.conflict)){const err=new Error((d&&d.message)||('HTTP '+r.status));err.code=(d&&d.error)||r.status;throw err}
   return d;
 }
-function initIdentity(){uid=ls.get('pid',null);if(!uid||!/^p_[a-z0-9]{8,}$/.test(uid)){uid='p_'+rid()+rid();ls.set('pid',uid)}S.name=ls.get('name','')}
+function initIdentity(){const qp=new URLSearchParams(location.search).get('pid');if(qp&&/^p_[a-z0-9]{8,}$/.test(qp)){uid=qp;S.name=ls.get('name:'+qp,'')||'';return}uid=ls.get('pid',null);if(!uid||!/^p_[a-z0-9]{8,}$/.test(uid)){uid='p_'+rid()+rid();ls.set('pid',uid)}S.name=ls.get('name','')}
 async function savePlayerName(n,quiet){S.name=n;ls.set('name',n);renderHeader();try{await api('PUT','players/'+uid,{data:{name:n,updatedAt:Date.now()}})}catch(e){if(!quiet)toast('Could not save name ('+(e.code||'error')+')')}}
 function nameOf(id){if(!id)return 'Empty';if(id===uid&&S.name)return S.name;const p=S.players[id];if(p&&p.name)return p.name;return 'Player'}
 let syncTimer=null,syncing=false;const lastSig={};
@@ -420,7 +431,7 @@ function renderLobby(main){
       <div class="panel">
         <div class="row" style="margin-bottom:10px"><h2 class="grow">Tables</h2>${online?`<button class="pri" id="newgame" type="button">New table</button>`:''}</div>
         ${games.length?`<div class="list">${games.map(g=>{const a=g.seats?.a||{},b=g.seats?.b||{};const mine=a.uid===uid||b.uid===uid;const open=(!a.uid||!b.uid)&&g.status==='lobby';
-          return `<div class="item"><div class="grow"><div class="t">${esc(g.name)}</div><div class="small muted">${g.status==='lobby'?'Setting up':g.status==='playing'?`In play · turn ${g.state?.turnNo||1}`:'Finished'} · host ${esc(nameOf(g.host))}</div>
+          return `<div class="item"><div class="grow"><div class="t">${esc(g.name)}</div><div class="small muted">${g.status==='lobby'?'Setting up':g.status==='playing'?`In play · turn ${g.state?.turnNo||1}`:'Finished'} · ${g.mode==='auto'?'auto rules':'tabletop'} · host ${esc(nameOf(g.host))}</div>
             <div class="row" style="margin-top:6px"><span class="seat ${a.uid?'full':''}">${esc(nameOf(a.uid))}</span><span class="muted small">vs</span><span class="seat ${b.uid?'full':''}">${esc(nameOf(b.uid))}</span></div></div>
             <div class="row">${mine?`<button class="sec" data-open="${g.id}" type="button">Open</button>`:open?`<button class="pri" data-join="${g.id}" type="button">Take a seat</button>`:`<button data-open="${g.id}" type="button">Watch</button>`}${g.host===uid?`<button class="sm dng ghost" data-del="${g.id}" type="button" title="Close table">✕</button>`:''}</div></div>`}).join('')}</div>`
           :`<p class="muted">No tables yet. ${online?'Start one and your cousins can take the other seat from their own device.':''}</p>`}
@@ -444,7 +455,11 @@ function renderLobby(main){
   };
 }
 function newGameModal(){
-  showModal('New table',`<label class="lbl" for="gname">Table name</label><input type="text" id="gname" maxlength="40" placeholder="e.g. Thanksgiving grudge match" style="width:100%;margin-bottom:12px"><div class="lbl" style="margin-bottom:6px">Rules</div>${rulesForm(DEFAULT_RULES)}`,`<button class="pri" id="gok" type="button">Create table</button>`,m=>{m.querySelector('#gname').focus();m.querySelector('#gok').onclick=async()=>{const name=m.querySelector('#gname').value.trim()||`${S.name||'Someone'}'s table`;const rules=readRulesForm(m);const id=rid();closeModal();try{await api('PUT','games/'+id,{data:{name,host:uid,createdAt:Date.now(),updatedAt:Date.now(),status:'lobby',rules,seats:{a:{uid,deckId:null,deckName:null},b:{uid:null,deckId:null,deckName:null}},state:null,log:[],v:0}});openGame(id)}catch(e){toast('Could not create table ('+(e.code||'error')+')')}}});
+  showModal('New table',`<label class="lbl" for="gname">Table name</label><input type="text" id="gname" maxlength="40" placeholder="e.g. Thanksgiving grudge match" style="width:100%;margin-bottom:12px">
+    <div class="lbl" style="margin-bottom:6px">How the table runs</div>
+    <label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px"><input type="radio" name="gmode" value="auto" checked><span><b>Automated rules</b><br><span class="small muted">The table enforces energy, timing, damage, conditions and prizes. Base Set cards are fully scripted; cards from other sets without text work too, and anything else has a Fix menu.</span></span></label>
+    <label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:12px"><input type="radio" name="gmode" value="manual"><span><b>Tabletop</b><br><span class="small muted">The table only moves cards and counts damage. You apply every effect yourselves.</span></span></label>
+    <div class="lbl" style="margin-bottom:6px">Rules</div>${rulesForm(DEFAULT_RULES)}`,`<button class="pri" id="gok" type="button">Create table</button>`,m=>{m.querySelector('#gname').focus();m.querySelector('#gok').onclick=async()=>{const name=m.querySelector('#gname').value.trim()||`${S.name||'Someone'}'s table`;const rules=readRulesForm(m);const mode=(m.querySelector('input[name=gmode]:checked')||{}).value||'auto';const id=rid();closeModal();try{await api('PUT','games/'+id,{data:{name,mode,host:uid,createdAt:Date.now(),updatedAt:Date.now(),status:'lobby',rules,seats:{a:{uid,deckId:null,deckName:null},b:{uid:null,deckId:null,deckName:null}},state:null,log:[],v:0}});openGame(id)}catch(e){toast('Could not create table ('+(e.code||'error')+')')}}});
 }
 async function joinGame(id){
   try{const g=await api('GET','games/'+id);if(!g||g.missing){toast('That table is gone');return}
@@ -556,6 +571,7 @@ async function startGame(){
   const decks={};
   for(const s of ['a','b']){const did=g.seats[s].deckId;if(!did){toast('Both players need a deck');return}
     try{const d=await api('GET','decks/'+did);if(!d||d.missing){toast(`${who(g,s)}'s deck was deleted`);return}decks[s]=d}catch(e){toast('Could not load a deck');return}}
+  if(g.mode==='auto'){commit(g=>{g.state=window.AUTO.startGame(g,decks);g.status='playing';g.startedAt=Date.now();g.inflight=null;g.log=[]});return}
   const first=Math.random()<.5?'a':'b';
   commit(g=>{
     const p={};
@@ -574,6 +590,7 @@ function renderGame(main){
   const g=S.game;
   if(!g){main.innerHTML=`<div class="panel"><p class="muted">Loading table…</p></div>`;return}
   if(g.status==='lobby')return renderSetup(main,g);
+  if(g.mode==='auto'){if(!window.AUTO){main.innerHTML='<div class="panel muted">Loading the rules engine…</div>';return}return window.AUTO.render(main,g)}
   const my=mySeat(g);const bottom=my||'a';const top=other(bottom);const r=g.rules;const st=g.state;
   const isTurn=s=>st.turn===s;
   const pileHTML=(seat,z,label,count,faceUp)=>`<div class="z"><span class="zlbl">${label}</span><div class="pile" data-pile="${z}" data-seat="${seat}">${count?(faceUp?cardHTML(faceUp,.34):backHTML(.34)):`<div class="slot">empty</div>`}${count?`<span class="n">${count}</span>`:''}</div></div>`;
@@ -782,8 +799,21 @@ async function start(){
   if(S.name)savePlayerName(S.name,true);
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();closeModal()}});
+async function saveGame(doc){
+  const id=doc.id;const cur=clone(doc);const ver=cur.version;delete cur.id;delete cur.version;cur.updatedAt=Date.now();cur.v=(cur.v||0)+1;
+  try{const r=await api('PUT','games/'+id,{data:cur,ifVersion:ver});
+    if(r&&r.conflict){S.game=r.doc;render();toast('The table changed under you; showing the latest.');return false}
+    if(r&&r.version!=null&&S.game&&S.game.id===id){S.game.version=r.version}return true}
+  catch(e){toast('Could not save ('+(e.code||'error')+')');return false}
+}
+window.PT={esc,get CARDS(){return CARDS},cardHTML,backHTML,cardStyle,showModal,closeModal,showMenu,toast,nameOf,uid:()=>uid,S,saveGame,render,go,viewCard,rulesSummary};
 start();
 })();
+</script>
+<script type="module">
+import { install } from './js/auto.js';
+window.AUTO = install(window.PT);
+if (window.PT && window.PT.S && window.PT.S.screen === 'game') window.PT.render();
 </script>
 </body>
 </html>

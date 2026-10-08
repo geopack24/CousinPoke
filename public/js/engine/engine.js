@@ -172,13 +172,11 @@ function makeCtx(g, db, rng, events, seat, nextAnswer, action) {
     fail(msg) { throw new RuleError(msg); },
     /** Ask the acting player (or `forSeat`) to choose. Returns array of keys. */
     choose(prompt) {
-      const a = nextAnswer();
       const min = prompt.min == null ? 1 : prompt.min, max = prompt.max == null ? 1 : prompt.max;
       if (prompt.options.length === 0) return [];
-      if (a === undefined) {
-        if (prompt.options.length <= min && !prompt.ordered && prompt.options.length) return prompt.options.map((o) => o.key); // forced
-        throw new NeedInput({ ...prompt, min, max, seat: prompt.seat || seat });
-      }
+      if (prompt.options.length <= min && !prompt.ordered) return prompt.options.map((o) => o.key); // forced: never consumes an answer
+      const a = nextAnswer();
+      if (a === undefined) throw new NeedInput({ ...prompt, min, max, seat: prompt.seat || seat });
       const arr = Array.isArray(a) ? a : [a];
       const keys = new Set(prompt.options.map((o) => o.key));
       if (arr.some((k) => !keys.has(k)) || arr.length < min || arr.length > max) throw new RuleError('Invalid choice');
