@@ -12,6 +12,7 @@ export const DEFAULT_RULES = {
   multiEvolve: true,           // a Pokémon may evolve more than once per turn
   confusedRetreatFlip: true,   // confused Pokémon flip to retreat (tails: self damage)
   confusionSelfDamage: 20,     // damage a Confused Pokémon does to itself on a failed flip
+  conditionsStack: true,       // Asleep, Confused and Paralyzed can all be on one Pokémon at once
   banned: ["Imposter Oak's Revenge", 'Lass', 'Scoop Up', 'Gust of Wind'],
   limits: { 'Energy Removal': 2, 'Super Energy Removal': 2 },
   notes: '',

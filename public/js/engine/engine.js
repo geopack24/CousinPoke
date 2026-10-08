@@ -267,7 +267,7 @@ function applyStatus(ctx, target, code) {
   const { db } = ctx;
   if (isDollLike(db, target) && scriptOf(target.c).asPokemon && scriptOf(target.c).asPokemon.noConditions) return false;
   if (hasFx(target, 'preventAll')) return false;
-  if (code !== 'PSN') target.st = target.st.filter((x) => x === 'PSN');
+  if (code !== 'PSN' && !R(ctx.g.rules).conditionsStack) target.st = target.st.filter((x) => x === 'PSN');
   if (!target.st.includes(code)) target.st.push(code);
   ctx.events.push({ t: 'status', target: target.id, code });
   ctx.log(`${nameOf(db, target.c)} is now ${STATUS_NAMES[code]}`);

@@ -92,6 +92,15 @@ test('promotion after knockout, then the turn passes', () => {
   assert.equal(g.p.b.active.c, N['Chansey']); assert.equal(g.turn, 'b'); assert.equal(g.turnNo, 2);
 });
 
+test('conditions stack under the house rule and replace under the official one', () => {
+  let g = setup({ a: { active: { c: N['Drowzee'], en: [N['Psychic Energy'], N['Psychic Energy']] } }, b: { active: { c: N['Chansey'], st: ['PAR'] }, deck: [N['Bill']] } });
+  const stacked = act(g, { type: 'attack', index: 1 }, { seed: HEADS }); // Confuse Ray heads
+  assert.deepEqual(stacked.p.b.active.st.sort(), ['CNF', 'PAR']);
+  g.rules.conditionsStack = false;
+  const replaced = act(g, { type: 'attack', index: 1 }, { seed: HEADS });
+  assert.deepEqual(replaced.p.b.active.st, ['CNF']);
+});
+
 test('status: poison ticks between turns, paralysis clears after owner turn, sleep flips', () => {
   let g = setup({ a: { active: { c: N['Tangela'], en: [N['Grass Energy'], N['Grass Energy'], N['Grass Energy']] } }, b: { active: N['Chansey'], deck: [N['Bill']] } });
   g = act(g, { type: 'attack', index: 1 }); // Poisonpowder 20 + PSN
