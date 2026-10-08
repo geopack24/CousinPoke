@@ -174,7 +174,7 @@ test('Damage Swap moves counters and refuses a knockout', () => {
 test('confused attacker flips; Metronome copies the defender attack', () => {
   let g = setup({ a: { active: { c: N['Hitmonchan'], en: [N['Fighting Energy']], st: ['CNF'] } }, b: { active: N['Chansey'], deck: [N['Bill']] } });
   const hurt = act(g, { type: 'attack', index: 0 }, { seed: TAILS });
-  assert.equal(hurt.p.a.active.dmg, 30); assert.equal(hurt.p.b.active.dmg, 0);
+  assert.equal(hurt.p.a.active.dmg, 20, 'house rule: 20 self-damage'); assert.equal(hurt.p.b.active.dmg, 0);
   const ok = act(g, { type: 'attack', index: 0 }, { seed: HEADS });
   assert.equal(ok.p.b.active.dmg, 40);
   let m = setup({ a: { active: { c: N['Clefairy'], en: [N['Double Colorless Energy'], N['Fighting Energy']] } }, b: { active: N['Hitmonchan'], deck: [N['Bill']] } });

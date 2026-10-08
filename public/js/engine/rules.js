@@ -10,7 +10,8 @@ export const DEFAULT_RULES = {
   conditionsPersist: true,     // special conditions stay when a Pokémon is benched
   deckOutDamage: true,         // empty deck: 10 damage to your Active each turn instead of losing
   multiEvolve: true,           // a Pokémon may evolve more than once per turn
-  confusedRetreatFlip: true,   // confused Pokémon flip to retreat (tails: 30 to itself)
+  confusedRetreatFlip: true,   // confused Pokémon flip to retreat (tails: self damage)
+  confusionSelfDamage: 20,     // damage a Confused Pokémon does to itself on a failed flip
   banned: ["Imposter Oak's Revenge", 'Lass', 'Scoop Up', 'Gust of Wind'],
   limits: { 'Energy Removal': 2, 'Super Energy Removal': 2 },
   notes: '',

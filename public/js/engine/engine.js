@@ -328,7 +328,7 @@ function runAction(ctx, a) {
       const m = p.active; must(m, 'No Active Pokémon'); must(!p.retreatedThisTurn, 'Already retreated this turn'); must(!m.st.includes('SLP') && !m.st.includes('PAR'), "Can't retreat while Asleep or Paralyzed"); must(!hasFx(m, 'noRetreat') && !isDollLike(db, m), "Can't retreat");
       const i = p.bench.findIndex((x) => x.id === a.target); must(i >= 0, 'Not on your bench');
       const rc = db[m.c].rc || 0; must(energyUnits(db, m) >= rc, 'Not enough energy to retreat');
-      if (m.st.includes('CNF') && r.confusedRetreatFlip) { if (!ctx.flip('confused retreat')) { p.retreatedThisTurn = true; ctx.log(`${nameOf(db, m.c)} is Confused and failed to retreat`); dealDamage(ctx, m, 30, { noWR: true, self: true }); checkKOs(ctx); return; } }
+      if (m.st.includes('CNF') && r.confusedRetreatFlip) { if (!ctx.flip('confused retreat')) { p.retreatedThisTurn = true; ctx.log(`${nameOf(db, m.c)} is Confused and failed to retreat`); dealDamage(ctx, m, r.confusionSelfDamage, { noWR: true, self: true }); checkKOs(ctx); return; } }
       if (rc > 0) {
         // pick energy worth at least rc units
         let chosen = []; const pool = m.en.slice();
@@ -344,7 +344,7 @@ function runAction(ctx, a) {
       ctx.log(`${ctx.name(seat)}'s ${nameOf(db, m.c)} used ${atk.n}`); ctx.event({ t: 'attack', attacker: m.id, name: atk.n, type: (db[m.c].types || ['Colorless'])[0] });
       g.attacked = true; g.lastAttack = { seat, attacker: m.id, name: atk.n, turn: g.turnNo };
       let proceed = true;
-      if (m.st.includes('CNF')) { if (!ctx.flip('confusion')) { ctx.log(`${nameOf(db, m.c)} is Confused and hurt itself`); dealDamage(ctx, m, 30, { noWR: true, self: true }); proceed = false; } }
+      if (m.st.includes('CNF')) { if (!ctx.flip('confusion')) { ctx.log(`${nameOf(db, m.c)} is Confused and hurt itself`); dealDamage(ctx, m, R(g.rules).confusionSelfDamage, { noWR: true, self: true }); proceed = false; } }
       if (proceed && hasFx(m, 'sandAttack')) { if (!ctx.flip('Sand-attack')) { ctx.log('The attack does nothing (Sand-attack)'); proceed = false; } }
       if (proceed) runAttack(ctx, m, atk);
       checkKOs(ctx); finishTurnIfClear(ctx); return;
