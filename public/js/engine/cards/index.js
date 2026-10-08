@@ -1,7 +1,9 @@
 // Registry of card scripts. Sets are added here as they get automated.
 import { base1 } from './base1.js';
+import { jungle } from './jungle.js';
+import { rocket } from './rocket.js';
 
-export const CARD_SCRIPTS = Object.assign({}, base1);
+export const CARD_SCRIPTS = Object.assign({}, base1, jungle, rocket);
 
 /** Which cards of a set are fully automated: those with no text, or with a script. */
 export function automationReport(db) {

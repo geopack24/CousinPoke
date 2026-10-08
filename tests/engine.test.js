@@ -215,3 +215,18 @@ test('deck validation and automation coverage for Base Set', () => {
   const missing = base.filter(([, s]) => s === 'missing').map(([id]) => id);
   assert.deepEqual(missing, [], 'every Base Set card is scripted or plain');
 });
+
+test('Jungle Lickitung and Rocket Charmander scripts', () => {
+  let g = setup({ a: { active: { c: 'base2-38', en: [N['Fire Energy'], N['Fire Energy']] } }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  const cnf = act(g, { type: 'attack', index: 1 }, { seed: HEADS });
+  assert.ok(cnf.p.b.active.st.includes('CNF'), 'Supersonic heads confuses');
+  const none = act(g, { type: 'attack', index: 1 }, { seed: TAILS });
+  assert.ok(!none.p.b.active.st.includes('CNF'));
+  let h = setup({ a: { active: { c: N['Chansey'], en: [N['Fire Energy']] }, bench: ['base5-50'] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  const charm = h.p.a.bench[0].id;
+  assert.ok(has(legalActions(h, 'a', DB), 'usePower', { power: 'Gather Fire' }));
+  h = act(h, { type: 'usePower', pokemon: charm, power: 'Gather Fire' });
+  assert.equal(h.p.a.bench[0].en.length, 1); assert.equal(h.p.a.active.en.length, 0);
+  assert.ok(!has(legalActions(h, 'a', DB), 'usePower', { power: 'Gather Fire' }), 'once per turn');
+});
+
