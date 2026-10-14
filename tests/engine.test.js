@@ -268,9 +268,39 @@ test('Jungle and Fossil mechanics: Invisible Wall, Thick Skinned, Kabuto Armor, 
 
 test('every scripted set has no missing cards', () => {
   const rep = automationReport(DB);
-  for (const set of ['base1', 'base2', 'base3']) {
+  for (const set of ['base1', 'base2', 'base3', 'base5']) {
     const missing = Object.entries(rep).filter(([id, s]) => id.startsWith(set + '-') && s === 'missing').map(([id]) => id + ' ' + DB[id].name);
     assert.deepEqual(missing, [], set + ' fully scripted');
   }
+});
+
+test('Team Rocket mechanics: Rainbow Energy, Sinkhole, Sticky Goo, Frenzy, Summon Minions, Goop Gas', () => {
+  // Rainbow Energy hurts on attach
+  let g = setup({ a: { hand: ['base5-17'], active: N['Chansey'], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  g = act(g, { type: 'attach', card: g.p.a.hand[0].id, target: g.p.a.active.id });
+  assert.equal(g.p.a.active.dmg, 10);
+  // Sticky Goo adds 2 to the opponent's retreat cost; Sinkhole hurts on tails
+  let s = setup({ a: { active: { c: N['Pikachu'], en: [N['Lightning Energy']] }, bench: [N['Chansey']], deck: [N['Bill']] }, b: { active: 'base5-41', bench: ['base5-6'], deck: [N['Bill']] } });
+  assert.ok(!has(legalActions(s, 'a', DB), 'retreat'), 'one energy is not enough with Sticky Goo');
+  s.p.a.active.en.push(inst(N['Lightning Energy']), inst(N['Lightning Energy']));
+  const r = actWith(s, { type: 'retreat', target: s.p.a.bench[0].id }, [], { seed: TAILS });
+  assert.ok(!r.error && !r.prompt, r.error || 'prompt?');
+  assert.equal(r.state.p.a.bench[0].dmg, 20, 'Sinkhole 20 on tails');
+  // Frenzy: confused Dark Primeape adds 30
+  let f = setup({ a: { active: { c: 'base5-43', en: [N['Fighting Energy'], N['Fighting Energy']], st: ['CNF'] }, deck: [N['Bill']] }, b: { active: N['Hitmonchan'], deck: [N['Bill']] } });
+  assert.equal(act(f, { type: 'attack', index: 0 }, { seed: HEADS }).p.b.active.dmg, 70, '40 + 30 frenzy');
+  // Summon Minions on evolve
+  let d = setup({ a: { hand: ['base5-5'], active: { c: N['Dragonair'] }, deck: [N['Pikachu'], N['Chansey'], N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  d.p.a.active.playedTurn = 0; d.turnNo = 2;
+  const rr = actWith(d, { type: 'evolve', card: d.p.a.hand[0].id, target: d.p.a.active.id }, []);
+  assert.equal(rr.prompt && rr.prompt.id, 'search');
+  const picks = rr.prompt.options.map((o) => o.key);
+  const done = actWith(d, { type: 'evolve', card: d.p.a.hand[0].id, target: d.p.a.active.id }, [picks]).state;
+  assert.equal(done.p.a.bench.length, 2);
+  // Goop Gas Attack turns Damage Swap off
+  let z = setup({ a: { hand: ['base5-78'], active: { c: N['Chansey'], dmg: 20 }, bench: [N['Alakazam']], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  assert.ok(has(legalActions(z, 'a', DB), 'usePower'));
+  z = act(z, { type: 'playTrainer', card: z.p.a.hand[0].id });
+  assert.ok(!has(legalActions(z, 'a', DB), 'usePower'), 'powers off');
 });
 

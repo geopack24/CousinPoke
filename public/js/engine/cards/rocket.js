@@ -1,29 +1,102 @@
-// Team Rocket scripts (in progress). Cards with plain damage need no entry.
-import { energyTypesOf, nameOf } from '../engine.js';
-import { findMon, mons, pullCard, P } from '../state.js';
+// Team Rocket scripts. Holo and non-holo printings share one script.
+import * as H from './helpers.js';
+const { T, flipStatus, sureStatus, flipTimes, tailsNothing, headsPlus, preventNext, discardTypeThen, extraWater, discardDefenderEnergy, drain, callFor, rage, benchSnipe, countersOn, ownPokemon, findMon, mons, pullCard, P, other, toMon, removeMon, monCards, nameOf, monHP, smokescreen, typeFilter, hasType, energyTypesOf, typeOptions } = H;
 
-const isFire = (ctx, e) => (ctx.g.rules.energyTextAnyType ? true : energyTypesOf(ctx.db, e).includes('Fire'));
+const isFire = (ctx, e) => hasType(ctx, e, 'Fire');
+const oncePerTurn = (flag, inner) => ({ canUse: (a) => (a.m.flags[flag] === a.g.turnNo ? 'Already used this turn' : inner && inner.canUse ? inner.canUse(a) : true), use: (ctx, m) => { m.flags[flag] = ctx.g.turnNo; inner.use(ctx, m); } });
+const snipeAny = (n, opts) => ({ effect: (ctx) => { const all = mons(ctx.opp); if (!all.length) return; const k = ctx.chooseMon(`Choose a Pokémon to take ${n}`, all, { id: 'snipeAny' })[0]; const f = findMon(ctx.g, k); if (opts && opts.before) opts.before(ctx, f.m); if (f.p.active && f.p.active.id === k) ctx.damage(n, { target: f.m, noWR: true }); else ctx.benchDamageOne(k, n); if (opts && opts.after) opts.after(ctx, f.m); } });
+const oppSwitchChoice = (label) => (ctx) => { if (ctx.opp.bench.length && ctx.opp.active) { const k = ctx.chooseMon('Choose the Pokémon to switch in', ctx.opp.bench, { seat: ctx.oppSeat, id: 'oppswitch' })[0]; ctx.switchActive(ctx.oppSeat, k, label); } };
+const mySwitchChoice = (label, optional) => (ctx) => { if (!ctx.me.bench.length) return; const k = ctx.chooseMon(optional ? 'Switch with… (or none)' : 'Switch with…', ctx.me.bench, { id: 'myswitch', min: optional ? 0 : 1 }); if (k.length) ctx.switchActive(ctx.seat, k[0], label); };
 
-export const rocket = {
-  'base5-50': { // Charmander: Gather Fire (once per turn)
-    powers: { 'Gather Fire': {
-      canUse: ({ g, db, seat, m }) => {
-        if (m.flags.gatherFireTurn === g.turnNo) return 'Already used this turn';
-        const src = mons(P(g, seat)).some((x) => x.id !== m.id && x.en.some((e) => g.rules.energyTextAnyType || energyTypesOf(db, e).includes('Fire')));
-        return src ? true : 'No Fire Energy on your other Pokémon';
-      },
-      use: (ctx, m) => {
-        const srcs = mons(ctx.me).filter((x) => x.id !== m.id && x.en.some((e) => isFire(ctx, e)));
-        const from = ctx.chooseMon('Take a Fire Energy from…', srcs, { id: 'gatherFrom' })[0]; const fm = findMon(ctx.g, from).m;
-        const card = ctx.chooseCards('Which Fire Energy?', fm.en.filter((e) => isFire(ctx, e)), { id: 'gatherCard' })[0];
-        const c = pullCard(ctx.g, card); m.en.push(c); m.flags.gatherFireTurn = ctx.g.turnNo;
-        ctx.log(`Gather Fire: moved ${nameOf(ctx.db, c.c)} from ${nameOf(ctx.db, fm.c)} to Charmander`); ctx.event({ t: 'attach', card: c, target: m.id });
-      } } },
-  },
-  'base5-32': { attacks: { // Dark Charmeleon
-    Fireball: {
-      canUse: ({ g, db, m }) => (m.en.some((e) => g.rules.energyTextAnyType || energyTypesOf(db, e).includes('Fire')) ? null : 'Needs a Fire Energy attached'),
-      effect: (ctx, m) => { if (ctx.flip()) { ctx.requireDiscardEnergy(m, 1, (e) => isFire(ctx, e), 'Discard 1 Fire Energy for Fireball'); ctx.damage(70); } else ctx.log('Fireball does nothing'); },
-    },
+const byName = {
+  'Dark Alakazam': { attacks: { 'Teleport Blast': { effect: (ctx) => { ctx.damage(30); mySwitchChoice('Teleport Blast', true)(ctx); } }, 'Mind Shock': { effect: (ctx) => ctx.damage(40, { noWR: true }) } } },
+  'Dark Arbok': { attacks: {
+    Stare: snipeAny(10, { after: (ctx, m) => { if (ctx.db[m.c].pw && ctx.db[m.c].pw.length) { ctx.addFx(m, { k: 'powerOff', until: T(ctx) + 1 }); ctx.log(`${nameOf(ctx.db, m.c)}'s power stops working until the end of the next turn`); } } }),
+    'Poison Vapor': { effect: (ctx) => { ctx.damage(10); ctx.status('PSN'); ctx.benchDamage(ctx.oppSeat, 10); } },
   } },
+  'Dark Blastoise': { attacks: { Hydrocannon: { effect: (ctx, m) => { const extra = Math.min(2, Math.max(0, H.countType(ctx, m, 'Water') - 2)); ctx.damage(30 + 20 * extra); } }, 'Rocket Tackle': { effect: (ctx, m) => { ctx.damage(40); ctx.selfDamage(10); if (ctx.flip()) ctx.addFx(m, { k: 'preventDamage', until: T(ctx) + 1 }); } } } },
+  'Dark Charizard': { attacks: { 'Continuous Fireball': { effect: (ctx, m) => { const fires = m.en.filter((e) => isFire(ctx, e)); const h = ctx.flips(fires.length); if (h) { ctx.damage(50 * h); ctx.discardEnergy(m, fires.slice(0, h)); } else ctx.log('No heads'); } } } },
+  'Dark Dragonite': { onPlay: (ctx, m) => { const room = ctx.g.rules.benchSize - ctx.me.bench.length; if (room <= 0) return; const got = ctx.searchDeck(ctx.seat, 'Summon Minions: choose up to 2 Basic Pokémon', (c) => c.st === 'Pokémon' && c.sub === 'Basic', { min: 0, max: Math.min(2, room) }); for (const c of got) ctx.me.bench.push(toMon(c, ctx.g.turnNo)); ctx.shuffle(ctx.seat); ctx.log(`Summon Minions: ${got.length} Basic Pokémon to the bench`); }, attacks: { 'Giant Tail': tailsNothing(70) } },
+  'Dark Dugtrio': { passive: { onOpponentRetreat: (ctx, dug, retreating) => { if (!ctx.flip('Sinkhole')) { retreating.dmg += 20; ctx.log(`Sinkhole: 20 damage to ${nameOf(ctx.db, retreating.c)} (now ${retreating.dmg})`); ctx.event({ t: 'damage', target: retreating.id, amount: 20 }); } } }, attacks: { 'Knock Down': { effect: (ctx) => ctx.damage(ctx.flip('opponent flips') ? 20 : 40) } } },
+  'Dark Golbat': { onPlay: (ctx, m) => { const all = mons(ctx.opp); if (!all.length) return; const k = ctx.chooseMon('Sneak Attack: 10 damage to which Pokémon? (or none)', all, { id: 'sneak', min: 0 }); if (!k.length) return; const f = findMon(ctx.g, k[0]); const was = ctx.attacker; ctx.attacker = m; if (f.p.active && f.p.active.id === k[0]) ctx.damage(10, { target: f.m }); else ctx.benchDamageOne(k[0], 10); ctx.attacker = was; }, attacks: { Flitter: snipeAny(20) } },
+  'Dark Gyarados': { passive: { onKnockedOut: (ctx, m, attacker) => { if (ctx.flip('Final Beam')) { const n = 20 * H.countType(ctx, m, 'Water'); if (n) { const was = ctx.attacker; ctx.attacker = m; ctx.damage(n, { target: attacker }); ctx.attacker = was; } } } }, attacks: { 'Ice Beam': flipStatus(30, 'PAR') } },
+  'Dark Hypno': { attacks: { 'Bench Manipulation': { effect: (ctx) => { const n = ctx.opp.bench.length; let tails = 0; for (let i = 0; i < n; i++) if (!ctx.flip('opponent flips')) tails++; if (tails) ctx.damage(20 * tails, { noWR: true }); else ctx.log('No tails'); } } } },
+  'Dark Machamp': { attacks: { Fling: { canUse: ({ g, seat }) => (P(g, other(seat)).bench.length ? null : 'Opponent has no Benched Pokémon'), effect: (ctx) => { const d = ctx.opp.active; if (!d) return; removeMon(ctx.g, d.id); ctx.opp.deck.push(...monCards(d)); ctx.shuffle(ctx.oppSeat); ctx.log(`Fling: ${nameOf(ctx.db, d.c)} and its cards shuffled into ${ctx.name(ctx.oppSeat)}'s deck`); ctx.g.pending.push({ t: 'promote', seat: ctx.oppSeat }); } } } },
+  'Dark Magneton': { attacks: { Sonicboom: { effect: (ctx) => ctx.damage(20, { noWR: true }) }, 'Magnetic Lines': { effect: (ctx) => { ctx.damage(30); const d = ctx.opp.active; if (!d) return; const basics = d.en.filter((e) => ctx.db[e.c].st === 'Energy' && ctx.db[e.c].sub === 'Basic'); if (!basics.length || !ctx.opp.bench.length) return; const e = ctx.chooseCards('Move which basic Energy?', basics, { id: 'maglines' })[0]; const to = ctx.chooseMon('…to which Benched Pokémon?', ctx.opp.bench, { id: 'maglinesTo' })[0]; const c = pullCard(ctx.g, e); findMon(ctx.g, to).m.en.push(c); ctx.log('Magnetic Lines: moved the Energy'); } } } },
+  'Dark Slowbro': { onPlay: (ctx) => { const pool = ctx.me.discard.filter((c) => ctx.db[c.c].st === 'Pokémon'); const k = ctx.chooseCards('Reel In: take up to 3 Pokémon cards', pool, { min: 0, max: 3, id: 'reelin' }); for (const id of k) ctx.toHand(ctx.seat, pullCard(ctx.g, id)); ctx.log(`Reel In: ${k.length} card${k.length === 1 ? '' : 's'} to hand`); }, attacks: { 'Fickle Attack': tailsNothing(40) } },
+  'Dark Vileplume': { passive: { noTrainers: true }, attacks: { 'Petal Whirlwind': { effect: (ctx, m) => { const h = ctx.flips(3); if (h) ctx.damage(30 * h); if (h >= 2) ctx.status('CNF', m); } } } },
+  'Dark Weezing': { attacks: {
+    'Mass Explosion': { effect: (ctx) => { const isK = (x) => /^(Koffing|Weezing|Dark Weezing)$/.test(nameOf(ctx.db, x.c)); const all = [...mons(ctx.me), ...mons(ctx.opp)].filter(isK); if (all.length) ctx.damage(20 * all.length); for (const x of all) ctx.benchDamageOne(x.id, 20); } },
+    'Stun Gas': { effect: (ctx) => { ctx.damage(20); ctx.status(ctx.flip() ? 'PSN' : 'PAR'); } },
+  } },
+  'Dark Charmeleon': { attacks: { Fireball: { canUse: ({ g, db, m }) => (m.en.some((e) => g.rules.energyTextAnyType || energyTypesOf(db, e).includes('Fire')) ? null : 'Needs a Fire Energy attached'), effect: (ctx, m) => { if (ctx.flip()) { ctx.requireDiscardEnergy(m, 1, (e) => isFire(ctx, e), 'Discard 1 Fire Energy for Fireball'); ctx.damage(70); } else ctx.log('Fireball does nothing'); } } } },
+  'Dark Dragonair': { powers: { 'Evolutionary Light': oncePerTurn('evoLight', { use: (ctx) => { const got = ctx.searchDeck(ctx.seat, 'Choose an Evolution card', (c) => c.st === 'Pokémon' && c.sub !== 'Basic', { min: 0, max: 1 }); got.forEach((c) => { ctx.toHand(ctx.seat, c); ctx.log(`Evolutionary Light: ${nameOf(ctx.db, c.c)}`); }); ctx.shuffle(ctx.seat); } }) }, attacks: { 'Tail Strike': headsPlus(20, 20) } },
+  'Dark Electrode': { attacks: { 'Energy Bomb': { effect: (ctx, m) => { ctx.damage(30); const en = m.en.slice(); if (!en.length) return; if (!ctx.me.bench.length) { ctx.discardEnergy(m, en); return; } for (const e of en) { const to = ctx.chooseMon(`Attach ${nameOf(ctx.db, e.c)} to…`, ctx.me.bench, { id: 'ebomb' })[0]; pullCard(ctx.g, e.id); findMon(ctx.g, to).m.en.push(e); } ctx.log('Energy Bomb: energy moved to the bench'); } } } },
+  'Dark Flareon': { attacks: { Rage: rage(10), 'Playing with Fire': { canUse: ({ g, db, m }) => (m.en.some((e) => g.rules.energyTextAnyType || energyTypesOf(db, e).includes('Fire')) ? null : 'Needs a Fire Energy attached'), effect: (ctx, m) => { if (ctx.flip()) { ctx.requireDiscardEnergy(m, 1, (e) => isFire(ctx, e)); ctx.damage(50); } else ctx.damage(30); } } } },
+  'Dark Gloom': { powers: { 'Pollen Stench': oncePerTurn('pollen', { use: (ctx) => { if (ctx.flip()) ctx.status('CNF'); else if (ctx.me.active) ctx.status('CNF', ctx.me.active); } }) }, attacks: { Poisonpowder: sureStatus(10, 'PSN') } },
+  'Dark Golduck': { attacks: { 'Third Eye': { canUse: ({ m }) => (m.en.length ? null : 'Needs an Energy to discard'), effect: (ctx, m) => { ctx.requireDiscardEnergy(m, 1, null, 'Discard 1 Energy for Third Eye'); ctx.draw(ctx.seat, 3); } } } },
+  'Dark Jolteon': { attacks: { 'Lightning Flash': smokescreen(20), 'Thunder Attack': { effect: (ctx, m) => { ctx.damage(30); if (ctx.flip()) ctx.status('PAR'); else ctx.selfDamage(10); } } } },
+  'Dark Kadabra': { powers: { 'Matter Exchange': oncePerTurn('matter', { canUse: ({ g, seat }) => (P(g, seat).hand.length ? true : 'No card to discard'), use: (ctx) => { const k = ctx.chooseCards('Discard which card?', ctx.me.hand, { id: 'matter' })[0]; ctx.discardFromHand(ctx.seat, k); ctx.draw(ctx.seat, 1); } }) }, attacks: { 'Mind Shock': { effect: (ctx) => ctx.damage(30, { noWR: true }) } } },
+  'Dark Machoke': { attacks: { 'Drag Off': { canUse: ({ g, seat }) => (P(g, other(seat)).bench.length ? null : 'Opponent has no Benched Pokémon'), effect: (ctx) => { const k = ctx.chooseMon('Drag which Benched Pokémon in?', ctx.opp.bench, { id: 'dragoff' })[0]; ctx.switchActive(ctx.oppSeat, k, 'Drag Off'); ctx.defender = ctx.opp.active; ctx.damage(20); } }, 'Knock Back': { effect: (ctx) => { ctx.damage(30); oppSwitchChoice('Knock Back')(ctx); } } } },
+  'Dark Muk': { passive: { retreatTax: 2 }, attacks: { 'Sludge Punch': sureStatus(20, 'PSN') } },
+  'Dark Persian': { attacks: { Fascinate: { canUse: ({ g, seat }) => (P(g, other(seat)).bench.length ? null : 'Opponent has no Benched Pokémon'), effect: (ctx) => { if (ctx.flip()) { const k = ctx.chooseMon('Switch in which Benched Pokémon?', ctx.opp.bench, { id: 'fascinate' })[0]; ctx.switchActive(ctx.oppSeat, k, 'Fascinate'); } } }, 'Poison Claws': flipStatus(10, 'PSN') } },
+  'Dark Primeape': { passive: { confusedBonus: 30 }, attacks: { 'Frenzied Attack': { effect: (ctx, m) => { ctx.damage(40); ctx.status('CNF', m); } } } },
+  'Dark Rapidash': { attacks: { 'Flame Pillar': { effect: (ctx, m) => { ctx.damage(30); const fires = m.en.filter((e) => isFire(ctx, e)); if (!fires.length || !ctx.opp.bench.length) return; const k = ctx.chooseCards('Discard a Fire Energy to hit the bench? (or none)', fires, { min: 0, max: 1, id: 'pillar' }); if (!k.length) return; ctx.discardEnergy(m, fires.filter((e) => k.includes(e.id))); const t = ctx.chooseMon('10 damage to which Benched Pokémon?', ctx.opp.bench, { id: 'pillarTo' })[0]; ctx.benchDamageOne(t, 10); } } } },
+  'Dark Vaporeon': { attacks: { Whirlpool: discardDefenderEnergy(20) } },
+  'Dark Wartortle': { attacks: { Doubleslap: flipTimes(10, 2), 'Mirror Shell': { effect: (ctx, m) => { ctx.addFx(m, { k: 'mirrorShell', until: T(ctx) + 1 }); ctx.log('Mirror Shell is up'); } } } },
+  Magikarp: { attacks: { 'Rapid Evolution': { effect: (ctx, m) => { const got = ctx.searchDeck(ctx.seat, 'Choose a Gyarados or Dark Gyarados', (c) => /Gyarados$/.test(c.name), { min: 0, max: 1 }); ctx.shuffle(ctx.seat); if (got.length) { ctx.me.hand.push(got[0]); ctx.evolveWith(m, got[0]); } } } } },
+  Porygon: { attacks: { 'Conversion 1': { effect: (ctx) => { const d = ctx.opp.active; if (!d || !(ctx.cardFor(d).wk || []).length) { ctx.log('No Weakness to change'); return; } const t = ctx.choose({ id: 'conv1', title: 'Change its Weakness to…', options: typeOptions() })[0]; d.flags.wkOverride = t; ctx.log(`${nameOf(ctx.db, d.c)}'s Weakness is now ${t}`); } }, Psybeam: flipStatus(20, 'CNF') } },
+  Abra: { attacks: { Vanish: { effect: (ctx, m) => { const f = removeMon(ctx.g, m.id); const rest = monCards(m).filter((c) => c.id !== m.id); f.p.discard.push(...rest); f.p.deck.push({ id: m.id, c: m.c }); ctx.shuffle(ctx.seat); ctx.log('Vanish: Abra shuffled into the deck'); if (!f.p.active) ctx.g.pending.push({ t: 'promote', seat: ctx.seat }); } }, Psyshock: flipStatus(10, 'PAR') } },
+  Charmander: { powers: { 'Gather Fire': { canUse: ({ g, db, seat, m }) => { if (m.flags.gatherFireTurn === g.turnNo) return 'Already used this turn'; return mons(P(g, seat)).some((x) => x.id !== m.id && x.en.some((e) => g.rules.energyTextAnyType || energyTypesOf(db, e).includes('Fire'))) ? true : 'No Fire Energy on your other Pokémon'; }, use: (ctx, m) => { const srcs = mons(ctx.me).filter((x) => x.id !== m.id && x.en.some((e) => isFire(ctx, e))); const from = ctx.chooseMon('Take a Fire Energy from…', srcs, { id: 'gatherFrom' })[0]; const fm = findMon(ctx.g, from).m; const card = ctx.chooseCards('Which Fire Energy?', fm.en.filter((e) => isFire(ctx, e)), { id: 'gatherCard' })[0]; const c = pullCard(ctx.g, card); m.en.push(c); m.flags.gatherFireTurn = ctx.g.turnNo; ctx.log(`Gather Fire: moved ${nameOf(ctx.db, c.c)} from ${nameOf(ctx.db, fm.c)} to Charmander`); ctx.event({ t: 'attach', card: c, target: m.id }); } } } },
+  'Dark Raticate': { attacks: { 'Hyper Fang': tailsNothing(50) } },
+  Diglett: { attacks: { 'Dig Under': snipeAny(10) } },
+  Dratini: { attacks: { Wrap: flipStatus(10, 'PAR') } },
+  Drowzee: { powers: { 'Long-Distance Hypnosis': oncePerTurn('ldh', { use: (ctx) => { if (ctx.flip()) ctx.status('SLP'); else if (ctx.me.active) ctx.status('SLP', ctx.me.active); } }) }, attacks: { Nightmare: sureStatus(10, 'SLP') } },
+  Eevee: { attacks: { 'Sand-attack': smokescreen(10) } },
+  Ekans: { attacks: { 'Poison Sting': flipStatus(20, 'PSN') } },
+  Grimer: { attacks: { 'Poison Gas': sureStatus(0, 'SLP'), 'Sticky Hands': { effect: (ctx) => { if (ctx.flip()) { ctx.damage(30); ctx.status('PAR'); } else ctx.damage(10); } } } },
+  Koffing: { attacks: { 'Poison Gas': flipStatus(20, 'PSN') } },
+  Magnemite: { attacks: { Magnetism: { effect: (ctx) => ctx.damage(10 + 10 * ctx.me.bench.filter((x) => /^(Magnemite|Magneton|Dark Magneton)$/.test(nameOf(ctx.db, x.c))).length) } } },
+  Mankey: { attacks: { Mischief: { effect: (ctx) => { ctx.shuffle(ctx.oppSeat); ctx.log("Mischief: opponent's deck shuffled"); } }, Anger: headsPlus(20, 20) } },
+  Meowth: { attacks: { 'Coin Hurl': { effect: (ctx) => { const all = mons(ctx.opp); if (!all.length) return; const k = ctx.chooseMon('Coin Hurl at which Pokémon?', all, { id: 'coinhurl' })[0]; if (ctx.flip()) { const f = findMon(ctx.g, k); if (f.p.active && f.p.active.id === k) ctx.damage(20, { noWR: true, target: f.m }); else ctx.benchDamageOne(k, 20); } } } } },
+  Oddish: { attacks: { 'Sleep Powder': sureStatus(0, 'SLP'), Poisonpowder: sureStatus(0, 'PSN') } },
+  Ponyta: { attacks: { Ember: discardTypeThen('Fire', 1, 30) } },
+  Psyduck: { attacks: { Dizziness: { effect: (ctx) => ctx.draw(ctx.seat, 1) }, 'Water Gun': extraWater(20, 2, 2) } },
+  Rattata: { powers: { Trickery: oncePerTurn('trickery', { canUse: ({ g, seat }) => (P(g, seat).prizes.length && P(g, seat).deck.length ? true : 'Needs a prize and a deck'), use: (ctx) => { const i = ctx.choose({ id: 'trickery', title: 'Swap which prize with the top card of your deck?', options: ctx.me.prizes.map((c, j) => ({ key: String(j), label: 'Prize ' + (j + 1) })) })[0]; const top = ctx.me.deck.shift(); const pz = ctx.me.prizes[+i]; ctx.me.prizes[+i] = top; ctx.me.deck.unshift(pz); ctx.log('Trickery: swapped a prize with the top of the deck'); } }) }, attacks: { 'Quick Attack': headsPlus(10, 10) } },
+  Slowpoke: { attacks: { 'Afternoon Nap': { effect: (ctx, m) => { const got = ctx.searchDeck(ctx.seat, 'Choose a Psychic Energy', (c) => c.st === 'Energy' && /Psychic/.test(c.name), { min: 0, max: 1 }); got.forEach((c) => { m.en.push(c); ctx.log('Afternoon Nap: attached Psychic Energy'); }); ctx.shuffle(ctx.seat); } } } },
+  'Dark Raichu': { attacks: { 'Surprise Thunder': { effect: (ctx) => { ctx.damage(30); if (ctx.flip()) ctx.benchDamage(ctx.oppSeat, ctx.flip() ? 20 : 10); } } } },
+  // ----- Trainers -----
+  'Here Comes Team Rocket!': { trainer: (ctx) => { ctx.g.flags = ctx.g.flags || {}; ctx.g.flags.prizesFaceUp = true; ctx.log('Prizes are face up for the rest of the game'); } },
+  "Rocket's Sneak Attack": { trainer: (ctx) => { const h = ctx.opp.hand; const tr = h.filter((c) => ctx.db[c.c].st === 'Trainer'); ctx.choose({ id: 'sneakLook', title: `${ctx.name(ctx.oppSeat)}'s hand`, options: [{ key: 'ok', label: h.map((c) => nameOf(ctx.db, c.c)).join(', ') || 'empty' }] }); if (!tr.length) { ctx.log('No Trainer cards there'); return; } const k = ctx.chooseCards('Shuffle which Trainer into their deck?', tr, { id: 'sneak' })[0]; ctx.opp.deck.push(pullCard(ctx.g, k)); ctx.shuffle(ctx.oppSeat); ctx.log(`Rocket's Sneak Attack: ${nameOf(ctx.db, tr.find((c) => c.id === k).c)} shuffled into ${ctx.name(ctx.oppSeat)}'s deck`); } },
+  "The Boss's Way": { trainer: (ctx) => { const got = ctx.searchDeck(ctx.seat, 'Choose a Dark Evolution card', (c) => c.st === 'Pokémon' && c.sub !== 'Basic' && /^Dark /.test(c.name), { min: 0, max: 1 }); got.forEach((c) => { ctx.toHand(ctx.seat, c); ctx.log(`The Boss's Way: ${nameOf(ctx.db, c.c)}`); }); ctx.shuffle(ctx.seat); } },
+  'Challenge!': { trainer: (ctx) => {
+    const full = ctx.me.bench.length >= ctx.g.rules.benchSize && ctx.opp.bench.length >= ctx.g.rules.benchSize;
+    const accept = !full && ctx.choose({ id: 'challenge', title: `${ctx.name(ctx.seat)} issues a Challenge! Accept?`, options: [{ key: 'yes', label: 'Accept: both search for Basics' }, { key: 'no', label: 'Decline: they draw 2' }], seat: ctx.oppSeat })[0] === 'yes';
+    if (!accept) { ctx.draw(ctx.seat, 2); return; }
+    for (const s of [ctx.seat, ctx.oppSeat]) { const p = P(ctx.g, s); const room = ctx.g.rules.benchSize - p.bench.length; if (room <= 0) continue; const pool = p.deck.filter((c) => ctx.db[c.c].st === 'Pokémon' && ctx.db[c.c].sub === 'Basic'); const k = ctx.chooseCards('Challenge: choose Basic Pokémon for your bench', pool, { min: 0, max: room, id: 'challengePick', seat: s }); for (const id of k) p.bench.push(toMon(pullCard(ctx.g, id), ctx.g.turnNo)); ctx.shuffle(s); ctx.log(`${ctx.name(s)} benched ${k.length} Basic Pokémon`); }
+  } },
+  Digger: { trainer: (ctx) => { let who = ctx.seat; for (let i = 0; i < 20; i++) { if (!ctx.flip(`${ctx.name(who)} flips`)) { const a = P(ctx.g, who).active; if (a) { a.dmg += 10; ctx.log(`Digger: 10 damage to ${ctx.name(who)}'s ${nameOf(ctx.db, a.c)} (now ${a.dmg})`); ctx.event({ t: 'damage', target: a.id, amount: 10 }); } break; } who = other(who); } } },
+  "Imposter Oak's Revenge": { canPlay: ({ g, seat }) => (P(g, seat).hand.length >= 2 ? true : 'Needs a card to discard'), trainer: (ctx) => { const k = ctx.chooseCards('Discard a card', ctx.me.hand.filter((c) => c.id !== ctx.card.id), { id: 'ioak' })[0]; ctx.discardFromHand(ctx.seat, k); ctx.opp.deck.push(...ctx.opp.hand); ctx.opp.hand = []; ctx.shuffle(ctx.oppSeat); ctx.draw(ctx.oppSeat, 4); } },
+  'Nightly Garbage Run': { trainer: (ctx) => { const pool = ctx.me.discard.filter((c) => ctx.db[c.c].st === 'Pokémon' || (ctx.db[c.c].st === 'Energy' && ctx.db[c.c].sub === 'Basic')); const k = ctx.chooseCards('Shuffle up to 3 cards into your deck', pool, { min: 0, max: 3, id: 'garbage' }); for (const id of k) ctx.me.deck.push(pullCard(ctx.g, id)); ctx.shuffle(ctx.seat); ctx.log(`Nightly Garbage Run: ${k.length} card${k.length === 1 ? '' : 's'} back in the deck`); } },
+  'Goop Gas Attack': { trainer: (ctx) => { ctx.addGlobalFx({ k: 'powersOff', until: T(ctx) + 1 }); ctx.log('Goop Gas Attack: all Pokémon Powers stop until the end of the next turn'); } },
+  'Sleep!': { trainer: (ctx) => { if (ctx.flip()) ctx.status('SLP'); } },
+  // ----- Energy -----
+  'Rainbow Energy': { energy: ['Rainbow'], onAttach: (ctx, c, m) => { m.dmg += 10; ctx.log(`Rainbow Energy: 10 damage to ${nameOf(ctx.db, m.c)} (now ${m.dmg})`); ctx.event({ t: 'damage', target: m.id, amount: 10 }); } },
+  'Full Heal Energy': { energy: ['Colorless'], onAttach: (ctx, c, m) => { if (m.st.length) { ctx.cure(m); ctx.log(`Full Heal Energy cured ${nameOf(ctx.db, m.c)}`); } } },
+  'Potion Energy': { energy: ['Colorless'], onAttach: (ctx, c, m) => { if (m.dmg) ctx.heal(m, 10); } },
 };
+
+const IDS = {
+  'Dark Alakazam': ['base5-1', 'base5-18'], 'Dark Arbok': ['base5-2', 'base5-19'], 'Dark Blastoise': ['base5-3', 'base5-20'], 'Dark Charizard': ['base5-4', 'base5-21'], 'Dark Dragonite': ['base5-5', 'base5-22'],
+  'Dark Dugtrio': ['base5-6', 'base5-23'], 'Dark Golbat': ['base5-7', 'base5-24'], 'Dark Gyarados': ['base5-8', 'base5-25'], 'Dark Hypno': ['base5-9', 'base5-26'], 'Dark Machamp': ['base5-10', 'base5-27'],
+  'Dark Magneton': ['base5-11', 'base5-28'], 'Dark Slowbro': ['base5-12', 'base5-29'], 'Dark Vileplume': ['base5-13', 'base5-30'], 'Dark Weezing': ['base5-14', 'base5-31'],
+  'Here Comes Team Rocket!': ['base5-15', 'base5-71'], "Rocket's Sneak Attack": ['base5-16', 'base5-72'], 'Rainbow Energy': ['base5-17', 'base5-80'],
+  'Dark Charmeleon': ['base5-32'], 'Dark Dragonair': ['base5-33'], 'Dark Electrode': ['base5-34'], 'Dark Flareon': ['base5-35'], 'Dark Gloom': ['base5-36'], 'Dark Golduck': ['base5-37'], 'Dark Jolteon': ['base5-38'],
+  'Dark Kadabra': ['base5-39'], 'Dark Machoke': ['base5-40'], 'Dark Muk': ['base5-41'], 'Dark Persian': ['base5-42'], 'Dark Primeape': ['base5-43'], 'Dark Rapidash': ['base5-44'], 'Dark Vaporeon': ['base5-45'],
+  'Dark Wartortle': ['base5-46'], Magikarp: ['base5-47'], Porygon: ['base5-48'], Abra: ['base5-49'], Charmander: ['base5-50'], 'Dark Raticate': ['base5-51'], Diglett: ['base5-52'], Dratini: ['base5-53'],
+  Drowzee: ['base5-54'], Eevee: ['base5-55'], Ekans: ['base5-56'], Grimer: ['base5-57'], Koffing: ['base5-58'], Magnemite: ['base5-60'], Mankey: ['base5-61'], Meowth: ['base5-62'], Oddish: ['base5-63'],
+  Ponyta: ['base5-64'], Psyduck: ['base5-65'], Rattata: ['base5-66'], Slowpoke: ['base5-67'], "The Boss's Way": ['base5-73'], 'Challenge!': ['base5-74'], Digger: ['base5-75'], "Imposter Oak's Revenge": ['base5-76'],
+  'Nightly Garbage Run': ['base5-77'], 'Goop Gas Attack': ['base5-78'], 'Sleep!': ['base5-79'], 'Full Heal Energy': ['base5-81'], 'Potion Energy': ['base5-82'], 'Dark Raichu': ['base5-83'],
+};
+export const rocket = {};
+for (const [name, ids] of Object.entries(IDS)) for (const id of ids) rocket[id] = byName[name];

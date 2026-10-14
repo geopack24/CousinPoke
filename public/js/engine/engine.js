@@ -38,7 +38,7 @@ export function canPay(db, rules, m, cost) {
   if (R(rules).colorlessCosts) return energyUnits(db, m) >= cost.length;
   const pool = []; for (const e of m.en) pool.push(...energyTypesOf(db, e));
   const need = cost.filter((t) => t !== 'Colorless'); let free = cost.length - need.length;
-  for (const t of need) { const i = pool.indexOf(t); if (i < 0) return false; pool.splice(i, 1); }
+  for (const t of need) { let i = pool.indexOf(t); if (i < 0) i = pool.indexOf('Rainbow'); if (i < 0) return false; pool.splice(i, 1); }
   return pool.length >= free;
 }
 
@@ -55,11 +55,12 @@ export function trainersLocked(g, db, seat) {
   return null;
 }
 export function powersActive(g, db) {
+  if (g.fx && g.fx.some((f) => f.k === 'powersOff')) return false;
   // Muk's Toxic Gas and friends: any passive 'disablePowers' in play that is not asleep/confused/paralyzed.
   for (const m of allMons(g)) { const s = scriptOf(m.c); if (s.passive && s.passive.disablePowers && !conditioned(m)) return false; }
   return true;
 }
-export const conditioned = (m) => m.st.some((x) => x === 'SLP' || x === 'CNF' || x === 'PAR');
+export const conditioned = (m) => m.st.some((x) => x === 'SLP' || x === 'CNF' || x === 'PAR') || m.fx.some((f) => f.k === 'powerOff');
 /** The card a Pokémon currently behaves as: Ditto copies the Defending Pokémon while Active and unconditioned. */
 export function effectiveCard(g, db, m) {
   const c = db[m.c]; const s = scriptOf(m.c);
@@ -75,6 +76,7 @@ export function stageOf(db, m) { const c = db[m.c]; return c.st === 'Pokémon' ?
 export function hasFx(m, k) { return m.fx.some((f) => f.k === k); }
 export function retreatCost(g, db, seat, m) {
   let rc = effectiveCard(g, db, m).rc || 0;
+  { const oa = P(g, other(seat)).active; if (oa && powersActive(g, db)) { const s = scriptOf(oa.c); if (s.passive && s.passive.retreatTax && !conditioned(oa)) rc += s.passive.retreatTax; } }
   if (powersActive(g, db)) for (const b of P(g, seat).bench) { const s = scriptOf(b.c); if (s.passive && s.passive.retreatAid && !conditioned(b)) rc -= s.passive.retreatAid; }
   return Math.max(0, rc);
 }
@@ -257,6 +259,8 @@ function makeCtx(g, db, rng, events, seat, nextAnswer, action) {
     cardFor(m) { return effectiveCard(g, db, m); },
     runAttack(m, atk, srcCid) { return runAttack(ctx, m, atk, srcCid); },
     addPlayerFx(s, fx) { const p = P(g, s); p.fx = p.fx || []; p.fx.push(fx); },
+    addGlobalFx(fx) { g.fx = g.fx || []; g.fx.push(fx); },
+    evolveWith(m, card) { const f = findMon(g, m.id); return doEvolve(ctx, f, card); },
     attacker: null, defender: null,
   };
   return ctx;
@@ -285,6 +289,7 @@ function dealDamage(ctx, target, amount, opts = {}) {
     const ps = scriptOf(target.c).passive;
     if (ps && ps.preventDamage && powersActive(g, db) && !conditioned(target) && ps.preventDamage({ ctx, target, amount: dmg, info })) { ctx.log(`${nameOf(db, target.c)}: damage prevented`); return 0; }
   }
+  if (src && src.st.includes('CNF')) { const ss = scriptOf(src.c).passive; if (ss && ss.confusedBonus && powersActive(g, db)) dmg += ss.confusedBonus; }
   if (dmg <= 0) return 0;
   target.dmg += dmg; target.flags.lastHit = { amount: dmg, turn: g.turnNo };
   events.push({ t: 'damage', target: target.id, amount: dmg, wr: info.wr, self: !!opts.self });
@@ -292,6 +297,7 @@ function dealDamage(ctx, target, amount, opts = {}) {
   // Machamp-style counter damage
   const ps = scriptOf(target.c).passive;
   if (ps && ps.onDamaged && src && !opts.self && !opts.bench && powersActive(g, db) && !conditioned(target)) ps.onDamaged({ ctx, target, source: src, amount: dmg });
+  if (hasFx(target, 'mirrorShell') && src && !opts.self && !opts.bench && !opts.mirrored) { ctx.log('Mirror Shell strikes back'); dealDamage(ctx, src, dmg, { source: target, mirrored: true }); }
   return dmg;
 }
 function applyStatus(ctx, target, code) {
@@ -331,7 +337,8 @@ function runAction(ctx, a) {
     case 'attach': {
       must(!p.attachedThisTurn, 'Already attached energy this turn'); const c = handCard(a.card); must(db[c.c].st === 'Energy', 'Not an energy card');
       const f = findMon(g, a.target); must(f && f.seat === seat, 'Not your Pokémon'); must(!isDollLike(db, f.m), "Can't attach to that");
-      pullCard(g, c.id); f.m.en.push(c); p.attachedThisTurn = true; ctx.log(`${ctx.name(seat)} attached ${nameOf(db, c.c)} to ${nameOf(db, f.m.c)}`); ctx.event({ t: 'attach', card: c, target: f.m.id }); return;
+      pullCard(g, c.id); f.m.en.push(c); p.attachedThisTurn = true; ctx.log(`${ctx.name(seat)} attached ${nameOf(db, c.c)} to ${nameOf(db, f.m.c)}`); ctx.event({ t: 'attach', card: c, target: f.m.id });
+      { const es = scriptOf(c.c); if (es.onAttach) es.onAttach(ctx, c, f.m); } checkKOs(ctx); return;
     }
     case 'playBasic': {
       const c = handCard(a.card); must(isBasicLike(db[c.c]), 'Not a Basic Pokémon'); must(p.bench.length < r.benchSize, 'Bench is full');
@@ -340,7 +347,7 @@ function runAction(ctx, a) {
     case 'evolve': {
       const c = handCard(a.card); const f = findMon(g, a.target); must(f && f.seat === seat, 'Not your Pokémon');
       must(matchesEvolution(db, c.c, f.m), `${nameOf(db, c.c)} doesn't evolve from ${nameOf(db, f.m.c)}`); must(canEvolveTarget(g, f.m, r, db), evolutionLocked(g, db) ? 'Evolution is blocked (Prehistoric Power)' : "That Pokémon can't evolve yet");
-      doEvolve(ctx, f, c); return;
+      doEvolve(ctx, f, c); checkKOs(ctx); return;
     }
     case 'playTrainer': {
       const c = handCard(a.card); const card = db[c.c]; must(card.st === 'Trainer' && !isBasicLike(card), 'Not a Trainer'); must(!(r.banned || []).includes(card.name), `${card.name} is banned`); must(!trainersLocked(g, db, seat), trainersLocked(g, db, seat));
@@ -368,7 +375,8 @@ function runAction(ctx, a) {
         else { const keys = ctx.chooseCards(`Discard energy worth ${rc} to retreat`, pool, { min: 1, max: pool.length, id: 'retreatCost' }); chosen = pool.filter((e) => keys.includes(e.id)); must(chosen.reduce((n, e) => n + energyTypesOf(db, e).length, 0) >= rc, 'Not enough energy chosen'); }
         ctx.discardEnergy(m, chosen);
       }
-      ctx.switchActive(seat, a.target, 'Retreat'); p.retreatedThisTurn = true; return;
+      { const retreating = m; for (const om of mons(P(g, other(seat)))) { const s = scriptOf(om.c); if (s.passive && s.passive.onOpponentRetreat && powersActive(g, db) && !conditioned(om)) s.passive.onOpponentRetreat(ctx, om, retreating); } }
+      ctx.switchActive(seat, a.target, 'Retreat'); p.retreatedThisTurn = true; checkKOs(ctx); return;
     }
     case 'attack': {
       const chk = canAttack(g, seat, a.index, db); must(chk.ok, chk.why);
@@ -401,6 +409,7 @@ function doEvolve(ctx, f, c) {
   const { g, db, seat } = ctx; const m = f.m;
   const nm = { ...m, id: c.id, c: c.c, st: [], fx: m.fx.filter((x) => x.k === 'defender' || x.k === 'plusPower'), un: [{ id: m.id, c: m.c }, ...m.un], evolvedTurn: g.turnNo, flags: {} };
   pullCard(g, c.id); replaceMon(g, f, nm); ctx.log(`${ctx.name(seat)} evolved ${nameOf(db, m.c)} into ${nameOf(db, c.c)}`); ctx.event({ t: 'evolve', id: nm.id, from: m.id });
+  { const es = scriptOf(c.c); if (es.onPlay && powersActive(g, db)) es.onPlay(ctx, nm); }
   return nm;
 }
 export { doEvolve };
@@ -470,6 +479,7 @@ function endTurn(ctx) {
     if (m.st.includes('SLP')) { if (ctx.flip('sleep')) { m.st = m.st.filter((x) => x !== 'SLP'); ctx.log(`${nameOf(db, m.c)} woke up`); } }
   }
   // expire effects
+  if (g.fx) g.fx = g.fx.filter((f) => !(f.until != null && f.until <= T));
   for (const s of ['a', 'b']) { const p = P(g, s); if (p.fx) p.fx = p.fx.filter((f) => !(f.until != null && f.until <= T)); }
   for (const m of allMons(g)) {
     const expiring = m.fx.filter((f) => f.until != null && f.until <= T);
@@ -489,6 +499,7 @@ function checkKOs(ctx) {
     for (const m of mons(p)) {
       if (m.dmg >= monHP(db, m, g) && monHP(db, m, g) > 0) {
         const doll = isDollLike(db, m) && scriptOf(m.c).asPokemon && scriptOf(m.c).asPokemon.noPrize;
+        { const ks = scriptOf(m.c).passive; if (ks && ks.onKnockedOut && g.lastAttack && g.lastAttack.turn === g.turnNo && g.lastAttack.seat === other(s) && powersActive(g, db) && !conditioned(m)) { const att = findMon(g, g.lastAttack.attacker); if (att) ks.onKnockedOut(ctx, m, att.m); } }
         removeMon(g, m.id); p.discard.push(...monCards(m));
         ctx.log(`${ctx.name(s)}'s ${nameOf(db, m.c)} was Knocked Out`); ctx.event({ t: 'ko', id: m.id, seat: s });
         if (!doll) g.pending.push({ t: 'prize', seat: other(s), n: 1 });
