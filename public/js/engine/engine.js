@@ -307,9 +307,9 @@ function dealDamage(ctx, target, amount, opts = {}) {
     const wk = target.flags.wkOverride ? [target.flags.wkOverride] : (tCard.wk || []);
     const rs = target.flags.rsOverride ? [target.flags.rsOverride] : (tCard.rs || []);
     const ignoreWeak = st.ignoreWeakness && st.ignoreWeakness(g, db, src, target);
-    if (wk.includes(type) && !ignoreWeak) { dmg *= 2; info.wr = 'weak'; }
+    if (wk.includes(type) && !ignoreWeak) { const wb = R(g.rules).weaknessBonus; dmg = wb ? dmg + wb : dmg * 2; info.wr = 'weak'; }
     const noRes = opts.noResist || (st.noResistanceFor && st.noResistanceFor(g, db, src));
-    if (rs.includes(type) && !noRes) { dmg = Math.max(0, dmg - (st.resistanceAmount || 30)); info.wr = 'resist'; }
+    if (rs.includes(type) && !noRes) { const ra = Math.max(0, R(g.rules).resistanceAmount - (st.resistanceReduce || 0)); dmg = Math.max(0, dmg - ra); info.wr = 'resist'; }
   }
   if (src && !opts.self && !opts.bench && target === ctx.defender) { for (const f of fxOf(src, 'bonus')) dmg += f.amount; const my = findMon(g, src.id); if (my && playerFx(g, my.seat, 'misty') && nameHas(db, src, "Misty's") && dmg > 0) dmg += 20; for (const f of fxOf(src, 'charity')) dmg = Math.max(0, dmg - f.amount); }
   if (opts.bench) { const o = findMon(g, target.id); if (o && o.p.active !== target && playerFx(g, o.seat, 'benchShield')) { ctx.log(`Transparent Walls protects ${nameOf(db, target.c)}`); return 0; } }

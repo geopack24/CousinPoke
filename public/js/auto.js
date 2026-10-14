@@ -5,10 +5,12 @@ import { newGame, other, mons, findMon } from './engine/state.js';
 import { randomSeed } from './engine/rng.js';
 import { R } from './engine/rules.js';
 import { automationReport } from './engine/cards/index.js';
+import { playAttack, playKO, playHeal, playSelfHit, playCoins, attachLayer, isEnabled as fxEnabled, setEnabled as setFxEnabled } from './fx.js';
 
 let PT = null;           // bridge from index.html
 let promptOpen = null;   // id of the prompt modal currently shown
-let lastEventsKey = '';
+let seenFxId = null;     // id of the last doc.fx payload this client animated
+let pendingFx = null;
 
 export function install(bridge) { PT = bridge; return { render, startGame, submit, automationReport }; }
 
@@ -37,9 +39,10 @@ export async function submit(action, answers = []) {
     if (r.prompt.seat === mySeat(doc)) { const ans = await promptModal(r.prompt); if (ans == null) return; return submit(action, [...answers, ans]); }
     doc.inflight = { action, prompt: r.prompt }; await PT.saveGame(doc); PT.render(); return;
   }
+  const scene = captureScene(r.events, doc.state);
   doc.prev = undoable(action, r.events) ? { state: doc.state, seat, label: action.type } : null;
   doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner;
-  playEvents(r.events, doc); await PT.saveGame(doc); PT.render();
+  publishFx(doc, r.events); PT.render(); playEvents(r.events, doc, scene); await PT.saveGame(doc);
 }
 /** A move can be undone only if it revealed nothing: no flip, draw, search, prize, and it didn't hand the turn over. */
 function undoable(action, events) {
@@ -70,23 +73,55 @@ function promptModal(prompt) {
   });
 }
 
-/* ---------- events -> small animations ---------- */
-function playEvents(events, doc) {
+/* ---------- events -> animations ---------- */
+const FX_EVENTS = ['attack', 'damage', 'heal', 'ko', 'flip', 'status'];
+/** Store the interesting events on the doc so the other player's screen animates them too. */
+function publishFx(doc, events) {
+  const ev = events.filter((e) => FX_EVENTS.includes(e.t)); if (!ev.length) { return; }
+  doc.fx = { id: Math.random().toString(36).slice(2, 10), events: ev }; seenFxId = doc.fx.id;
+}
+const boardEl = () => document.querySelector('.board.auto');
+function rectIn(b, el) { if (!b || !el) return null; const br = b.getBoundingClientRect(), r = el.getBoundingClientRect(); return { x: r.left - br.left, y: r.top - br.top, w: r.width, h: r.height, cx: r.left - br.left + r.width / 2, cy: r.top - br.top + r.height / 2, el: el.closest('.mon') }; }
+const rectOf = (id) => { const b = boardEl(); return rectIn(b, b && b.querySelector(`[data-mon="${id}"] .poke`)); };
+const slotRect = (seat) => { const b = boardEl(); return rectIn(b, b && b.querySelector(`[data-active-slot="${seat}"]`)); };
+/** Where things are on screen right now, for the attack in `events`. Call before re-rendering when you can. */
+function captureScene(events, g) {
+  const atk = events.find((e) => e.t === 'attack'); if (!atk) return null;
+  const f = findMon(g, atk.attacker); const seat = f ? f.seat : (g.lastAttack && g.lastAttack.attacker === atk.attacker ? g.lastAttack.seat : null);
+  const from = rectOf(atk.attacker) || (seat && slotRect(seat));
+  const ids = [...new Set(events.filter((e) => e.t === 'damage' && !e.self && e.target !== atk.attacker).map((e) => e.target))];
+  const rects = {}; for (const id of ids) rects[id] = rectOf(id);
+  const targets = ids.map((id) => rects[id] || (seat && slotRect(other(seat)))).filter(Boolean);
+  if (!targets.length && seat) { const r = slotRect(other(seat)); if (r) targets.push(r); }
+  rects[atk.attacker] = from;
+  return { type: atk.type, name: atk.name, cardId: f ? f.m.c : null, attacker: atk.attacker, from, targets, rects };
+}
+function playEvents(events, doc, scene) {
+  const b = boardEl();
   const flips = events.filter((e) => e.t === 'flip');
   if (flips.length) PT.toast(flips.map((e) => (e.heads ? 'Heads' : 'Tails')).join(', '));
-  lastEventsKey = JSON.stringify(events.slice(-6));
+  let delay = 30; if (flips.length && b) delay += Math.round(playCoins(b, flips.map((e) => e.heads)) * 0.7);
+  const atk = events.find((e) => e.t === 'attack');
   setTimeout(() => {
-    for (const e of events) {
-      if (e.t === 'damage') { const el = document.querySelector(`[data-mon="${e.target}"]`); if (el) { el.classList.add('hit'); const f = document.createElement('div'); f.className = 'float-dmg'; f.textContent = '-' + e.amount; el.appendChild(f); setTimeout(() => { el.classList.remove('hit'); f.remove(); }, 900); } }
-      if (e.t === 'heal') { const el = document.querySelector(`[data-mon="${e.target}"]`); if (el) { const f = document.createElement('div'); f.className = 'float-dmg heal'; f.textContent = '+' + e.amount; el.appendChild(f); setTimeout(() => f.remove(), 900); } }
-      if (e.t === 'attack') { const el = document.querySelector(`[data-mon="${e.attacker}"]`); if (el) { el.classList.add('lunge'); setTimeout(() => el.classList.remove('lunge'), 500); } }
-    }
-  }, 30);
+    let impact = 0; const board = boardEl();
+    if (atk && scene && board) { scene.fromEl = board.querySelector(`[data-mon="${atk.attacker}"]`); impact = playAttack(board, scene).impact; }
+    else if (atk) { const el = board && board.querySelector(`[data-mon="${atk.attacker}"]`); if (el) { el.classList.add('lunge'); setTimeout(() => el.classList.remove('lunge'), 500); } }
+    const rect = (id) => (scene && scene.rects && scene.rects[id]) || rectOf(id);
+    setTimeout(() => {
+      for (const e of events) {
+        if (e.t === 'damage') { const el = document.querySelector(`[data-mon="${e.target}"]`); if (el) { el.classList.add('hit'); const f = document.createElement('div'); f.className = 'float-dmg'; f.textContent = '-' + e.amount; el.appendChild(f); setTimeout(() => { el.classList.remove('hit'); f.remove(); }, 900); } if (e.self) playSelfHit(board, rect(e.target)); }
+        if (e.t === 'heal') { const el = document.querySelector(`[data-mon="${e.target}"]`); if (el) { const f = document.createElement('div'); f.className = 'float-dmg heal'; f.textContent = '+' + e.amount; el.appendChild(f); setTimeout(() => f.remove(), 900); } playHeal(board, rect(e.target)); }
+        if (e.t === 'ko') setTimeout(() => playKO(board, rect(e.id)), 250);
+      }
+    }, impact);
+  }, delay);
 }
 
 /* ---------- rendering ---------- */
 export function render(main, doc) {
   const g = doc.state; const me = mySeat(doc); const bottom = me || 'a'; const top = other(bottom); const r = R(g.rules);
+  if (seenFxId === null) seenFxId = doc.fx ? doc.fx.id : '';
+  else if (doc.fx && doc.fx.id !== seenFxId) { seenFxId = doc.fx.id; pendingFx = doc.fx.events; }
   const legal = me ? legalActions(g, me, PT.CARDS) : [];
   const pending = g.pending[0];
   const myTurn = me && g.phase === 'main' && g.turn === me && !g.pending.length && !g.winner;
@@ -105,7 +140,7 @@ export function render(main, doc) {
       <div class="z"><span class="zlbl">Prizes${prizeClick ? ' · take one' : ''}</span><div class="row" style="gap:3px;flex-wrap:nowrap">${p.prizes.map((c, i) => `<div class="pile ${prizeClick ? 'glow' : ''}" data-prize="${i}" data-seat="${seat}" style="--s:.2">${PT.backHTML(.2)}</div>`).join('') || '<span class="small">none left</span>'}</div><span class="cnt">${p.prizes.length} left</span></div>
       ${own ? '' : (me && seesOpponentHand(g, PT.CARDS, me)) ? `<div class="z" style="align-items:stretch"><span class="zlbl">Their hand (Clairvoyance) · ${p.hand.length}</span><div class="hand">${p.hand.map((c) => PT.cardHTML(c.c, .3)).join('') || '<span class="small">empty</span>'}</div></div>` : `<div class="z"><span class="zlbl">Hand</span><div class="row" style="gap:0">${p.hand.slice(0, 12).map((c, i) => `<div style="margin-left:${i ? '-14px' : 0}">${PT.backHTML(.2)}</div>`).join('') || '<span class="small">empty</span>'}</div><span class="cnt">${p.hand.length} cards</span></div>`}
     </div>`;
-    const field = `<div class="zone-row" style="align-items:flex-end"><div class="z"><span class="zlbl">Active</span>${active}</div><div class="z grow" style="align-items:stretch"><span class="zlbl">Bench</span><div class="bench">${benchSlots.join('')}</div></div></div>`;
+    const field = `<div class="zone-row" style="align-items:flex-end"><div class="z" data-active-slot="${seat}"><span class="zlbl">Active</span>${active}</div><div class="z grow" style="align-items:stretch"><span class="zlbl">Bench</span><div class="bench">${benchSlots.join('')}</div></div></div>`;
     const name = `<div class="pname"><span>${esc(g.seats[seat].name)}${own ? ' (you)' : ''}</span>${g.phase === 'main' && g.turn === seat && !g.winner ? `<span class="chip">${own ? 'Your turn' : 'Their turn'}</span>` : ''}${g.phase === 'setup' ? `<span class="chip">${p.setupDone ? 'Ready' : 'Setting up'}</span>` : ''}${g.winner === seat ? '<span class="chip">Winner</span>' : ''}</div>`;
     const hand = own ? `<div class="z" style="align-items:stretch"><span class="zlbl">Your hand · ${p.hand.length}</span><div class="hand">${p.hand.map((c) => PT.cardHTML(c.c, .42, `data-hand="${c.id}"`, legal.some((a) => a.card === c.id) ? 'click can' : 'click')).join('') || '<span class="small muted">empty</span>'}</div></div>` : '';
     return isTop ? `<div class="side">${name}${rail}${field}</div>` : `<div class="side">${name}${field}${rail}${hand}</div>`;
@@ -129,6 +164,8 @@ export function render(main, doc) {
     <div class="entries" id="logentries">${g.log.slice().reverse().map((e) => `<div class="e ${e.k === 'chat' ? 'chat' : ''}">${e.k === 'chat' ? `<b>${esc(e.n)}:</b> ${esc(e.m)}` : esc(e.m)}<span class="t">${e.turn != null ? 'T' + e.turn : ''}</span></div>`).join('')}</div>
     ${me ? `<form id="chat"><input type="text" id="chatin" placeholder="Say something" maxlength="200" class="grow" autocomplete="off"><button class="sm" type="submit">Send</button></form>` : ''}</aside></div>`;
   const chatNew = main.querySelector('#chatin'); if (chatNew && chatPrev) { chatNew.value = chatPrev; if (chatFocus) chatNew.focus(); }
+  attachLayer(main.querySelector('.board.auto'));
+  if (pendingFx) { const ev = pendingFx; pendingFx = null; playEvents(ev, doc, captureScene(ev, g)); }
   const chat = main.querySelector('#chat'); if (chat) chat.onsubmit = (e) => { e.preventDefault(); const i = chat.querySelector('#chatin'); const v = i.value.trim(); if (!v) return; i.value = ''; submit({ type: 'chat', text: v }); };
 
   main.onclick = (e) => {
@@ -168,6 +205,7 @@ function onButton(act, btn, doc, legal, me) {
   if (act === 'more') {
     const items = [];
     if (me) items.push({ label: 'Draw a card (fix)', fn: () => submit({ type: 'override', op: 'draw', n: 1 }) }, { label: 'Shuffle my deck (fix)', fn: () => submit({ type: 'override', op: 'shuffle' }) }, { label: 'Force end of turn (fix)', fn: () => submit({ type: 'override', op: 'endTurn' }) }, { label: "It's my turn (fix)", fn: () => submit({ type: 'override', op: 'turn', seat: me }) }, { label: 'Clear pending steps (fix)', fn: () => submit({ type: 'override', op: 'clearPending' }) }, { sep: true }, { label: 'I concede', danger: true, fn: () => submit({ type: 'concede' }) }, { sep: true });
+    items.push({ label: fxEnabled() ? 'Attack animations: on' : 'Attack animations: off', fn: () => { setFxEnabled(!fxEnabled()); PT.toast(fxEnabled() ? 'Animations on' : 'Animations off'); } });
     items.push({ label: 'Back to lobby', fn: () => PT.go('lobby') });
     return PT.showMenu(items, btn, 'More');
   }
@@ -180,7 +218,9 @@ async function answerInflight(doc) {
   const r = apply(doc.state, action, PT.CARDS);
   if (r.error) { PT.toast(r.error); return; }
   if (r.prompt) { if (r.prompt.seat === mySeat(doc)) { doc.inflight = { action, prompt: r.prompt }; return answerInflight(doc); } doc.inflight = { action, prompt: r.prompt }; await PT.saveGame(doc); PT.render(); return; }
-  doc.prev = null; doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner; playEvents(r.events, doc); await PT.saveGame(doc); PT.render();
+  const scene = captureScene(r.events, doc.state);
+  doc.prev = null; doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner;
+  publishFx(doc, r.events); PT.render(); playEvents(r.events, doc, scene); await PT.saveGame(doc);
 }
 function handMenu(doc, legal, iid, anchor) {
   const g = doc.state; const me = mySeat(doc); const card = g.p[me].hand.find((c) => c.id === iid); if (!card) return; const c = C(card.c);

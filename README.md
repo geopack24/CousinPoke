@@ -35,3 +35,9 @@ Tables created in "auto" mode run a rules engine (`public/js/engine/`) with scri
 
 - `npm test` runs the engine tests.
 - `npm run smoke` runs every scripted attack, power and trainer with auto-answered prompts and reports crashes.
+
+## Attack animations
+
+`public/js/fx.js` draws attacks on a canvas over the board. Every attack gets a default animation for the attacker's type (Fire fireball, Water stream, Lightning strike, Grass leaves, Psychic rings, Fighting impact, Colorless slashes) after the attacking card jiggles. Signature moves live in `MOVE_FX` in the same file, keyed by attack name (`'Fire Spin'`) or by card and attack (`'base1-4|Fire Spin'`), and win over the type default. To add one, write a function `(fx, scene) => ({ impact, done })` using the toolkit on `fx` (`particle`, `burst`, `ring`, `bolt`, `beam`, `flash`, `glowSpot`, `slash`, `text`, `emitter`, `shake`, `at`). `scene.from` and `scene.targets[0]` are the attacker and defender rectangles. Both players' screens animate: the acting client stores the attack's events on the table document (`doc.fx`) and the other client plays them when it syncs. Players can turn animations off under More….
+
+Local testing: `python tools/devserver.py public 8766`, then `node tools/seed-dev.mjs` seeds a ready-to-attack table and `node tools/act-dev.mjs fxtest b '{"type":"attack","index":0}'` plays the other seat's move.

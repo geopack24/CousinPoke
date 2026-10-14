@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "poke-dev", "runtimeExecutable": "python", "runtimeArgs": ["tools/devserver.py", "public", "8766"], "port": 8766 }
+  ]
+}

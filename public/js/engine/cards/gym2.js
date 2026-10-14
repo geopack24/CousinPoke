@@ -137,7 +137,7 @@ export const gym2 = {
   'gym2-126': { trainer: (ctx) => { if (ctx.opp.bench.length && ctx.opp.active) { const k = ctx.chooseMon('Warp Point: choose your new Active Pokémon', ctx.opp.bench, { seat: ctx.oppSeat, id: 'warpOpp' })[0]; ctx.switchActive(ctx.oppSeat, k, 'Warp Point'); } if (ctx.me.bench.length && ctx.me.active) { const k = ctx.chooseMon('Warp Point: choose your new Active Pokémon', ctx.me.bench, { id: 'warpMe' })[0]; ctx.switchActive(ctx.seat, k, 'Warp Point'); } } },
   // ----- Stadiums -----
   'gym2-102': { stadium: { chaos: true }, trainer: () => {} },
-  'gym2-109': { stadium: { resistanceAmount: 10 }, trainer: () => {} },
+  'gym2-109': { stadium: { resistanceReduce: 20 }, trainer: () => {} },
   'gym2-113': { stadium: { ignoreWeakness: (g, db, src, target) => (db[src.c].types || []).includes('Water') && /Blaine/.test(db[target.c].name) }, trainer: () => {} },
   'gym2-114': { stadium: { canUse: (g, db, seat) => (P(g, seat).fuchsiaTurn === g.turnNo ? 'Already used this turn' : mons(P(g, seat)).some((m) => /Koga/.test(db[m.c].name)) ? true : "No Koga's Pokémon in play"), use: (ctx) => { ctx.me.fuchsiaTurn = ctx.g.turnNo; if (!ctx.flip()) return; const k = ctx.chooseMon('Shuffle which Pokémon into your deck? (or none)', ownPokemon(ctx).filter((m) => has(ctx, m, 'Koga')), { id: 'fuchsia', min: 0 }); if (k.length) shuffleSelfIn(ctx, findMon(ctx.g, k[0]).m, 'Fuchsia City Gym'); } }, trainer: () => {} },
   'gym2-119': { stadium: { onBench: (ctx, m) => { if (!ctx.flip("Rocket's Minefield Gym")) rawDamage(ctx, m, 20, 'Minefield'); } }, trainer: () => {} },

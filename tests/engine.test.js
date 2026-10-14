@@ -22,7 +22,7 @@ const inst = (cid) => ({ id: 'c' + (++ids).toString(36), c: cid });
 
 /** Build a game with explicit hands/decks and an optional board, already in the main phase. */
 function setup({ a, b, first = 'a', rules = {} }) {
-  const g = newGame({ rules: { firstTurnAttack: true, ...rules }, seats: { a: { uid: 'ua', name: 'Ann', cards: { [N['Pikachu']]: 60 } }, b: { uid: 'ub', name: 'Bob', cards: { [N['Pikachu']]: 60 } } }, seed: 7, first });
+  const g = newGame({ rules: { firstTurnAttack: true, weaknessBonus: 0, resistanceAmount: 30, ...rules }, seats: { a: { uid: 'ua', name: 'Ann', cards: { [N['Pikachu']]: 60 } }, b: { uid: 'ub', name: 'Bob', cards: { [N['Pikachu']]: 60 } } }, seed: 7, first });
   for (const s of ['a', 'b']) {
     const spec = s === 'a' ? a : b; const p = g.p[s];
     p.hand = (spec.hand || []).map(inst); p.deck = (spec.deck || []).map(inst); p.prizes = (spec.prizes || Array(6).fill(N['Bill'])).map(inst); p.discard = []; p.prizesTaken = 6 - p.prizes.length;
@@ -349,3 +349,9 @@ test('Gym sets: stadiums, Blaine, Fortitude, Rebellion, Psylink, Swift, Transpar
   assert.equal(tw.p.a.active.dmg, 10, 'active still hit by Spiral Dive');
 });
 
+test('house rule: weakness adds 10 and resistance takes 20', () => {
+  const w = setup({ a: { active: { c: N['Hitmonchan'], en: [N['Fighting Energy']] }, deck: [N['Bill']] }, b: { active: N['Electabuzz'], deck: [N['Bill']] }, rules: { weaknessBonus: 10, resistanceAmount: 20 } });
+  assert.equal(act(w, { type: 'attack', index: 0 }).p.b.active.dmg, 30, 'Jab 20 + 10 weakness');
+  const r = setup({ a: { active: { c: N['Hitmonchan'], en: [N['Fighting Energy']] }, deck: [N['Bill']] }, b: { active: N['Gastly'], deck: [N['Bill']] }, rules: { weaknessBonus: 10, resistanceAmount: 20 } });
+  assert.equal(act(r, { type: 'attack', index: 0 }).p.b.active.dmg, 0, 'Jab 20 − 20 resistance');
+});
