@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Animation Lab · Poké Table</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Titan+One&family=Nunito+Sans:wght@400;700;800&display=swap">
+<style>
+:root{--bg:#141821;--panel:#1d2330;--fg:#e9edf5;--muted:#9aa4b8;--accent:#ffcb05;--felt:#2f6b45;--felt-line:#255a38;--display:"Titan One",cursive}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:"Nunito Sans",system-ui,sans-serif;font-size:14px}
+header{display:flex;align-items:center;gap:14px;padding:10px 16px;background:#0f1218;border-bottom:1px solid #2a3140}
+header h1{font-family:var(--display);font-size:20px;margin:0;font-weight:400}
+header a{color:var(--muted);text-decoration:none}header a:hover{color:var(--fg)}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;padding:14px;align-items:start}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}}
+.board{position:relative;background:var(--felt);border-radius:16px;padding:18px;box-shadow:inset 0 0 0 2px var(--felt-line);min-height:560px;display:flex;flex-direction:column;justify-content:space-between;align-items:center;gap:20px;overflow:hidden}
+.fxlayer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:40;border-radius:16px}
+.row{display:flex;gap:16px;align-items:flex-end;justify-content:center;flex-wrap:wrap}
+.lbl{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.75;text-align:center;margin-bottom:4px}
+.cd{--s:.5;width:calc(240px*var(--s));height:calc(330px*var(--s));border-radius:calc(11px*var(--s));background-size:calc(2880px*var(--s)) auto;background-position:calc(-240px*var(--x)*var(--s)) calc(-330px*var(--y)*var(--s));background-repeat:no-repeat;flex:none;box-shadow:0 1px 3px rgba(0,0,0,.45);position:relative;background-color:#222}
+.mon{position:relative;flex:none}
+.mon .poke{position:relative}
+.mon .hp{position:absolute;left:-4px;top:-8px;background:rgba(0,0,0,.75);color:#fff;border-radius:6px;padding:1px 6px;font-size:11px;font-weight:800;z-index:3}
+.mon .nm{font-size:11px;font-weight:800;text-align:center;margin-top:4px;opacity:.9}
+.mon.windup .poke{animation:windup .45s}
+.mon.hit .poke{animation:shake .5s}
+@keyframes windup{0%,100%{transform:rotate(0)}15%{transform:rotate(-7deg) scale(1.04)}30%{transform:rotate(7deg) scale(1.07)}45%{transform:rotate(-6deg) scale(1.07)}60%{transform:rotate(5deg) scale(1.05)}80%{transform:translateY(-12px) rotate(0)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.float-dmg{position:absolute;left:50%;top:10%;transform:translateX(-50%);font-family:var(--display);font-size:28px;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.7),0 0 2px #e33;animation:floatup .9s forwards;pointer-events:none;z-index:9}
+@keyframes floatup{0%{opacity:0;transform:translate(-50%,10px)}20%{opacity:1}100%{opacity:0;transform:translate(-50%,-40px)}}
+.panel{background:var(--panel);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.panel h3{margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+input[type=text]{width:100%;padding:8px 10px;border-radius:8px;border:1px solid #38425a;background:#0f1218;color:var(--fg);font:inherit}
+button{font:inherit;font-weight:700;padding:6px 10px;border-radius:8px;border:1px solid #38425a;background:#283044;color:var(--fg);cursor:pointer}
+button:hover{background:#344059}
+button.pri{background:var(--accent);border-color:var(--accent);color:#1a1a1a}
+button.on{outline:2px solid var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.small{font-size:12px;color:var(--muted)}
+code{background:#0f1218;padding:1px 5px;border-radius:4px}
+.matched{font-size:12px;padding:6px 8px;border-radius:8px;background:#0f1218}
+.matched b{color:var(--accent)}
+</style>
+</head>
+<body>
+<header><h1>Animation Lab</h1><a href="./">← back to Poké Table</a><span class="small">Pick an attacker and a defender, then click an attack. Nothing here touches a real game.</span></header>
+<div class="wrap">
+  <div class="board" id="board">
+    <div><div class="lbl">Defender</div><div class="row"><div class="mon" id="def"></div><div class="mon" id="bench1" hidden></div></div></div>
+    <div><div class="lbl">Attacker</div><div class="row"><div class="mon" id="atk"></div></div></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="panel">
+      <h3>Cards</h3>
+      <label class="small">Attacker<input type="text" id="atkName" list="names" placeholder="Charmander" autocomplete="off"></label>
+      <label class="small">Defender<input type="text" id="defName" list="names" placeholder="Pikachu" autocomplete="off"></label>
+      <datalist id="names"></datalist>
+      <label class="small"><input type="checkbox" id="benchToggle"> also hit a benched Pokémon</label>
+    </div>
+    <div class="panel"><h3>Attacker's attacks</h3><div class="chips" id="attacks"></div><div class="matched" id="matched">Pick a card.</div></div>
+    <div class="panel"><h3>Type defaults</h3><div class="chips" id="types"></div><span class="small">Plays the fallback animation for that type with the current cards, regardless of the attack.</span></div>
+    <div class="panel"><h3>Signature moves</h3><div class="chips" id="moves"></div><span class="small">Entries in <code>MOVE_FX</code>. Add more in <code>js/fx.js</code>.</span></div>
+    <div class="panel"><h3>Other effects</h3><div class="chips"><button data-x="coin1">1 coin</button><button data-x="coin3">3 coins</button><button data-x="ko">Knock Out</button><button data-x="heal">Heal</button><button data-x="self">Self damage</button></div></div>
+  </div>
+</div>
+<script type="module">
+import { playAttack, playKO, playHeal, playSelfHit, playCoins, MOVE_FX, TYPE_FX } from './js/fx.js';
+const $ = (s) => document.querySelector(s);
+const DATA = await fetch('cards.json').then((r) => r.json());
+const CARDS = Object.fromEntries(DATA.cards.map((c) => [c.id, c]));
+const SETIDX = Object.fromEntries((DATA.sets || []).map((s) => [s.id, s]));
+const POKES = DATA.cards.filter((c) => c.st === 'Pokémon');
+const list = $('#names'); for (const n of [...new Set(POKES.map((c) => c.name))].sort()) { const o = document.createElement('option'); o.value = n; list.appendChild(o); }
+const cardStyle = (c) => { const s = SETIDX[c.set] || { cols: 12 }; return `background-image:url(${c.set}.webp);--x:${c.i % s.cols};--y:${Math.floor(c.i / s.cols)}`; };
+const state = { atk: byName('Charmander'), def: byName('Pikachu'), bench: byName('Electabuzz'), last: null };
+function byName(n) { return POKES.find((c) => c.name.toLowerCase() === n.toLowerCase()); }
+function monHTML(c, scale) { return `<div class="poke"><div class="cd" style="--s:${scale};${cardStyle(c)}"></div><span class="hp">${c.hp} HP</span></div><div class="nm">${c.name}</div>`; }
+function render() {
+  $('#atk').innerHTML = monHTML(state.atk, .5); $('#def').innerHTML = monHTML(state.def, .5); $('#bench1').innerHTML = monHTML(state.bench, .4); $('#bench1').hidden = !$('#benchToggle').checked;
+  $('#attacks').innerHTML = (state.atk.atk || []).map((a, i) => `<button data-i="${i}" class="pri">${a.n}${a.d ? ' ' + a.d : ''}</button>`).join('') || '<span class="small">No attacks</span>';
+}
+function rects() {
+  const b = $('#board'); const br = b.getBoundingClientRect();
+  const r = (el) => { const q = el.querySelector('.poke').getBoundingClientRect(); return { x: q.left - br.left, y: q.top - br.top, w: q.width, h: q.height, cx: q.left - br.left + q.width / 2, cy: q.top - br.top + q.height / 2 }; };
+  const targets = [r($('#def'))]; if ($('#benchToggle').checked) targets.push(r($('#bench1')));
+  return { from: r($('#atk')), targets };
+}
+function matchedKey(cardId, name, type) { if (MOVE_FX[`${cardId}|${name}`]) return `card-specific <b>${cardId}|${name}</b>`; if (MOVE_FX[name]) return `signature move <b>${name}</b>`; return `type default <b>${type}</b>`; }
+function play({ name, type, cardId, damage }) {
+  const { from, targets } = rects(); const scene = { type, name, cardId, from, targets, fromEl: $('#atk') };
+  state.last = { name, type, cardId, damage };
+  $('#matched').innerHTML = `Playing ${matchedKey(cardId, name, type)}`;
+  const t = playAttack($('#board'), scene);
+  setTimeout(() => { for (const id of ['def', ...($('#benchToggle').checked ? ['bench1'] : [])]) { const el = $('#' + id); el.classList.add('hit'); const f = document.createElement('div'); f.className = 'float-dmg'; f.textContent = '-' + (damage || 30); el.appendChild(f); setTimeout(() => { el.classList.remove('hit'); f.remove(); }, 900); } }, t.impact);
+}
+$('#atkName').onchange = (e) => { const c = byName(e.target.value); if (c) { state.atk = c; render(); } };
+$('#defName').onchange = (e) => { const c = byName(e.target.value); if (c) { state.def = c; render(); } };
+$('#benchToggle').onchange = render;
+$('#attacks').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; const a = state.atk.atk[+b.dataset.i]; play({ name: a.n, type: (state.atk.types || ['Colorless'])[0], cardId: state.atk.id, damage: parseInt(a.d, 10) || 30 }); };
+$('#types').innerHTML = Object.keys(TYPE_FX).map((t) => `<button data-t="${t}">${t}</button>`).join('');
+$('#types').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; play({ name: '(type default)', type: b.dataset.t, cardId: state.atk.id, damage: 30 }); };
+$('#moves').innerHTML = Object.keys(MOVE_FX).sort().map((m) => `<button data-m="${m}">${m}</button>`).join('');
+$('#moves').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; play({ name: b.dataset.m, type: (state.atk.types || ['Colorless'])[0], cardId: state.atk.id, damage: 60 }); };
+document.querySelector('.panel:last-child .chips').onclick = (e) => {
+  const b = e.target.closest('button'); if (!b) return; const { from, targets } = rects(); const board = $('#board');
+  if (b.dataset.x === 'coin1') playCoins(board, [Math.random() < 0.5]); if (b.dataset.x === 'coin3') playCoins(board, [0, 1, 2].map(() => Math.random() < 0.5));
+  if (b.dataset.x === 'ko') playKO(board, targets[0]); if (b.dataset.x === 'heal') playHeal(board, from); if (b.dataset.x === 'self') playSelfHit(board, from);
+};
+document.addEventListener('keydown', (e) => { if (e.key === ' ' && state.last && e.target.tagName !== 'INPUT') { e.preventDefault(); play(state.last); } });
+$('#atkName').value = 'Charmander'; $('#defName').value = 'Pikachu'; render();
+</script>
+</body>
+</html>
