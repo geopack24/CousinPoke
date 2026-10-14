@@ -117,11 +117,12 @@ export function render(main, doc) {
     ${g.phase === 'setup' && legal.some((a) => a.type === 'setupDone') ? '<button type="button" class="pri" data-act="setupDone">Ready</button>' : ''}
     ${pending && pending.t === 'mulliganDraw' && pending.seat === me ? `<button type="button" class="pri" data-act="mulliganDraw1">Draw ${pending.n} extra</button><button type="button" data-act="mulliganDraw0">Skip</button>` : ''}
     ${doc.prev && doc.prev.seat === me && !g.winner ? '<button type="button" data-act="undo" title="Undo your last move (only moves that revealed nothing)">Undo</button>' : ''}
+    ${legal.some((a) => a.type === 'useStadium') ? `<button type="button" data-act="useStadium">Use ${esc(C(g.stadium.c).name)}</button>` : ''}
     ${myTurn ? '<button type="button" class="pri" data-act="end">End turn</button>' : ''}
     ${inflightMine ? '<button type="button" class="pri" data-act="answer">Answer the prompt</button>' : ''}
     <button type="button" data-act="more">More…</button>` : '<span class="small">Watching</span>';
   main.innerHTML = `<div class="tablewrap"><div class="board auto">${sideHTML(top, true)}
-    <div class="midbar"><span class="turn ${myTurn ? 'mine' : ''}">${statusLine}</span>${doc.inflight && !inflightMine ? `<span class="chip">Waiting for ${esc(g.seats[doc.inflight.prompt.seat].name)}…</span>` : ''}<span class="grow"></span>${buttons}</div>
+    <div class="midbar"><span class="turn ${myTurn ? 'mine' : ''}">${statusLine}</span>${g.stadium ? `<span class="chip click" data-stadium="${g.stadium.c}" title="Stadium in play (click to read)">Stadium: ${esc(C(g.stadium.c).name)}</span>` : ''}${doc.inflight && !inflightMine ? `<span class="chip">Waiting for ${esc(g.seats[doc.inflight.prompt.seat].name)}…</span>` : ''}<span class="grow"></span>${buttons}</div>
     ${sideHTML(bottom, false)}
     <div class="legend small"><span class="SLP">Zz Asleep</span><span class="CNF">?! Confused</span><span class="PAR">⚡ Paralyzed</span><span class="PSN">☠ Poisoned</span><span class="FX">SHIELD / BARRIER / DEF: protection in effect</span><span class="muted">Badges show only while a condition is on that Pokémon.</span></div></div>
     <aside class="logpane panel"><div class="row"><h3 class="grow">${esc(doc.name)}</h3><span class="chip">Auto rules</span><button class="sm" type="button" data-act="rules">Rules</button></div>
@@ -133,6 +134,7 @@ export function render(main, doc) {
   main.onclick = (e) => {
     const t = e.target; const btn = t.closest('button');
     if (btn && btn.dataset.act) return onButton(btn.dataset.act, btn, doc, legal, me);
+    const stEl = t.closest('[data-stadium]'); if (stEl) return PT.viewCard(stEl.dataset.stadium);
     const hand = t.closest('[data-hand]'); if (hand && me) return handMenu(doc, legal, hand.dataset.hand, hand);
     const mon = t.closest('[data-mon]'); if (mon) return monMenu(doc, legal, mon.dataset.mon, mon, me);
     const prize = t.closest('[data-prize]'); if (prize && me && prize.dataset.seat === me && pending && pending.t === 'prize' && pending.seat === me) return submit({ type: 'takePrize', index: +prize.dataset.prize });
@@ -161,6 +163,7 @@ function onButton(act, btn, doc, legal, me) {
   if (act === 'mulliganDraw1') return submit({ type: 'mulliganDraw', n: g.pending[0].n });
   if (act === 'mulliganDraw0') return submit({ type: 'mulliganDraw', n: 0 });
   if (act === 'answer') return answerInflight(doc);
+  if (act === 'useStadium') return submit({ type: 'useStadium' });
   if (act === 'rules') return PT.showModal('Rules at this table', `<p>${esc(PT.rulesSummary(g.rules))}</p>${g.rules.notes ? `<div class="notice info" style="white-space:pre-wrap">${esc(g.rules.notes)}</div>` : ''}<p class="small muted">Automated rules: the table enforces costs, timing, damage, conditions and prizes. Use "Fix" on a Pokémon or the More menu if a card isn't automated yet.</p>`);
   if (act === 'more') {
     const items = [];

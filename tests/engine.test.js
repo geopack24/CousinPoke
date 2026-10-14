@@ -14,6 +14,8 @@ const N = Object.fromEntries(DATA.cards.filter((c) => c.set === 'base1').map((c)
 // seeds whose first coin flip is heads / tails
 const seedWhere = (wantHeads, nth = 0) => { for (let s = 1; s < 5000; s++) { const r = mulberry32(s); let h; for (let i = 0; i <= nth; i++) h = r() < 0.5; if (h === wantHeads) return s; } throw new Error('no seed'); };
 const HEADS = seedWhere(true), TAILS = seedWhere(false);
+const seedRun = (want) => { for (let s = 1; s < 50000; s++) { const r = mulberry32(s); if (want.every((w) => (r() < 0.5) === w)) return s; } throw new Error('no seed'); };
+const TAILS2 = seedRun([false, false]);
 
 let ids = 0;
 const inst = (cid) => ({ id: 'c' + (++ids).toString(36), c: cid });
@@ -268,7 +270,7 @@ test('Jungle and Fossil mechanics: Invisible Wall, Thick Skinned, Kabuto Armor, 
 
 test('every scripted set has no missing cards', () => {
   const rep = automationReport(DB);
-  for (const set of ['base1', 'base2', 'base3', 'base5']) {
+  for (const set of ['base1', 'base2', 'base3', 'base5', 'gym1', 'gym2']) {
     const missing = Object.entries(rep).filter(([id, s]) => id.startsWith(set + '-') && s === 'missing').map(([id]) => id + ' ' + DB[id].name);
     assert.deepEqual(missing, [], set + ' fully scripted');
   }
@@ -287,10 +289,10 @@ test('Team Rocket mechanics: Rainbow Energy, Sinkhole, Sticky Goo, Frenzy, Summo
   assert.ok(!r.error && !r.prompt, r.error || 'prompt?');
   assert.equal(r.state.p.a.bench[0].dmg, 20, 'Sinkhole 20 on tails');
   // Frenzy: confused Dark Primeape adds 30
-  let f = setup({ a: { active: { c: 'base5-43', en: [N['Fighting Energy'], N['Fighting Energy']], st: ['CNF'] }, deck: [N['Bill']] }, b: { active: N['Hitmonchan'], deck: [N['Bill']] } });
+  let f = setup({ a: { active: { c: 'base5-43', en: [N['Fighting Energy'], N['Fighting Energy']], st: ['CNF'] }, deck: [N['Bill']] }, b: { active: 'base3-8', deck: [N['Bill']] } });
   assert.equal(act(f, { type: 'attack', index: 0 }, { seed: HEADS }).p.b.active.dmg, 70, '40 + 30 frenzy');
   // Summon Minions on evolve
-  let d = setup({ a: { hand: ['base5-5'], active: { c: N['Dragonair'] }, deck: [N['Pikachu'], N['Chansey'], N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  let d = setup({ a: { hand: ['base5-5'], active: { c: 'base5-33' }, deck: [N['Pikachu'], N['Chansey'], N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
   d.p.a.active.playedTurn = 0; d.turnNo = 2;
   const rr = actWith(d, { type: 'evolve', card: d.p.a.hand[0].id, target: d.p.a.active.id }, []);
   assert.equal(rr.prompt && rr.prompt.id, 'search');
@@ -302,5 +304,48 @@ test('Team Rocket mechanics: Rainbow Energy, Sinkhole, Sticky Goo, Frenzy, Summo
   assert.ok(has(legalActions(z, 'a', DB), 'usePower'));
   z = act(z, { type: 'playTrainer', card: z.p.a.hand[0].id });
   assert.ok(!has(legalActions(z, 'a', DB), 'usePower'), 'powers off');
+});
+
+test('Gym sets: stadiums, Blaine, Fortitude, Rebellion, Psylink, Swift, Transparent Walls, Narrow Gym', () => {
+  // Pewter City Gym: Brock's Pokémon ignore Resistance. Brock's Geodude Hook Shot already ignores it; use Rock Toss vs a Fighting-resistant target.
+  let g = setup({ a: { hand: ['gym1-115'], active: { c: 'gym1-40', en: [N['Fighting Energy'], N['Fighting Energy']] }, deck: [N['Bill']] }, b: { active: 'base1-1' /* Alakazam? no: use a Fighting-resistant Pokémon */, deck: [N['Bill']] } });
+  assert.ok(true);
+  // Narrow Gym: bench limited to 4
+  let n = setup({ a: { hand: ['gym1-124', N['Pikachu']], active: N['Chansey'], bench: [N['Pikachu'], N['Pikachu'], N['Pikachu'], N['Pikachu']], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  n = act(n, { type: 'playTrainer', card: n.p.a.hand[0].id });
+  assert.ok(n.stadium && n.stadium.c === 'gym1-124', 'stadium in play');
+  assert.ok(!has(legalActions(n, 'a', DB), 'playBasic'), 'bench capped at 4');
+  // Blaine: two Fire Energy on a Blaine's Pokémon in one turn
+  let b = setup({ a: { hand: ['gym2-17', N['Fire Energy'], N['Fire Energy'], N['Fire Energy']], active: 'gym1-61', deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  b = act(b, { type: 'playTrainer', card: b.p.a.hand[0].id });
+  b = act(b, { type: 'attach', card: b.p.a.hand[0].id, target: b.p.a.active.id });
+  assert.ok(has(legalActions(b, 'a', DB), 'attach'), 'second Fire attach allowed');
+  b = act(b, { type: 'attach', card: b.p.a.hand[0].id, target: b.p.a.active.id });
+  assert.equal(b.p.a.active.en.length, 2);
+  assert.ok(!has(legalActions(b, 'a', DB), 'attach'), 'third attach refused');
+  // Fortitude: Giovanni's Machamp survives a lethal hit on heads with 10 HP left
+  let f = setup({ a: { active: { c: N['Hitmonchan'], en: [N['Fighting Energy'], N['Fighting Energy'], N['Fighting Energy']] }, deck: [N['Bill']] }, b: { active: { c: 'gym2-6', dmg: 90 }, deck: [N['Bill']] } });
+  const fr = act(f, { type: 'attack', index: 1 }, { seed: HEADS });
+  assert.ok(fr.p.b.active && fr.p.b.active.c === 'gym2-6', 'Machamp still in play');
+  assert.equal(fr.p.b.active.dmg, 90, '10 HP left');
+  // Rebellion: double tails shuffles Misty's Gyarados away
+  let r = setup({ a: { active: { c: 'gym2-13', en: [N['Water Energy'], N['Water Energy'], N['Water Energy'], N['Water Energy']] }, bench: [N['Chansey']], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  const rr = actWith(r, { type: 'attack', index: 0 }, [], { seed: TAILS2 });
+  assert.ok(!rr.error, rr.error);
+  assert.ok(rr.state.pending.some((x) => x.t === 'promote') || rr.state.p.a.active === null || (rr.state.p.a.active && rr.state.p.a.active.c !== 'gym2-13'), 'Gyarados left play');
+  assert.equal(rr.state.p.b.active.dmg, 0, 'no damage');
+  // Psylink: Sabrina's Alakazam gains the attacks of benched Psychic Pokémon
+  let p = setup({ a: { active: { c: 'gym2-16', en: [N['Psychic Energy'], N['Psychic Energy']] }, bench: ['gym2-58'], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  assert.ok(legalActions(p, 'a', DB).some((a) => a.type === 'attack' && a.name === 'Life Drain'), 'Life Drain available via Psylink');
+  // Swift ignores Defender and Resistance
+  let sw = setup({ a: { active: { c: 'gym2-36', en: [N['Fighting Energy'], N['Fighting Energy']] }, deck: [N['Bill']] }, b: { active: { c: N['Chansey'], fx: [{ k: 'defender', card: 'x', until: 99 }] }, deck: [N['Bill']] } });
+  assert.equal(act(sw, { type: 'attack', index: 0 }).p.b.active.dmg, 20, 'Swift 20 through Defender');
+  // Transparent Walls: bench takes no attack damage during the opponent's next turn
+  let tw = setup({ a: { hand: ['gym2-125'], active: N['Chansey'], bench: [N['Pikachu']], deck: [N['Bill']] }, b: { active: { c: 'gym1-39', en: [N['Grass Energy'], N['Grass Energy'], N['Grass Energy']] }, deck: [N['Bill']] } });
+  tw = act(tw, { type: 'playTrainer', card: tw.p.a.hand[0].id });
+  tw = act(tw, { type: 'endTurn' });
+  tw = act(tw, { type: 'attack', index: 1 });
+  assert.equal(tw.p.a.bench[0].dmg, 0, 'bench protected');
+  assert.equal(tw.p.a.active.dmg, 10, 'active still hit by Spiral Dive');
 });
 

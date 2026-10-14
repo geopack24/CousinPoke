@@ -2,9 +2,11 @@
 import { base1 } from './base1.js';
 import { jungle } from './jungle.js';
 import { rocket } from './rocket.js';
+import { gym1 } from './gym1.js';
+import { gym2 } from './gym2.js';
 import { fossil } from './fossil.js';
 
-export const CARD_SCRIPTS = Object.assign({}, base1, jungle, fossil, rocket);
+export const CARD_SCRIPTS = Object.assign({}, base1, jungle, fossil, rocket, gym1, gym2);
 
 /** Which cards of a set are fully automated: those with no text, or with a script. */
 export function automationReport(db) {
@@ -15,7 +17,7 @@ export function automationReport(db) {
     if (c.st === 'Pokémon') {
       for (const a of c.atk || []) { if (a.t || !/^\d+$/.test(a.d || '')) { needs = true; if (!(s && s.attacks && s.attacks[a.n])) has = false; } }
       for (const p of c.pw || []) { needs = true; if (!(s && ((s.powers && s.powers[p.n]) || s.passive || s.onPlay))) has = false; }
-    } else if (c.st === 'Trainer') { needs = true; if (!(s && (s.trainer || s.asPokemon))) has = false; }
+    } else if (c.st === 'Trainer') { needs = true; if (!(s && (s.trainer || s.asPokemon || s.stadium))) has = false; }
     else if (c.st === 'Energy' && c.sub !== 'Basic') { needs = true; if (!(s && s.energy)) has = false; }
     out[c.id] = needs ? (has ? 'scripted' : 'missing') : 'plain';
   }

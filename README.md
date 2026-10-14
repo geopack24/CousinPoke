@@ -28,3 +28,10 @@ The database tables are created automatically on first use. No SQL to run by han
 - `functions/api/[[route]].js` — the API: `POST /api/sync`, plus `GET`/`PUT`/`DELETE` on `/api/{games|decks|players}/{id}`.
 
 Card data comes from the PokemonTCG/pokemon-tcg-data project and images.pokemontcg.io. Card art is © The Pokémon Company; this is a private fan project.
+
+## Automated tables
+
+Tables created in "auto" mode run a rules engine (`public/js/engine/`) with scripts for every card in all six sets (`public/js/engine/cards/`). Stadium cards sit in the middle bar; cards that can't be fully automated (Lt. Surge's Secret Plan, Sabrina's ESP re-flips, Chaos Gym's "opponent may use it" clause) are noted in the log and can be settled with the Fix menu.
+
+- `npm test` runs the engine tests.
+- `npm run smoke` runs every scripted attack, power and trainer with auto-answered prompts and reports crashes.

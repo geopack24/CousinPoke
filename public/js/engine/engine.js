@@ -44,6 +44,10 @@ export function canPay(db, rules, m, cost) {
 
 /* ---------- card helpers ---------- */
 export function scriptOf(cid) { return CARD_SCRIPTS[cid] || {}; }
+export function stadiumScript(g) { return g.stadium ? (scriptOf(g.stadium.c).stadium || {}) : {}; }
+export function benchLimit(g) { const st = stadiumScript(g); return Math.min(R(g.rules).benchSize, st.benchMax || 99); }
+export const nameHas = (db, m, word) => (db[m.c] ? db[m.c].name : '').includes(word);
+export function playerFx(g, seat, k) { const p = P(g, seat); return p.fx ? p.fx.find((f) => f.k === k) : null; }
 export function attackScript(cid, name) { const s = scriptOf(cid); return s.attacks && s.attacks[name]; }
 /** Does `viewer` get to see the opponent's hand (Omanyte's Clairvoyance)? */
 export function seesOpponentHand(g, db, viewer) {
@@ -64,19 +68,29 @@ export const conditioned = (m) => m.st.some((x) => x === 'SLP' || x === 'CNF' ||
 /** The card a Pokémon currently behaves as: Ditto copies the Defending Pokémon while Active and unconditioned. */
 export function effectiveCard(g, db, m) {
   const c = db[m.c]; const s = scriptOf(m.c);
+  if (m.flags.shapeOf && db[m.flags.shapeOf]) return { ...db[m.flags.shapeOf], id: m.flags.shapeOf, pw: [] };
+  if (s.passive && s.passive.psylink && !conditioned(m) && powersActive(g, db)) {
+    const owner = findMon(g, m.id); if (owner) { const atk = [...(c.atk || [])]; const atkSrc = {}; for (const x of mons(owner.p)) { if (x.id === m.id) continue; const xc = db[x.c]; if ((xc.types || []).includes('Psychic')) for (const a of xc.atk || []) if (!atk.some((y) => y.n === a.n)) { atk.push(a); atkSrc[a.n] = x.c; } } return { ...c, atk, atkSrc }; }
+  }
   if (s.passive && s.passive.transform && !conditioned(m) && powersActive(g, db)) {
     const owner = findMon(g, m.id); if (owner && owner.p.active && owner.p.active.id === m.id) { const d = P(g, other(owner.seat)).active; if (d && db[d.c] && db[d.c].st === 'Pokémon') return { ...db[d.c], id: db[d.c].id, name: c.name + ' (as ' + db[d.c].name + ')', sub: c.sub, ev: undefined }; }
   }
   return c;
 }
 export function typeOf(g, db, m) { return m.flags.typeOverride || (effectiveCard(g, db, m).types || ['Colorless'])[0]; }
-export function monHP(db, m, g) { const c = g ? effectiveCard(g, db, m) : db[m.c]; return c && c.hp ? c.hp : 0; }
+export function monHP(db, m, g) {
+  const c = g ? effectiveCard(g, db, m) : db[m.c]; let hp = c && c.hp ? c.hp : 0;
+  if (m.flags.hpOverride) hp = m.flags.hpOverride;
+  const ps = scriptOf(m.c).passive; if (ps && ps.bonusHP && g && powersActive(g, db)) hp += ps.bonusHP(db, m);
+  return hp;
+}
 export function isDollLike(db, m) { return db[m.c] && db[m.c].st === 'Trainer'; }
 export function stageOf(db, m) { const c = db[m.c]; return c.st === 'Pokémon' ? c.sub : 'Basic'; }
 export function hasFx(m, k) { return m.fx.some((f) => f.k === k); }
 export function retreatCost(g, db, seat, m) {
   let rc = effectiveCard(g, db, m).rc || 0;
   { const oa = P(g, other(seat)).active; if (oa && powersActive(g, db)) { const s = scriptOf(oa.c); if (s.passive && s.passive.retreatTax && !conditioned(oa)) rc += s.passive.retreatTax; } }
+  { const st = stadiumScript(g); if (st.retreatMod) rc += st.retreatMod(g, db, seat, m); }
   if (powersActive(g, db)) for (const b of P(g, seat).bench) { const s = scriptOf(b.c); if (s.passive && s.passive.retreatAid && !conditioned(b)) rc -= s.passive.retreatAid; }
   return Math.max(0, rc);
 }
@@ -87,6 +101,8 @@ function myTurn(g, seat) { return g.phase === 'main' && g.turn === seat && !g.pe
 export function evolutionLocked(g, db) { return allMons(g).some((m) => { const s = scriptOf(m.c); return s.passive && s.passive.noEvolve && !conditioned(m) && powersActive(g, db); }); }
 function canEvolveTarget(g, m, rules, db) {
   if (db && evolutionLocked(g, db)) return false;
+  if (m.flags.shapeOf) return false;
+  if (m.flags.giovanniTurn === g.turnNo) return true;
   if (m.playedTurn >= g.turnNo) return false; // must have been in play since last turn (setup placements are turn 0)
   if (!R(rules).multiEvolve && m.evolvedTurn === g.turnNo) return false;
   return true;
@@ -96,7 +112,14 @@ export function matchesEvolution(db, cardId, m) {
   const c = db[cardId]; const t = db[m.c];
   return !!(c && t && c.st === 'Pokémon' && c.ev && c.ev === t.name);
 }
-export function canAttack(g, seat, idx, db) {
+/** One attachment per turn, except Blaine lets 2 Fire go onto a Blaine's Pokémon. Crystal Beam blocks a target. */
+export function canAttachNow(g, db, seat, card, m) {
+  const p = P(g, seat); if (hasFx(m, 'noAttach')) return false;
+  const blaine = p.blaineTurn === g.turnNo && energyTypesOf(db, card).includes('Fire') && nameHas(db, m, "Blaine's");
+  if (blaine) return (p.blaineAttached || 0) < 2 && (!p.attachedThisTurn || p.blaineAttached > 0);
+  return !p.attachedThisTurn;
+}
+export function canAttack(g, seat, idx, db, srcCid) {
   const r = R(g.rules); const p = P(g, seat); const m = p.active; if (!m) return { ok: false, why: 'No Active Pokémon' };
   if (!myTurn(g, seat)) return { ok: false, why: 'Not your turn' };
   if (g.attacked) return { ok: false, why: 'Already attacked this turn' };
@@ -105,7 +128,7 @@ export function canAttack(g, seat, idx, db) {
   if (isDollLike(db, m)) return { ok: false, why: 'This card cannot attack' };
   if (m.st.includes('SLP')) return { ok: false, why: 'Asleep' };
   if (m.st.includes('PAR')) return { ok: false, why: 'Paralyzed' };
-  const c = effectiveCard(g, db, m); const atk = (c.atk || [])[idx]; if (!atk) return { ok: false, why: 'No such attack' };
+  const c = srcCid ? db[srcCid] : effectiveCard(g, db, m); const atk = (c.atk || [])[idx]; if (!atk) return { ok: false, why: 'No such attack' };
   if (!canPay(db, g.rules, m, atk.c)) return { ok: false, why: 'Not enough energy' };
   if (fxOf(m, 'noAttack').some((f) => f.attack === atk.n || !f.attack)) return { ok: false, why: `Can't use ${atk.n} this turn` };
   if (m.flags['used:' + atk.n] && attackScript(c.id, atk.n) && attackScript(c.id, atk.n).oncePerLife) return { ok: false, why: 'Already used' };
@@ -138,8 +161,8 @@ export function legalActions(g, seat, db) {
   // hand cards
   for (const c of p.hand) {
     const card = db[c.c]; if (!card) continue;
-    if (card.st === 'Energy' && !p.attachedThisTurn) for (const m of mons(p)) if (!isDollLike(db, m)) out.push({ type: 'attach', card: c.id, target: m.id });
-    if (isBasicLike(card) && p.bench.length < r.benchSize) out.push({ type: 'playBasic', card: c.id });
+    if (card.st === 'Energy') for (const m of mons(p)) if (!isDollLike(db, m) && canAttachNow(g, db, seat, c, m)) out.push({ type: 'attach', card: c.id, target: m.id });
+    if (isBasicLike(card) && p.bench.length < benchLimit(g)) out.push({ type: 'playBasic', card: c.id });
     if (card.st === 'Pokémon' && card.sub !== 'Basic') for (const m of mons(p)) if (matchesEvolution(db, c.c, m) && canEvolveTarget(g, m, r, db)) out.push({ type: 'evolve', card: c.id, target: m.id });
     if (card.st === 'Trainer' && !isBasicLike(card)) {
       const s = scriptOf(c.c);
@@ -159,6 +182,7 @@ export function legalActions(g, seat, db) {
       out.push({ type: 'usePower', pokemon: m.id, power: name });
     }
   }
+  { const st = stadiumScript(g); if (st.use && st.canUse && st.canUse(g, db, seat) === true) out.push({ type: 'useStadium' }); }
   if (p.active && isDollLike(db, p.active) && scriptOf(p.active.c).asPokemon && scriptOf(p.active.c).asPokemon.canDiscard) out.push({ type: 'discardDoll', pokemon: p.active.id });
   for (const m of p.bench) if (isDollLike(db, m) && scriptOf(m.c).asPokemon && scriptOf(m.c).asPokemon.canDiscard) out.push({ type: 'discardDoll', pokemon: m.id });
   // retreat
@@ -167,7 +191,10 @@ export function legalActions(g, seat, db) {
     if (energyUnits(db, p.active) >= rc && !hasFx(p.active, 'noRetreat')) for (const m of p.bench) out.push({ type: 'retreat', target: m.id });
   }
   // attacks
-  if (p.active) (effectiveCard(g, db, p.active).atk || []).forEach((a, i) => { if (canAttack(g, seat, i, db).ok) out.push({ type: 'attack', index: i, name: a.n }); });
+  if (p.active) {
+    (effectiveCard(g, db, p.active).atk || []).forEach((a, i) => { if (canAttack(g, seat, i, db).ok) out.push({ type: 'attack', index: i, name: a.n }); });
+    if (p.active.flags.recallTurn === g.turnNo) for (const u of p.active.un) (db[u.c].atk || []).forEach((a, i) => { if (canAttack(g, seat, i, db, u.c).ok) out.push({ type: 'attack', index: i, name: a.n, src: u.c }); });
+  }
   out.push({ type: 'endTurn' });
   return out;
 }
@@ -234,7 +261,7 @@ function makeCtx(g, db, rng, events, seat, nextAnswer, action) {
     heal(m, n) { const before = m.dmg; m.dmg = Math.max(0, m.dmg - (n == null ? m.dmg : n)); if (before !== m.dmg) { events.push({ t: 'heal', target: m.id, amount: before - m.dmg }); ctx.log(`${nameOf(db, m.c)} healed ${before - m.dmg}`); } },
     addFx(m, fx) { m.fx.push(fx); },
     /* --- attached cards --- */
-    discardEnergy(m, cards) { const owner = findMon(g, m.id).seat; for (const c of cards) { pullCard(g, c.id); P(g, owner).discard.push(c); } events.push({ t: 'discardEnergy', target: m.id, n: cards.length }); ctx.log(`Discarded ${cards.map((c) => nameOf(db, c.c)).join(', ')} from ${nameOf(db, m.c)}`); },
+    discardEnergy(m, cards) { const owner = findMon(g, m.id).seat; if (owner !== ctx.seat && m.tools.some((t) => scriptOf(t.c).protectEnergy)) { ctx.log(`Brock's Protection keeps the Energy on ${nameOf(db, m.c)}`); return; } for (const c of cards) { pullCard(g, c.id); P(g, owner).discard.push(c); } events.push({ t: 'discardEnergy', target: m.id, n: cards.length }); ctx.log(`Discarded ${cards.map((c) => nameOf(db, c.c)).join(', ')} from ${nameOf(db, m.c)}`); },
     /** Player `s` picks `n` energy cards attached to m (optionally filtered) and discards them. Skipped when copying (Metronome). */
     requireDiscardEnergy(m, n, filter, label) {
       if (ctx.copying) return [];
@@ -247,6 +274,8 @@ function makeCtx(g, db, rng, events, seat, nextAnswer, action) {
       const p = P(g, s); const i = p.bench.findIndex((x) => x.id === benchId); if (i < 0 || !p.active) return;
       const old = p.active; p.active = p.bench[i]; p.bench[i] = old;
       if (!R(g.rules).conditionsPersist) { old.st = []; delete old.flags.toxic; }
+      old.fx = old.fx.filter((f) => !f.benchClears); for (const t of old.tools.slice()) if (scriptOf(t.c).discardOnBench) { pullCard(g, t.id); p.discard.push(t); }
+      if (old.flags.giantGrowth) { delete old.flags.giantGrowth; delete old.flags.hpOverride; }
       events.push({ t: 'switch', seat: s, out: old.id, in: p.active.id });
       ctx.log(`${why || 'Switch'}: ${ctx.name(s)}'s ${nameOf(db, old.c)} to the bench, ${nameOf(db, p.active.c)} is now Active`);
     },
@@ -271,17 +300,24 @@ function dealDamage(ctx, target, amount, opts = {}) {
   const { g, db, events } = ctx; const src = opts.source; let dmg = amount;
   if (dmg <= 0) return 0;
   const tCard = effectiveCard(g, db, target); const sCard = src ? effectiveCard(g, db, src) : null;
-  const info = { target, source: src, base: amount, wr: false };
+  const info = { target, source: src, base: amount, wr: false }; const st = stadiumScript(g);
+  if (opts.pure) { target.dmg += dmg; target.flags.lastHit = { amount: dmg, turn: g.turnNo }; events.push({ t: 'damage', target: target.id, amount: dmg }); ctx.log(`${dmg} damage to ${nameOf(db, target.c)} (Swift, now ${target.dmg})`); return dmg; }
   if (!opts.noWR && sCard && !opts.bench && !opts.self) {
     const type = typeOf(g, db, src);
     const wk = target.flags.wkOverride ? [target.flags.wkOverride] : (tCard.wk || []);
     const rs = target.flags.rsOverride ? [target.flags.rsOverride] : (tCard.rs || []);
-    if (wk.includes(type)) { dmg *= 2; info.wr = 'weak'; }
-    if (rs.includes(type)) { dmg = Math.max(0, dmg - 30); info.wr = 'resist'; }
+    const ignoreWeak = st.ignoreWeakness && st.ignoreWeakness(g, db, src, target);
+    if (wk.includes(type) && !ignoreWeak) { dmg *= 2; info.wr = 'weak'; }
+    const noRes = opts.noResist || (st.noResistanceFor && st.noResistanceFor(g, db, src));
+    if (rs.includes(type) && !noRes) { dmg = Math.max(0, dmg - (st.resistanceAmount || 30)); info.wr = 'resist'; }
   }
+  if (src && !opts.self && !opts.bench && target === ctx.defender) { for (const f of fxOf(src, 'bonus')) dmg += f.amount; const my = findMon(g, src.id); if (my && playerFx(g, my.seat, 'misty') && nameHas(db, src, "Misty's") && dmg > 0) dmg += 20; for (const f of fxOf(src, 'charity')) dmg = Math.max(0, dmg - f.amount); }
+  if (opts.bench) { const o = findMon(g, target.id); if (o && o.p.active !== target && playerFx(g, o.seat, 'benchShield')) { ctx.log(`Transparent Walls protects ${nameOf(db, target.c)}`); return 0; } }
   if (src && !opts.self && !opts.bench && target === ctx.opp.active) dmg += 10 * fxOf(src, 'plusPower').length;
-  if (!opts.self) { dmg = Math.max(0, dmg - 20 * fxOf(target, 'defender').length); for (const f of fxOf(target, 'reduce')) dmg = Math.max(0, dmg - f.amount); }
-  if (!opts.self && !opts.bench) { const ps = scriptOf(target.c).passive; if (ps && ps.halveDamage && powersActive(g, db) && !conditioned(target)) dmg = Math.floor(dmg / 20) * 10; }
+  if (!opts.self) { dmg = Math.max(0, dmg - 20 * fxOf(target, 'defender').length); for (const f of fxOf(target, 'reduce')) dmg = Math.max(0, dmg - f.amount); if (hasFx(target, 'halveNext')) dmg = Math.ceil(dmg / 20) * 10; }
+  if (!opts.self && !opts.bench) { const ps = scriptOf(target.c).passive; if (ps && ps.halveDamage && powersActive(g, db) && !conditioned(target)) dmg = Math.floor(dmg / 20) * 10; if (ps && ps.reduceIncoming && powersActive(g, db) && !conditioned(target)) dmg = Math.max(0, ps.reduceIncoming({ ctx, target, source: src, amount: dmg })); }
+  if (!opts.self) { for (const s2 of ['a', 'b']) { const act = P(g, s2).active; if (act && act !== target) { const hs = scriptOf(act.c).passive; if (hs && hs.halveAll && powersActive(g, db) && !conditioned(act)) dmg = Math.ceil(dmg / 20) * 10; } } }
+  if (opts.bench && !opts.self) { const o = findMon(g, target.id); if (o) for (const b of o.p.bench) { const bs = scriptOf(b.c).passive; if (bs && bs.benchGuard && b.id !== target.id && powersActive(g, db) && !conditioned(b) && dmg >= 10 && b.dmg + 10 < monHP(db, b, g)) { b.dmg += 10; dmg -= 10; ctx.log(`Bench Guard: 10 of that damage goes to ${nameOf(db, b.c)} (now ${b.dmg})`); break; } } }
   // prevention effects on the target
   if (!opts.self) {
     if (hasFx(target, 'preventAll') || hasFx(target, 'preventDamage')) { ctx.log(`${nameOf(db, target.c)}: damage prevented`); return 0; }
@@ -296,7 +332,8 @@ function dealDamage(ctx, target, amount, opts = {}) {
   const owner = findMon(g, target.id); ctx.log(`${dmg} damage to ${owner ? ctx.name(owner.seat) + "'s " : ''}${nameOf(db, target.c)}${info.wr === 'weak' ? ' (weakness)' : info.wr === 'resist' ? ' (resistance)' : ''} (now ${target.dmg})`);
   // Machamp-style counter damage
   const ps = scriptOf(target.c).passive;
-  if (ps && ps.onDamaged && src && !opts.self && !opts.bench && powersActive(g, db) && !conditioned(target)) ps.onDamaged({ ctx, target, source: src, amount: dmg });
+  if (ps && ps.onDamaged && src && !opts.self && !opts.bench && powersActive(g, db) && (ps.alwaysOn || !conditioned(target))) ps.onDamaged({ ctx, target, source: src, amount: dmg });
+  if (ps && ps.onAnyDamage && powersActive(g, db)) ps.onAnyDamage({ ctx, target, source: src, amount: dmg, self: !!opts.self });
   if (hasFx(target, 'mirrorShell') && src && !opts.self && !opts.bench && !opts.mirrored) { ctx.log('Mirror Shell strikes back'); dealDamage(ctx, src, dmg, { source: target, mirrored: true }); }
   return dmg;
 }
@@ -307,6 +344,7 @@ function applyStatus(ctx, target, code) {
   { const ps = scriptOf(target.c).passive; if (ps && ps.immuneConditions && powersActive(ctx.g, db) && !conditioned(target)) { ctx.log(`${nameOf(db, target.c)} can't be ${STATUS_NAMES[code]}`); return false; } }
   if (code !== 'PSN' && !R(ctx.g.rules).conditionsStack) target.st = target.st.filter((x) => x === 'PSN');
   if (!target.st.includes(code)) target.st.push(code);
+  if (target.flags.shapeOf && conditioned(target)) { const o = findMon(ctx.g, target.id); for (const t of target.tools.filter((t) => t.c === target.flags.shapeOf)) { pullCard(ctx.g, t.id); if (o) o.p.discard.push(t); } delete target.flags.shapeOf; ctx.log('Shapeshift ends'); }
   ctx.events.push({ t: 'status', target: target.id, code });
   ctx.log(`${nameOf(db, target.c)} is now ${STATUS_NAMES[code]}`);
   return true;
@@ -335,14 +373,17 @@ function runAction(ctx, a) {
   must(g.phase === 'main' && g.turn === seat, 'Not your turn');
   switch (a.type) {
     case 'attach': {
-      must(!p.attachedThisTurn, 'Already attached energy this turn'); const c = handCard(a.card); must(db[c.c].st === 'Energy', 'Not an energy card');
+      const c = handCard(a.card); must(db[c.c].st === 'Energy', 'Not an energy card');
       const f = findMon(g, a.target); must(f && f.seat === seat, 'Not your Pokémon'); must(!isDollLike(db, f.m), "Can't attach to that");
-      pullCard(g, c.id); f.m.en.push(c); p.attachedThisTurn = true; ctx.log(`${ctx.name(seat)} attached ${nameOf(db, c.c)} to ${nameOf(db, f.m.c)}`); ctx.event({ t: 'attach', card: c, target: f.m.id });
+      must(canAttachNow(g, db, seat, c, f.m), hasFx(f.m, 'noAttach') ? "Energy can't be attached to that Pokémon this turn" : 'Already attached energy this turn');
+      pullCard(g, c.id); f.m.en.push(c); p.attachedThisTurn = true; if (p.blaineTurn === g.turnNo && energyTypesOf(db, c).includes('Fire') && nameHas(db, f.m, "Blaine's")) p.blaineAttached = (p.blaineAttached || 0) + 1;
+      { const ts = scriptOf(f.m.c).passive; if (ts && ts.onEnergyAttached && powersActive(g, db) && !conditioned(f.m)) ts.onEnergyAttached(ctx, f.m, c); } ctx.log(`${ctx.name(seat)} attached ${nameOf(db, c.c)} to ${nameOf(db, f.m.c)}`); ctx.event({ t: 'attach', card: c, target: f.m.id });
       { const es = scriptOf(c.c); if (es.onAttach) es.onAttach(ctx, c, f.m); } checkKOs(ctx); return;
     }
     case 'playBasic': {
-      const c = handCard(a.card); must(isBasicLike(db[c.c]), 'Not a Basic Pokémon'); must(p.bench.length < r.benchSize, 'Bench is full');
-      pullCard(g, c.id); const m = toMon(c, g.turnNo); if (!p.active) p.active = m; else p.bench.push(m); ctx.log(`${ctx.name(seat)} played ${nameOf(db, c.c)}${p.active === m ? ' as Active' : ' to the bench'}`); ctx.event({ t: 'play', id: m.id, seat }); return;
+      const c = handCard(a.card); must(isBasicLike(db[c.c]), 'Not a Basic Pokémon'); must(p.bench.length < benchLimit(g), 'Bench is full');
+      pullCard(g, c.id); const m = toMon(c, g.turnNo); if (!p.active) p.active = m; else p.bench.push(m); ctx.log(`${ctx.name(seat)} played ${nameOf(db, c.c)}${p.active === m ? ' as Active' : ' to the bench'}`); ctx.event({ t: 'play', id: m.id, seat });
+      { const st = stadiumScript(g); if (st.onBench && p.active !== m) st.onBench(ctx, m); } checkKOs(ctx); return;
     }
     case 'evolve': {
       const c = handCard(a.card); const f = findMon(g, a.target); must(f && f.seat === seat, 'Not your Pokémon');
@@ -354,7 +395,9 @@ function runAction(ctx, a) {
       const s = scriptOf(c.c); must(s.trainer, `${card.name} isn't automated yet; use an override`);
       if (s.canPlay) { const ok = s.canPlay({ g, db, seat, card: c }); must(ok === true, typeof ok === 'string' ? ok : `Can't play ${card.name} now`); }
       pullCard(g, c.id); ctx.log(`${ctx.name(seat)} played ${card.name}`); ctx.event({ t: 'trainer', card: c, seat });
-      ctx.card = c; const keep = s.trainer(ctx); if (!keep) p.discard.push(c); checkKOs(ctx); return;
+      if (card.sub === 'Stadium') { const old = g.stadium; if (old) { P(g, old.owner).discard.push({ id: old.id, c: old.c }); ctx.log(`${nameOf(db, old.c)} leaves play`); } g.stadium = { id: c.id, c: c.c, owner: seat }; ctx.card = c; if (s.trainer) s.trainer(ctx); checkKOs(ctx); return; }
+      { const st = stadiumScript(g); if (st.chaos && !ctx.flip('Chaos Gym')) { p.discard.push(c); ctx.log(`Chaos Gym: ${card.name} fizzles`); return; } if (st.removalTax && /Energy Removal/.test(card.name)) { const others = p.hand.filter((x) => x.id !== c.id); must(others.length >= 2, 'No Removal Gym: needs 2 other cards to discard'); const k = ctx.chooseCards('No Removal Gym: discard 2 cards', others, { min: 2, max: 2, id: 'noRemoval' }); for (const id of k) ctx.discardFromHand(seat, id); } }
+      ctx.card = c; const keep = s.trainer(ctx); if (!keep) p.discard.push(c); checkKOs(ctx); if (ctx.endTurnNow) { ctx.log('The turn ends immediately'); g.attacked = true; finishTurnIfClear(ctx); } return;
     }
     case 'usePower': {
       must(powersActive(g, db), 'Pokémon Powers are switched off'); const f = findMon(g, a.pokemon); must(f && f.seat === seat, 'Not your Pokémon');
@@ -362,6 +405,7 @@ function runAction(ctx, a) {
       if (pw.canUse) { const ok = pw.canUse({ g, db, seat, m: f.m }); must(ok === true, typeof ok === 'string' ? ok : "Can't use that now"); }
       ctx.log(`${ctx.name(seat)} used ${a.power} (${nameOf(db, f.m.c)})`); pw.use(ctx, f.m); checkKOs(ctx); return;
     }
+    case 'useStadium': { const st = stadiumScript(g); must(st.use, 'No stadium effect to use'); const ok = st.canUse(g, db, seat); must(ok === true, typeof ok === 'string' ? ok : "Can't use that now"); ctx.log(`${ctx.name(seat)} uses ${nameOf(db, g.stadium.c)}`); st.use(ctx); checkKOs(ctx); return; }
     case 'discardDoll': { const f = findMon(g, a.pokemon); must(f && f.seat === seat && isDollLike(db, f.m), 'Not a doll'); removeMon(g, f.m.id); p.discard.push(...monCards(f.m)); ctx.log(`${ctx.name(seat)} discarded ${nameOf(db, f.m.c)}`); if (!p.active) g.pending.push({ t: 'promote', seat }); return; }
     case 'retreat': {
       const m = p.active; must(m, 'No Active Pokémon'); must(!p.retreatedThisTurn, 'Already retreated this turn'); must(!m.st.includes('SLP') && !m.st.includes('PAR'), "Can't retreat while Asleep or Paralyzed"); must(!hasFx(m, 'noRetreat') && !isDollLike(db, m), "Can't retreat");
@@ -379,15 +423,21 @@ function runAction(ctx, a) {
       ctx.switchActive(seat, a.target, 'Retreat'); p.retreatedThisTurn = true; checkKOs(ctx); return;
     }
     case 'attack': {
-      const chk = canAttack(g, seat, a.index, db); must(chk.ok, chk.why);
-      const m = p.active; const ec = effectiveCard(g, db, m); const atk = ec.atk[a.index]; ctx.attacker = m; ctx.defender = ctx.opp.active; ctx.attackName = atk.n; ctx.attackCard = ec.id;
+      if (a.src) must(p.active && p.active.flags.recallTurn === g.turnNo && p.active.un.some((u) => u.c === a.src), 'Recall is not in effect');
+      const chk = canAttack(g, seat, a.index, db, a.src); must(chk.ok, chk.why);
+      const m = p.active; const ec = a.src ? db[a.src] : effectiveCard(g, db, m); const atk = ec.atk[a.index]; ctx.attacker = m; ctx.defender = ctx.opp.active; ctx.attackName = atk.n; ctx.attackCard = ec.id;
       ctx.log(`${ctx.name(seat)}'s ${nameOf(db, m.c)} used ${atk.n}`); ctx.event({ t: 'attack', attacker: m.id, name: atk.n, type: typeOf(g, db, m) });
       g.attacked = true; g.lastAttack = { seat, attacker: m.id, name: atk.n, turn: g.turnNo };
       let proceed = true;
       if (m.st.includes('CNF')) { if (!ctx.flip('confusion')) { ctx.log(`${nameOf(db, m.c)} is Confused and hurt itself`); dealDamage(ctx, m, R(g.rules).confusionSelfDamage, { noWR: true, self: true }); proceed = false; } }
       if (proceed && hasFx(m, 'sandAttack')) { if (!ctx.flip('Sand-attack')) { ctx.log('The attack does nothing (Sand-attack)'); proceed = false; } }
+      if (proceed) { const bs = scriptOf(m.c).passive; if (bs && bs.beforeAttack && powersActive(g, db) && bs.beforeAttack(ctx, m) === false) proceed = false; }
       if (proceed && ctx.defender) { const ps = scriptOf(ctx.defender.c).passive; if (ps && ps.onTargeted && powersActive(g, db) && !conditioned(ctx.defender)) ps.onTargeted(ctx, ctx.defender); }
-      if (proceed) runAttack(ctx, m, atk, ec.id);
+      if (proceed && ctx.defender && ctx.defender.tools.some((t) => scriptOf(t.c).ninjaTrick) && ctx.opp.bench.length) { const k = ctx.chooseMon("Koga's Ninja Trick: switch before the attack? (or none)", ctx.opp.bench, { seat: other(seat), id: 'ninja', min: 0 }); if (k.length) { const tool = ctx.defender.tools.find((t) => scriptOf(t.c).ninjaTrick); ctx.switchActive(other(seat), k[0], "Koga's Ninja Trick"); pullCard(g, tool.id); ctx.opp.discard.push(tool); ctx.defender = ctx.opp.active; } }
+      if (proceed && m.tools.some((t) => scriptOf(t.c).charity)) { const amt = ctx.choose({ id: 'charity', title: 'Charity: reduce this attack\'s damage by how much?', options: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((n) => ({ key: String(n), label: n === 0 ? 'No reduction' : '-' + n })) })[0]; if (+amt) ctx.addFx(m, { k: 'charity', amount: +amt, until: g.turnNo }); }
+      if (proceed) { const st = stadiumScript(g); if (st.vermilion && nameHas(db, m, "Lt. Surge's")) { const want = ctx.choose({ id: 'vermilion', title: 'Vermilion City Gym: flip for +10 (tails: 10 to yourself)?', options: [{ key: 'yes', label: 'Flip' }, { key: 'no', label: 'Skip' }] })[0]; if (want === 'yes') { if (ctx.flip('Vermilion')) ctx.addFx(m, { k: 'bonus', amount: 10, until: g.turnNo }); else dealDamage(ctx, m, 10, { noWR: true, self: true }); } } }
+      if (proceed) runAttack(ctx, m, atk, (ec.atkSrc && ec.atkSrc[atk.n]) || ec.id);
+      if (proceed && ctx.defender && playerFx(g, seat, 'koga') && nameHas(db, m, "Koga's") && ctx.defender.flags.lastHit && ctx.defender.flags.lastHit.turn === g.turnNo && findMon(g, ctx.defender.id)) applyStatus(ctx, ctx.defender, 'PSN');
       checkKOs(ctx); finishTurnIfClear(ctx); return;
     }
     case 'endTurn': { ctx.log(`${ctx.name(seat)} ended the turn`); finishTurnIfClear(ctx, true); return; }
@@ -407,9 +457,10 @@ export function runAttack(ctx, m, atk, srcCid) {
 
 function doEvolve(ctx, f, c) {
   const { g, db, seat } = ctx; const m = f.m;
-  const nm = { ...m, id: c.id, c: c.c, st: [], fx: m.fx.filter((x) => x.k === 'defender' || x.k === 'plusPower'), un: [{ id: m.id, c: m.c }, ...m.un], evolvedTurn: g.turnNo, flags: {} };
+  const nm = { ...m, id: c.id, c: c.c, st: [], fx: m.fx.filter((x) => x.k === 'defender' || x.k === 'plusPower'), un: [{ id: m.id, c: m.c }, ...m.un], evolvedTurn: g.turnNo, flags: m.flags.giovanniTurn === g.turnNo ? { giovanniTurn: g.turnNo } : {} };
   pullCard(g, c.id); replaceMon(g, f, nm); ctx.log(`${ctx.name(seat)} evolved ${nameOf(db, m.c)} into ${nameOf(db, c.c)}`); ctx.event({ t: 'evolve', id: nm.id, from: m.id });
   { const es = scriptOf(c.c); if (es.onPlay && powersActive(g, db)) es.onPlay(ctx, nm); }
+  { const st = stadiumScript(g); if (st.onEvolve) st.onEvolve(ctx, nm); }
   return nm;
 }
 export { doEvolve };
@@ -469,9 +520,11 @@ function endTurn(ctx) {
   // end-of-turn: PlusPower discards, paralysis of the ending player's Pokémon clears
   for (const m of mons(P(g, seat))) {
     for (const f of fxOf(m, 'plusPower')) { const c = m.tools.find((x) => x.id === f.card); if (c) { pullCard(g, c.id); P(g, seat).discard.push(c); } }
+    for (const t of m.tools.slice()) { const ts = scriptOf(t.c); if (ts.charity) { pullCard(g, t.id); P(g, seat).hand.push(t); ctx.log('Charity returns to hand'); } if (ts.discardAtEndOfTurn) { pullCard(g, t.id); P(g, seat).discard.push(t); } }
     m.fx = m.fx.filter((f) => f.k !== 'plusPower');
     m.st = m.st.filter((x) => x !== 'PAR');
   }
+  { const p = P(g, seat); if (p.setAside && p.setAsideUntil === T) { p.hand.push(...p.setAside); p.setAside = null; ctx.log(`${ctx.name(seat)} gets the set-aside cards back`); } }
   // between turns: poison, sleep checks (Active only)
   for (const s of ['a', 'b']) {
     const m = P(g, s).active; if (!m) continue;
@@ -497,10 +550,15 @@ function checkKOs(ctx) {
   for (const s of ['a', 'b']) {
     const p = P(g, s);
     for (const m of mons(p)) {
+      { const hs = scriptOf(m.c).passive; if (hs && hs.onHpCheck && powersActive(g, db) && !conditioned(m)) hs.onHpCheck(ctx, m); }
+      if (!findMon(g, m.id)) continue;
       if (m.dmg >= monHP(db, m, g) && monHP(db, m, g) > 0) {
         const doll = isDollLike(db, m) && scriptOf(m.c).asPokemon && scriptOf(m.c).asPokemon.noPrize;
+        { const fs = scriptOf(m.c).passive; if (fs && fs.onWouldKO && g.lastAttack && g.lastAttack.turn === g.turnNo && g.lastAttack.seat === other(s) && powersActive(g, db) && !conditioned(m) && fs.onWouldKO(ctx, m)) { m.dmg = monHP(db, m, g) - 10; ctx.log(`${nameOf(db, m.c)} hangs on with 10 HP`); continue; } }
         { const ks = scriptOf(m.c).passive; if (ks && ks.onKnockedOut && g.lastAttack && g.lastAttack.turn === g.turnNo && g.lastAttack.seat === other(s) && powersActive(g, db) && !conditioned(m)) { const att = findMon(g, g.lastAttack.attacker); if (att) ks.onKnockedOut(ctx, m, att.m); } }
-        removeMon(g, m.id); p.discard.push(...monCards(m));
+        removeMon(g, m.id); const rebirth = (scriptOf(m.c).passive || {}).rebirth && !conditioned(m) && powersActive(g, db);
+        for (const c of monCards(m)) { if (rebirth && c.id === m.id) p.hand.push(c); else p.discard.push(c); }
+        if (rebirth) ctx.log(`Rebirth: ${nameOf(db, m.c)} returns to hand`);
         ctx.log(`${ctx.name(s)}'s ${nameOf(db, m.c)} was Knocked Out`); ctx.event({ t: 'ko', id: m.id, seat: s });
         if (!doll) g.pending.push({ t: 'prize', seat: other(s), n: 1 });
         // Destiny Bond

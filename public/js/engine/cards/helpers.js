@@ -1,5 +1,5 @@
 // Shared building blocks for card scripts. ctx is the engine context (see engine.js makeCtx).
-import { energyTypesOf, nameOf, monHP, hasFx } from '../engine.js';
+import { energyTypesOf, nameOf, monHP, hasFx, scriptOf } from '../engine.js';
 import { findMon, mons, pullCard, P, other, toMon, removeMon, monCards } from '../state.js';
 
 export const T = (ctx) => ctx.g.turnNo;
@@ -52,4 +52,4 @@ export const noAttackNext = (needFlip) => ({ effect: (ctx) => { const d = ctx.op
 export const smokescreen = (n) => ({ effect: (ctx) => { ctx.damage(n); const d = ctx.opp.active; if (d) { ctx.addFx(d, { k: 'sandAttack', until: T(ctx) + 1 }); ctx.log(`${nameOf(ctx.db, d.c)} must flip to attack next turn`); } } });
 export const onceStatusSelf = (n, code) => ({ effect: (ctx, m) => { ctx.damage(n); ctx.status(code, m); } });
 export const asDoll = { asPokemon: { noPrize: true, noConditions: true, noRetreat: true, canDiscard: true } };
-export { findMon, mons, pullCard, P, other, toMon, removeMon, monCards, nameOf, monHP, hasFx, energyTypesOf };
+export { findMon, mons, pullCard, P, other, toMon, removeMon, monCards, nameOf, monHP, hasFx, energyTypesOf, scriptOf };
