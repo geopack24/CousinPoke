@@ -5,7 +5,7 @@ import { newGame, other, mons, findMon } from './engine/state.js';
 import { randomSeed } from './engine/rng.js';
 import { R } from './engine/rules.js';
 import { automationReport } from './engine/cards/index.js';
-import { playAttack, playKO, playHeal, playSelfHit, playCoins, attachLayer, isEnabled as fxEnabled, setEnabled as setFxEnabled } from './fx.js';
+import { playAttack, playKO, playHeal, playSelfHit, playCoins, attachLayer, isEnabled as fxEnabled, setEnabled as setFxEnabled, soundOn, setSoundVolume } from './fx.js';
 
 let PT = null;           // bridge from index.html
 let promptOpen = null;   // id of the prompt modal currently shown
@@ -209,6 +209,7 @@ function onButton(act, btn, doc, legal, me) {
     const items = [];
     if (me) items.push({ label: 'Draw a card (fix)', fn: () => submit({ type: 'override', op: 'draw', n: 1 }) }, { label: 'Shuffle my deck (fix)', fn: () => submit({ type: 'override', op: 'shuffle' }) }, { label: 'Force end of turn (fix)', fn: () => submit({ type: 'override', op: 'endTurn' }) }, { label: "It's my turn (fix)", fn: () => submit({ type: 'override', op: 'turn', seat: me }) }, { label: 'Clear pending steps (fix)', fn: () => submit({ type: 'override', op: 'clearPending' }) }, { sep: true }, { label: 'I concede', danger: true, fn: () => submit({ type: 'concede' }) }, { sep: true });
     items.push({ label: fxEnabled() ? 'Attack animations: on' : 'Attack animations: off', fn: () => { setFxEnabled(!fxEnabled()); PT.toast(fxEnabled() ? 'Animations on' : 'Animations off'); } });
+    items.push({ label: soundOn() ? 'Sound effects: on' : 'Sound effects: off', fn: () => { setSoundVolume(soundOn() ? 0 : 0.6); PT.toast(soundOn() ? 'Sound on' : 'Sound off'); } });
     items.push({ label: 'Back to lobby', fn: () => PT.go('lobby') });
     return PT.showMenu(items, btn, 'More');
   }

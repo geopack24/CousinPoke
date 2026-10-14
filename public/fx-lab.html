@@ -59,6 +59,8 @@ code{background:#0f1218;padding:1px 5px;border-radius:4px}
       <label class="small">Defender<input type="text" id="defName" list="names" placeholder="Pikachu" autocomplete="off"></label>
       <datalist id="names"></datalist>
       <label class="small"><input type="checkbox" id="benchToggle"> also hit a benched Pokémon</label>
+      <label class="small">Sound volume <input type="range" id="vol" min="0" max="1" step="0.05" style="width:100%"></label>
+      <span class="small">Browsers keep audio muted until you click something on the page once.</span>
     </div>
     <div class="panel"><h3>Attacker's attacks</h3><div class="chips" id="attacks"></div><div class="matched" id="matched">Pick a card.</div></div>
     <div class="panel"><h3>Type defaults</h3><div class="chips" id="types"></div><span class="small">Plays the fallback animation for that type with the current cards, regardless of the attack.</span></div>
@@ -68,7 +70,7 @@ code{background:#0f1218;padding:1px 5px;border-radius:4px}
   </div>
 </div>
 <script type="module">
-import { playAttack, playKO, playHeal, playSelfHit, playCoins, MOVE_FX, TYPE_FX, BASIC_FX, resolveFx } from './js/fx.js';
+import { playAttack, playKO, playHeal, playSelfHit, playCoins, MOVE_FX, TYPE_FX, BASIC_FX, resolveFx, soundVolume, setSoundVolume } from './js/fx.js';
 const $ = (s) => document.querySelector(s);
 const DATA = await fetch('cards.json').then((r) => r.json());
 const CARDS = Object.fromEntries(DATA.cards.map((c) => [c.id, c]));
@@ -113,6 +115,7 @@ document.querySelector('.panel:last-child .chips').onclick = (e) => {
   if (b.dataset.x === 'ko') playKO(board, targets[0]); if (b.dataset.x === 'heal') playHeal(board, from); if (b.dataset.x === 'self') playSelfHit(board, from);
 };
 document.addEventListener('keydown', (e) => { if (e.key === ' ' && state.last && e.target.tagName !== 'INPUT') { e.preventDefault(); play(state.last); } });
+$('#vol').value = soundVolume(); $('#vol').oninput = (e) => setSoundVolume(+e.target.value);
 $('#atkName').value = 'Charmander'; $('#defName').value = 'Pikachu'; render();
 </script>
 </body>

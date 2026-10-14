@@ -10,6 +10,8 @@
 // `fx` is the drawing toolkit below (particles, rings, bolts, beams, flashes, shake, text) plus fx.at(ms, fn) for timing.
 // Add a new custom move by adding one entry to MOVE_FX; the default type animation is used until then.
 
+import * as sfx from './sfx.js';
+
 const PAL = {
   Fire: ['#ffdd55', '#ff9a1f', '#ff5a1f', '#e8321f'],
   Water: ['#bfe9ff', '#6fcbff', '#2d8dff', '#1b5fd0'],
@@ -25,6 +27,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
 let enabledFlag = (() => { try { return localStorage.getItem('pt_fx') !== 'off'; } catch (e) { return true; } })();
+export { getVolume as soundVolume, setVolume as setSoundVolume, isOn as soundOn } from './sfx.js';
 export const isEnabled = () => enabledFlag && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 export function setEnabled(v) { enabledFlag = v; try { localStorage.setItem('pt_fx', v ? 'on' : 'off'); } catch (e) { /* ignore */ } }
 
@@ -265,22 +268,25 @@ function layerFor(board) { if (!LAYER) LAYER = new Layer(board); else if (LAYER.
 
 /** Play the attack described by `scene` on `boardEl`. Resolves timings {impact, done} immediately. */
 export function playAttack(boardEl, scene) {
-  if (!isEnabled() || !boardEl || !scene.from || !scene.targets.length) return { impact: 0, done: 0 };
+  const res = resolveFx(scene);
+  if (!isEnabled() || !boardEl || !scene.from || !scene.targets.length) { sfx.attack(res.key, scene.type, { impact: 300 }); return { impact: 300, done: 600 }; }
   const fx = layerFor(boardEl); scene.boardEl = boardEl; scene.board = { w: fx.w, h: fx.h };
   SZ = fx.sz = Math.max(0.9, Math.min(2.4, (scene.targets[0].w || 100) / 62)); // effects scale with the card size on screen
-  const anim = resolveFx(scene).fn;
+  const anim = res.fn;
   // wind-up: the attacker card jiggles
   if (scene.fromEl) { scene.fromEl.classList.add('windup'); setTimeout(() => scene.fromEl.classList.remove('windup'), 450); }
   let times; try { times = anim(fx, scene) || { impact: 300, done: 800 }; } catch (e) { console.warn('fx failed', e); times = { impact: 0, done: 0 }; }
+  sfx.attack(res.key, scene.type, times);
   // secondary targets (bench hits) get a small puff at impact
   for (const t of scene.targets.slice(1)) fx.at(times.impact, () => fx.burst(t.cx, t.cy, { n: 12, colors: PAL[scene.type] || PAL.Colorless, speed: 4, size: 5, life: 450 }));
   return times;
 }
-export function playKO(boardEl, rect) { if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); fx.burst(rect.cx, rect.cy, { n: 30, colors: ['#222', '#555', '#999', '#fff'], speed: 7, size: 6, life: 700, g: 0.1 }); fx.ring(rect.cx, rect.cy, { r0: 10, r1: 90, color: '#fff', width: 4, life: 400 }); fx.text(rect.cx, rect.cy - 20, 'KO', { color: '#ff5a5a', size: 40, life: 1100 }); }
-export function playHeal(boardEl, rect) { if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); for (let i = 0; i < 16; i++) fx.particle({ x: rect.cx + rnd(-rect.w / 2, rect.w / 2), y: rect.cy + rnd(-rect.h / 3, rect.h / 3), vy: rnd(-1.6, -0.6), size: rnd(2, 5), color: pick(['#c6ffd0', '#7ae58a', '#fff']), shape: 'star', life: rnd(500, 900), glow: 8, vr: 0.1 }); }
-export function playSelfHit(boardEl, rect) { if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); fx.burst(rect.cx, rect.cy, { n: 16, colors: ['#ff5a5a', '#ffb0b0', '#fff'], speed: 5, size: 5, life: 500 }); }
+export function playKO(boardEl, rect) { sfx.play('ko'); if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); fx.burst(rect.cx, rect.cy, { n: 30, colors: ['#222', '#555', '#999', '#fff'], speed: 7, size: 6, life: 700, g: 0.1 }); fx.ring(rect.cx, rect.cy, { r0: 10, r1: 90, color: '#fff', width: 4, life: 400 }); fx.text(rect.cx, rect.cy - 20, 'KO', { color: '#ff5a5a', size: 40, life: 1100 }); }
+export function playHeal(boardEl, rect) { sfx.play('heal'); if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); for (let i = 0; i < 16; i++) fx.particle({ x: rect.cx + rnd(-rect.w / 2, rect.w / 2), y: rect.cy + rnd(-rect.h / 3, rect.h / 3), vy: rnd(-1.6, -0.6), size: rnd(2, 5), color: pick(['#c6ffd0', '#7ae58a', '#fff']), shape: 'star', life: rnd(500, 900), glow: 8, vr: 0.1 }); }
+export function playSelfHit(boardEl, rect) { sfx.play('self'); if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); fx.burst(rect.cx, rect.cy, { n: 16, colors: ['#ff5a5a', '#ffb0b0', '#fff'], speed: 5, size: 5, life: 500 }); }
 /** Spinning coin(s) in the middle of the board; returns the ms it takes. */
 export function playCoins(boardEl, results) {
+  results.slice(0, 6).forEach((h, i) => sfx.play('coin', i * 150, h));
   if (!isEnabled() || !boardEl || !results.length) return 0; const fx = layerFor(boardEl); const n = Math.min(results.length, 6); const dur = 650;
   results.slice(0, n).forEach((heads, i) => { const x = fx.w / 2 + (i - (n - 1) / 2) * 56, y = fx.h / 2; fx.add({ t: 0, life: dur + 500, draw: (ctx, k) => { const kk = Math.min(1, (k * (dur + 500)) / dur); const spin = Math.cos(kk * Math.PI * 6) * (1 - kk) + (kk >= 1 ? 1 : 0); const sx = Math.max(0.08, Math.abs(spin) || 0.08); const lift = Math.sin(kk * Math.PI) * 50; ctx.globalAlpha = k > 0.85 ? (1 - k) / 0.15 : 1; ctx.translate(x, y - lift); ctx.scale(sx, 1); ctx.fillStyle = kk >= 1 ? (heads ? '#ffd84a' : '#9aa0b0') : '#e0c25a'; ctx.shadowBlur = 10; ctx.shadowColor = '#000'; ctx.beginPath(); ctx.arc(0, 0, 22, 0, 6.3); ctx.fill(); ctx.scale(1 / sx, 1); if (kk >= 1) { ctx.fillStyle = '#222'; ctx.font = '900 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(heads ? 'H' : 'T', 0, 1); } } }); });
   return dur;
