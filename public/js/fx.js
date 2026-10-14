@@ -152,6 +152,34 @@ export const TYPE_FX = {
 
 /* ---------- signature moves (keyed by attack name, or 'cardId|Attack Name') ---------- */
 export const MOVE_FX = {
+  // Charizard's own Fire Spin: charge-up, roar, flame stream with spiralling ribbons, fire tornado, white-out.
+  'base1-4|Fire Spin'(fx, s) {
+    const f = s.from, t = s.targets[0]; const C = PAL.Fire; const b = s.boardEl;
+    if (s.fromEl) { s.fromEl.classList.add('charge'); fx.at(700, () => s.fromEl.classList.remove('charge')); }
+    // the table dims for the whole thing
+    fx.add({ t: 0, life: 2900, draw: (ctx, k) => { const env = k < 0.15 ? k / 0.15 : k > 0.85 ? (1 - k) / 0.15 : 1; ctx.globalAlpha = 0.5 * env; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, fx.w, fx.h); } });
+    // 1. charge: embers get pulled into Charizard
+    fx.glowSpot(f.cx, f.cy, { color: '#ff6a00', r: 130, life: 700, grow: true, alpha: 0.8 });
+    fx.emitter({ life: 560, path: () => ({ x: f.cx, y: f.cy }), rate: 170, spawn: (x, y) => { const a = rnd(0, 6.3), r = rnd(70, 150); fx.particle({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, vx: -Math.cos(a) * r / 18, vy: -Math.sin(a) * r / 18, size: rnd(3, 6), color: pick(C), life: 300, glow: 10, shrink: false }); } });
+    // 2. roar
+    fx.at(600, () => { fx.flash({ life: 240, alpha: 0.55, color: '#ff9a1f' }); fx.shake(b, 1700, 6); fx.ring(f.cx, f.cy, { r0: 10, r1: 170, color: '#ffb347', width: 10, life: 420, glow: 20 }); fx.text(fx.w / 2, fx.h / 2 - 10, 'FIRE SPIN!', { size: 46, color: '#ffd27a', life: 1200 }); });
+    // 3. flame stream with two ribbons spiralling around it
+    const dx = t.cx - f.cx, dy = t.cy - f.cy, L = Math.hypot(dx, dy) || 1, px = -dy / L, py = dx / L;
+    fx.at(640, () => {
+      fx.beam(f.cx, f.cy, t.cx, t.cy, { life: 760, width: 44, color: '#ff7a1f', core: '#fff3c0' });
+      fx.add({ t: 0, life: 760, draw: () => { for (let i = 0; i < 7; i++) { const u = Math.random(); const ph = u * 16 + performance.now() / 60; const off = 36 * Math.sin(ph) * (i % 2 ? 1 : -1); fx.particle({ x: f.cx + dx * u + px * off, y: f.cy + dy * u + py * off, vx: px * Math.cos(ph) * 2 + rnd(-1, 1), vy: -1.5 + rnd(-1, 1), size: rnd(5, 11), color: pick(C), life: rnd(240, 420), glow: 12 }); } } });
+    });
+    // 4. impact and fire tornado around the defender
+    fx.at(1300, () => {
+      fx.flash({ life: 200, alpha: 0.45, color: '#fff' }); fx.glowSpot(t.cx, t.cy, { color: '#ff9a1f', r: 180, life: 1000, alpha: 0.8 });
+      fx.burst(t.cx, t.cy, { n: 70, colors: C, speed: 10, g: -0.1, size: 9, life: 900, glow: 10 });
+      for (let i = 0; i < 4; i++) fx.at(i * 120, () => fx.ring(t.cx, t.cy, { r0: 10, r1: 150, color: pick(C), width: 9, life: 520, glow: 16 }));
+      fx.add({ t: 0, life: 900, draw: (ctx, k) => { for (let i = 0; i < 5; i++) { const a = k * 30 + i * 1.26; const r = 90 * (1 - k * 0.3); fx.particle({ x: t.cx + Math.cos(a) * r, y: t.cy + Math.sin(a) * r * 0.55 - k * 110 + rnd(-30, 30), vx: -Math.sin(a) * 2.5, vy: -2.5, size: rnd(6, 13), color: pick(C), life: 420, glow: 14 }); } } });
+    });
+    // 5. white-out explosion and smoke
+    fx.at(2200, () => { fx.flash({ life: 380, alpha: 0.9, color: '#fff' }); fx.shake(b, 550, 12); fx.ring(t.cx, t.cy, { r0: 20, r1: 320, color: '#ffd27a', width: 24, life: 700, glow: 24 }); fx.burst(t.cx, t.cy, { n: 100, colors: C.concat(['#fff']), speed: 14, size: 10, life: 1100, glow: 10, drag: 0.94 }); for (let i = 0; i < 26; i++) fx.particle({ x: t.cx + rnd(-60, 60), y: t.cy + rnd(-20, 40), vx: rnd(-0.6, 0.6), vy: rnd(-1.8, -0.6), size: rnd(10, 22), color: pick(['#444', '#666', '#888']), life: rnd(900, 1500), alpha: 0.6, fadeIn: 200 }); });
+    return { impact: 1300, done: 3300 };
+  },
   'Fire Spin'(fx, s) {
     const t = s.targets[0]; const C = PAL.Fire; const dur = 900;
     fireball(fx, s.from, t, { dur: 380, n: 10, r: 11 });
