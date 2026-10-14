@@ -196,6 +196,39 @@ export const MOVE_FX = {
   'Seismic Toss'(fx, s) { const t = s.targets[0]; fx.emitter({ life: 520, path: (k) => ({ x: lerp(s.from.cx, t.cx, k), y: lerp(s.from.cy, t.cy, k) - Math.sin(k * Math.PI) * 160 }), rate: 50, head: (ctx, x, y) => { ctx.globalAlpha = 0.8; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y, 22, 14, 0, 0, 6.3); ctx.fill(); }, spawn: (x, y) => fx.particle({ x, y, size: 3, color: '#fff', life: 200 }) }); fx.at(520, () => { fx.shake(s.boardEl, 500, 10); fx.burst(t.cx, t.cy, { n: 36, colors: PAL.Fighting, speed: 9, shape: 'shard', size: 7, life: 500 }); fx.text(t.cx, t.cy - 30, 'SLAM!', { color: '#ffd27a', size: 32 }); }); return { impact: 520, done: 1100 }; },
 };
 
+/* ---------- plain physical moves (Scratch, Tackle...) ---------- */
+// A physical-sounding attack name plays a basic hit instead of the attacker's type effect, unless it has a signature entry.
+const CLAW_WORDS = /\b(scratch|slash|claw|claws|cut|swipe|swipes|fury swipes|rake|shred)\b/i;
+const PHYSICAL_WORDS = /\b(tackle|pound|bite|slam|headbutt|quick attack|peck|wing attack|fury attack|double kick|jab|punch|kick|horn attack|stomp|body slam|take down|double-edge|lick|gnaw|rage|thrash|karate chop|low kick|ram|lunge|sting|tail slap|flail|wrap|bind|clamp|crabhammer|vicegrip|vice grip|skull bash|hyper fang|super fang|drill peck|leek slap|pot smash|horn drill|rapid spin|rollout|dizzy punch|cross chop|submission|counter|strength|smack|headlock|lariat|ambush|rend|chop|strike|attack|hit|press|crush|squeeze|whip|hook|toss|throw|charge|tail|horn|fang|beak|needle|stab|collapse|retaliate|retaliation)\b/i;
+const ELEMENTAL_WORDS = /\b(fire|flame|flames|thunder|lightning|electric|electro|shock|spark|ice|icy|frost|blizzard|water|hydro|aqua|bubble|psy|psychic|psyshot|mind|dream|night|shadow|leaf|razor leaf|vine|solar|blaze|burn|heat|lava|magma|poison|toxic|sludge|acid|gas|smog|powder|spore|hypno|confuse|mystic|magic|curse|rock|stone|earth|quake|sand|mud)\b/i;
+export function physicalKind(name) {
+  if (!name || ELEMENTAL_WORDS.test(name)) return null;
+  if (CLAW_WORDS.test(name)) return 'claw';
+  if (PHYSICAL_WORDS.test(name)) return 'thump';
+  return null;
+}
+export const BASIC_FX = {
+  claw(fx, s) {
+    const t = s.targets[0]; const impact = 220;
+    [-1, 0, 1].forEach((i, n) => fx.at(impact + n * 45, () => fx.slash(t.cx + i * 16 - 6, t.cy - 14 + i * 4, { angle: -0.85, len: 50, width: 5, color: '#ffffff', life: 300 })));
+    fx.at(impact, () => fx.burst(t.cx, t.cy, { n: 8, colors: ['#ffffff', '#dddddd', '#aaaaaa'], speed: 3, size: 3, life: 350, drag: 0.9 }));
+    return { impact, done: impact + 420 };
+  },
+  thump(fx, s) {
+    const t = s.targets[0]; const impact = 230;
+    fx.at(impact, () => { fx.ring(t.cx, t.cy, { r0: 4, r1: 34, color: '#ffffff', width: 4, life: 260, alpha: 0.7 }); fx.burst(t.cx, t.cy + 6, { n: 10, colors: ['#ffffff', '#e6e6e6', '#bdbdbd'], speed: 3.5, size: 3, life: 380, drag: 0.9, g: 0.05 }); });
+    return { impact, done: impact + 420 };
+  },
+};
+/** Which animation a scene resolves to: { fn, key, label } */
+export function resolveFx(scene) {
+  const byCard = `${scene.cardId}|${scene.name}`;
+  if (MOVE_FX[byCard]) return { fn: MOVE_FX[byCard], key: byCard, label: 'card-specific ' + byCard };
+  if (MOVE_FX[scene.name]) return { fn: MOVE_FX[scene.name], key: scene.name, label: 'signature move ' + scene.name };
+  const kind = physicalKind(scene.name); if (kind) return { fn: BASIC_FX[kind], key: 'basic:' + kind, label: 'basic physical hit (' + kind + ')' };
+  const type = TYPE_FX[scene.type] ? scene.type : 'Colorless'; return { fn: TYPE_FX[type], key: 'type:' + type, label: 'type default ' + type };
+}
+
 /* ---------- entry points ---------- */
 let LAYER = null;
 /** Keep the (single) canvas on the current board element; call after every re-render so running animations stay visible. */
@@ -207,7 +240,7 @@ export function playAttack(boardEl, scene) {
   if (!isEnabled() || !boardEl || !scene.from || !scene.targets.length) return { impact: 0, done: 0 };
   const fx = layerFor(boardEl); scene.boardEl = boardEl; scene.board = { w: fx.w, h: fx.h };
   SZ = fx.sz = Math.max(0.9, Math.min(2.4, (scene.targets[0].w || 100) / 62)); // effects scale with the card size on screen
-  const anim = MOVE_FX[`${scene.cardId}|${scene.name}`] || MOVE_FX[scene.name] || TYPE_FX[scene.type] || TYPE_FX.Colorless;
+  const anim = resolveFx(scene).fn;
   // wind-up: the attacker card jiggles
   if (scene.fromEl) { scene.fromEl.classList.add('windup'); setTimeout(() => scene.fromEl.classList.remove('windup'), 450); }
   let times; try { times = anim(fx, scene) || { impact: 300, done: 800 }; } catch (e) { console.warn('fx failed', e); times = { impact: 0, done: 0 }; }
