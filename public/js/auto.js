@@ -1,6 +1,6 @@
 // Automated-rules table: renders an engine game and turns clicks into engine actions.
 // The page exposes a small bridge (window.PT) with shared helpers; this module owns everything on the board.
-import { apply, legalActions, STATUS_NAMES, energyUnits, canAttack, scriptOf } from './engine/engine.js';
+import { apply, legalActions, STATUS_NAMES, energyUnits, canAttack, scriptOf, seesOpponentHand } from './engine/engine.js';
 import { newGame, other, mons, findMon } from './engine/state.js';
 import { randomSeed } from './engine/rng.js';
 import { R } from './engine/rules.js';
@@ -103,7 +103,7 @@ export function render(main, doc) {
       ${pileHTML(seat, 'deck', 'Deck', p.deck.length, null)}
       ${pileHTML(seat, 'discard', 'Discard', p.discard.length, p.discard.length ? p.discard[p.discard.length - 1].c : null)}
       <div class="z"><span class="zlbl">Prizes${prizeClick ? ' · take one' : ''}</span><div class="row" style="gap:3px;flex-wrap:nowrap">${p.prizes.map((c, i) => `<div class="pile ${prizeClick ? 'glow' : ''}" data-prize="${i}" data-seat="${seat}" style="--s:.2">${PT.backHTML(.2)}</div>`).join('') || '<span class="small">none left</span>'}</div><span class="cnt">${p.prizes.length} left</span></div>
-      ${own ? '' : `<div class="z"><span class="zlbl">Hand</span><div class="row" style="gap:0">${p.hand.slice(0, 12).map((c, i) => `<div style="margin-left:${i ? '-14px' : 0}">${PT.backHTML(.2)}</div>`).join('') || '<span class="small">empty</span>'}</div><span class="cnt">${p.hand.length} cards</span></div>`}
+      ${own ? '' : (me && seesOpponentHand(g, PT.CARDS, me)) ? `<div class="z" style="align-items:stretch"><span class="zlbl">Their hand (Clairvoyance) · ${p.hand.length}</span><div class="hand">${p.hand.map((c) => PT.cardHTML(c.c, .3)).join('') || '<span class="small">empty</span>'}</div></div>` : `<div class="z"><span class="zlbl">Hand</span><div class="row" style="gap:0">${p.hand.slice(0, 12).map((c, i) => `<div style="margin-left:${i ? '-14px' : 0}">${PT.backHTML(.2)}</div>`).join('') || '<span class="small">empty</span>'}</div><span class="cnt">${p.hand.length} cards</span></div>`}
     </div>`;
     const field = `<div class="zone-row" style="align-items:flex-end"><div class="z"><span class="zlbl">Active</span>${active}</div><div class="z grow" style="align-items:stretch"><span class="zlbl">Bench</span><div class="bench">${benchSlots.join('')}</div></div></div>`;
     const name = `<div class="pname"><span>${esc(g.seats[seat].name)}${own ? ' (you)' : ''}</span>${g.phase === 'main' && g.turn === seat && !g.winner ? `<span class="chip">${own ? 'Your turn' : 'Their turn'}</span>` : ''}${g.phase === 'setup' ? `<span class="chip">${p.setupDone ? 'Ready' : 'Setting up'}</span>` : ''}${g.winner === seat ? '<span class="chip">Winner</span>' : ''}</div>`;

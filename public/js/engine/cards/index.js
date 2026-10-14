@@ -2,8 +2,9 @@
 import { base1 } from './base1.js';
 import { jungle } from './jungle.js';
 import { rocket } from './rocket.js';
+import { fossil } from './fossil.js';
 
-export const CARD_SCRIPTS = Object.assign({}, base1, jungle, rocket);
+export const CARD_SCRIPTS = Object.assign({}, base1, jungle, fossil, rocket);
 
 /** Which cards of a set are fully automated: those with no text, or with a script. */
 export function automationReport(db) {

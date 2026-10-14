@@ -239,3 +239,38 @@ test('Jungle Lickitung and Rocket Charmander scripts', () => {
   assert.ok(!has(legalActions(h, 'a', DB), 'usePower', { power: 'Gather Fire' }), 'once per turn');
 });
 
+test('Jungle and Fossil mechanics: Invisible Wall, Thick Skinned, Kabuto Armor, Prehistoric Power, Headache, Hurricane', () => {
+  // Mr. Mime blocks 30+ (after weakness) but not 20
+  let g = setup({ a: { active: { c: N['Hitmonchan'], en: [N['Fighting Energy'], N['Fighting Energy'], N['Fighting Energy']] }, deck: [N['Bill']] }, b: { active: 'base2-6', deck: [N['Bill']] } });
+  assert.equal(act(g, { type: 'attack', index: 1 }).p.b.active.dmg, 0, 'Special Punch 40 prevented');
+  assert.equal(act(g, { type: 'attack', index: 0 }).p.b.active.dmg, 20, 'Jab 20 gets through');
+  // Snorlax cannot be poisoned
+  let s = setup({ a: { active: { c: N['Tangela'], en: [N['Grass Energy'], N['Grass Energy'], N['Grass Energy']] }, deck: [N['Bill']] }, b: { active: 'base2-11', deck: [N['Bill']] } });
+  const sn = act(s, { type: 'attack', index: 1 }); assert.ok(!sn.p.b.active.st.includes('PSN')); assert.equal(sn.p.b.active.dmg, 20);
+  // Kabuto halves damage
+  let k = setup({ a: { active: { c: N['Hitmonchan'], en: [N['Fighting Energy']] }, deck: [N['Bill']] }, b: { active: 'base3-50', deck: [N['Bill']] } });
+  assert.equal(act(k, { type: 'attack', index: 0 }).p.b.active.dmg, 10, 'Jab 20 halved');
+  // Aerodactyl stops evolution
+  let a = setup({ a: { hand: [N['Raichu']], active: N['Pikachu'], deck: [N['Bill']] }, b: { active: 'base3-1', deck: [N['Bill']] } });
+  assert.ok(!has(legalActions(a, 'a', DB), 'evolve'), 'no evolution with Aerodactyl in play');
+  a.p.b.active.st.push('SLP'); assert.ok(has(legalActions(a, 'a', DB), 'evolve'), 'asleep Aerodactyl stops working');
+  // Headache locks Trainers next turn
+  let h = setup({ a: { active: { c: 'base3-53', en: [N['Psychic Energy']] }, deck: [N['Bill']] }, b: { active: N['Chansey'], hand: [N['Bill']], deck: [N['Bill']] } });
+  h = act(h, { type: 'attack', index: 0 });
+  assert.ok(!has(legalActions(h, 'b', DB), 'playTrainer'), 'Bob cannot play Bill');
+  h = act(h, { type: 'endTurn' }, { seat: 'b' }); h = act(h, { type: 'endTurn' }, { seat: 'a' });
+  assert.ok(has(legalActions(h, 'b', DB), 'playTrainer'), 'lock expired');
+  // Hurricane bounces the defender to hand
+  let p = setup({ a: { active: { c: 'base2-8', en: [N['Double Colorless Energy'], N['Fighting Energy']] }, deck: [N['Bill']] }, b: { active: { c: N['Chansey'], en: [N['Fire Energy']] }, bench: [N['Pikachu']], deck: [N['Bill']] } });
+  p = act(p, { type: 'attack', index: 1 });
+  assert.equal(p.p.b.active, null); assert.equal(p.p.b.hand.length, 2, 'Chansey and its energy returned'); assert.equal(p.pending[0].t, 'promote');
+});
+
+test('every scripted set has no missing cards', () => {
+  const rep = automationReport(DB);
+  for (const set of ['base1', 'base2', 'base3']) {
+    const missing = Object.entries(rep).filter(([id, s]) => id.startsWith(set + '-') && s === 'missing').map(([id]) => id + ' ' + DB[id].name);
+    assert.deepEqual(missing, [], set + ' fully scripted');
+  }
+});
+
