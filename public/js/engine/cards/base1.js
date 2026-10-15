@@ -51,7 +51,20 @@ export const base1 = {
   'base1-3': { attacks: { Scrunch: preventNext('preventDamage'), 'Double-edge': { effect: (ctx) => { ctx.damage(80); ctx.selfDamage(80); } } } },
   'base1-4': { // Charizard
     powers: { 'Energy Burn': { use: (ctx, m) => { m.flags.energyBurn = T(ctx); ctx.log('Energy Burn: all energy on Charizard counts as Fire this turn'); } } },
-    attacks: { 'Fire Spin': { canUse: ({ m }) => (m.en.length >= 2 ? null : 'Needs 2 Energy cards to discard'), effect: (ctx, m) => { ctx.requireDiscardEnergy(m, 2, null, 'Discard 2 Energy for Fire Spin'); ctx.damage(100); } } },
+    attacks: { 'Fire Spin': {
+      // house rule (charizardDoubleDiscard): Energy Burn lets Fire Spin burn energy worth 2, so one Double Colorless covers it
+      canUse: ({ g, db, m }) => ((g.rules.charizardDoubleDiscard ? m.en.reduce((n, e) => n + energyTypesOf(db, e).length, 0) : m.en.length) >= 2 ? null : 'Needs 2 Energy to discard'),
+      effect: (ctx, m) => {
+        if (!ctx.g.rules.charizardDoubleDiscard) ctx.requireDiscardEnergy(m, 2, null, 'Discard 2 Energy for Fire Spin');
+        else if (!ctx.copying) {
+          const units = (e) => energyTypesOf(ctx.db, e).length; const pool = m.en.slice(); let chosen;
+          if (pool.length === 1 || pool.reduce((n, e) => n + units(e), 0) === 2) chosen = pool;
+          else { const keys = ctx.chooseCards('Discard energy worth 2 for Fire Spin (a Double Colorless counts as 2)', pool, { min: 1, max: 2, id: 'fireSpin' }); chosen = pool.filter((e) => keys.includes(e.id)); if (chosen.reduce((n, e) => n + units(e), 0) < 2) ctx.fail('That is not worth 2 Energy'); }
+          ctx.discardEnergy(m, chosen);
+        }
+        ctx.damage(100);
+      },
+    } },
   },
   'base1-5': { attacks: {
     Sing: flipStatus(0, 'SLP'),

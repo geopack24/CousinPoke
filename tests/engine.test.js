@@ -64,7 +64,7 @@ test('attach, attack with plain damage, weakness, turn passes with a draw', () =
 
 test('colorless costs: Double Colorless pays Fire Spin; typed mode refuses', () => {
   const zard = { c: N['Charizard'], en: [N['Double Colorless Energy'], N['Double Colorless Energy'], N['Fire Energy']] };
-  let g = setup({ a: { active: zard }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  let g = setup({ a: { active: zard }, b: { active: N['Chansey'], deck: [N['Bill']] }, rules: { charizardDoubleDiscard: false } });
   assert.ok(canPay(DB, g.rules, active(g, 'a'), DB[N['Charizard']].atk[0].c));
   assert.ok(!canPay(DB, { colorlessCosts: false }, active(g, 'a'), DB[N['Charizard']].atk[0].c));
   // Fire Spin asks which 2 energy to discard, then hits for 100
@@ -355,3 +355,17 @@ test('house rule: weakness adds 10 and resistance takes 20', () => {
   const r = setup({ a: { active: { c: N['Hitmonchan'], en: [N['Fighting Energy']] }, deck: [N['Bill']] }, b: { active: N['Gastly'], deck: [N['Bill']] }, rules: { weaknessBonus: 10, resistanceAmount: 20 } });
   assert.equal(act(r, { type: 'attack', index: 0 }).p.b.active.dmg, 0, 'Jab 20 − 20 resistance');
 });
+
+test('house rule: Charizard Fire Spin can burn one Double Colorless', () => {
+  const dce = 'base1-96';
+  let g = setup({ a: { active: { c: 'base1-4', en: [dce, N['Fire Energy'], N['Fire Energy']] }, deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  const r = actWith(g, { type: 'attack', index: 0 }, [[g.p.a.active.en[0].id]]);
+  assert.ok(!r.error && !r.prompt, r.error || 'prompt?');
+  assert.equal(r.state.p.a.active.en.length, 2, 'only the Double Colorless was discarded');
+  assert.equal(r.state.p.b.active.dmg, 100);
+  // with the rule off the same board must discard two cards
+  let h = setup({ a: { active: { c: 'base1-4', en: [dce, N['Fire Energy'], N['Fire Energy']] }, deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] }, rules: { charizardDoubleDiscard: false } });
+  const p = actWith(h, { type: 'attack', index: 0 }, []);
+  assert.ok(p.prompt && p.prompt.min === 2, 'two cards required when the rule is off');
+});
+

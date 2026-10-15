@@ -13,6 +13,7 @@ export const DEFAULT_RULES = {
   confusedRetreatFlip: true,   // confused Pokémon flip to retreat (tails: self damage)
   confusionSelfDamage: 20,     // damage a Confused Pokémon does to itself on a failed flip
   conditionsStack: true,       // Asleep, Confused and Paralyzed can all be on one Pokémon at once
+  charizardDoubleDiscard: true, // Base Set Charizard's Fire Spin may discard energy worth 2 (one Double Colorless) instead of 2 cards
   weaknessBonus: 10,           // Weakness adds this much damage (0 = official doubling)
   resistanceAmount: 20,        // Resistance takes this much off (official: 30)
   banned: ["Imposter Oak's Revenge", 'Lass', 'Scoop Up', 'Gust of Wind'],
