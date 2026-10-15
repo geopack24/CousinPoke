@@ -1,6 +1,6 @@
 // Base Set scripts. Attacks with plain damage need no script; everything with text is here.
 // ctx API: see engine.js makeCtx. `m` is the attacking Pokémon, `T` the current turn number.
-import { energyTypesOf, nameOf, monHP, hasFx, runAttack } from '../engine.js';
+import { energyTypesOf, nameOf, monHP, hasFx, runAttack, evolutionNameMatches } from '../engine.js';
 import { findMon, mons, pullCard, removeMon, monCards, P, other, toMon } from '../state.js';
 
 const T = (ctx) => ctx.g.turnNo;
@@ -191,9 +191,9 @@ export const base1 = {
     for (const id of got) ctx.toHand(ctx.seat, pullCard(ctx.g, id)); ctx.log(`Item Finder: ${got.length ? 'took ' + nameOf(ctx.db, ctx.me.hand[ctx.me.hand.length - 1].c) : 'took nothing'}`);
   } },
   'base1-75': { trainer: (ctx) => { for (const s of ['a', 'b']) { const p = P(ctx.g, s); const tr = p.hand.filter((c) => ctx.db[c.c].st === 'Trainer'); ctx.log(`${ctx.name(s)} shows: ${p.hand.map((c) => nameOf(ctx.db, c.c)).join(', ') || 'nothing'}`); p.hand = p.hand.filter((c) => ctx.db[c.c].st !== 'Trainer'); p.deck.push(...tr); ctx.shuffle(s); } } },
-  'base1-76': { canPlay: ({ g, db, seat }) => { const p = P(g, seat); const ok = p.hand.some((c) => db[c.c].st === 'Pokémon' && db[c.c].sub === 'Stage 2' && mons(p).some((m) => breederMatch(db, c.c, m) && canEvolveLoose(g, m))); return ok ? true : 'No Stage 2 that fits a Basic in play'; }, trainer: (ctx) => {
-    const cards = ctx.me.hand.filter((c) => ctx.db[c.c].st === 'Pokémon' && ctx.db[c.c].sub === 'Stage 2' && ownPokemon(ctx).some((m) => breederMatch(ctx.db, c.c, m) && canEvolveLoose(ctx.g, m)));
-    const card = ctx.chooseCards('Which Stage 2?', cards, { id: 'breederCard' })[0]; const tgts = ownPokemon(ctx).filter((m) => breederMatch(ctx.db, card ? ctx.me.hand.find((c) => c.id === card).c : '', m) && canEvolveLoose(ctx.g, m));
+  'base1-76': { canPlay: ({ g, db, seat }) => { const p = P(g, seat); const ok = p.hand.some((c) => db[c.c].st === 'Pokémon' && db[c.c].sub === 'Stage 2' && mons(p).some((m) => breederMatch(db, c.c, m, g.rules) && canEvolveLoose(g, m))); return ok ? true : 'No Stage 2 that fits a Basic in play'; }, trainer: (ctx) => {
+    const cards = ctx.me.hand.filter((c) => ctx.db[c.c].st === 'Pokémon' && ctx.db[c.c].sub === 'Stage 2' && ownPokemon(ctx).some((m) => breederMatch(ctx.db, c.c, m, ctx.g.rules) && canEvolveLoose(ctx.g, m)));
+    const card = ctx.chooseCards('Which Stage 2?', cards, { id: 'breederCard' })[0]; const tgts = ownPokemon(ctx).filter((m) => breederMatch(ctx.db, card ? ctx.me.hand.find((c) => c.id === card).c : '', m, ctx.g.rules) && canEvolveLoose(ctx.g, m));
     const tgt = ctx.chooseMon('Onto which Basic?', tgts, { id: 'breederTo' })[0]; const f = findMon(ctx.g, tgt); const c = ctx.me.hand.find((x) => x.id === card);
     const nm = { ...f.m, id: c.id, c: c.c, st: [], fx: [], un: [{ id: f.m.id, c: f.m.c }, ...f.m.un], evolvedTurn: ctx.g.turnNo, flags: {} }; pullCard(ctx.g, c.id); if (f.p.active && f.p.active.id === f.m.id) f.p.active = nm; else f.p.bench[f.p.bench.findIndex((x) => x.id === f.m.id)] = nm;
     ctx.log(`Pokémon Breeder: ${nameOf(ctx.db, f.m.c)} evolved into ${nameOf(ctx.db, c.c)}`);
@@ -241,9 +241,9 @@ export const base1 = {
   'base1-96': { energy: ['Colorless', 'Colorless'] },
 };
 
-function breederMatch(db, stage2Id, m) {
+function breederMatch(db, stage2Id, m, rules) {
   const s2 = db[stage2Id]; if (!s2 || s2.sub !== 'Stage 2') return false;
   const basic = db[m.c]; if (!basic || basic.sub !== 'Basic') return false;
-  const mid = Object.values(db).find((c) => c.st === 'Pokémon' && c.name === s2.ev); return !!(mid && mid.ev === basic.name);
+  const mids = Object.values(db).filter((c) => c.st === 'Pokémon' && evolutionNameMatches(rules, s2.ev, c.name)); return mids.some((mid) => evolutionNameMatches(rules, mid.ev, basic.name));
 }
 function canEvolveLoose(g, m) { return m.playedTurn < g.turnNo; }

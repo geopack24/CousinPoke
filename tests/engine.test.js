@@ -369,3 +369,15 @@ test('house rule: Charizard Fire Spin can burn one Double Colorless', () => {
   assert.ok(p.prompt && p.prompt.min === 2, 'two cards required when the rule is off');
 });
 
+test('house rule: evolutions fit any version of the species', () => {
+  const blainesCharmeleon = DATA.cards.find((c) => c.name === "Blaine's Charmeleon").id;
+  let g = setup({ a: { hand: [blainesCharmeleon], active: N['Charmander'], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  g.p.a.active.playedTurn = 0; g.turnNo = 2;
+  assert.ok(has(legalActions(g, 'a', DB), 'evolve'), "Blaine's Charmeleon may go on a plain Charmander");
+  g = act(g, { type: 'evolve', card: g.p.a.hand[0].id, target: g.p.a.active.id });
+  assert.equal(g.p.a.active.c, blainesCharmeleon);
+  let h = setup({ a: { hand: [blainesCharmeleon], active: N['Charmander'], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] }, rules: { anyVersionEvolves: false } });
+  h.p.a.active.playedTurn = 0; h.turnNo = 2;
+  assert.ok(!has(legalActions(h, 'a', DB), 'evolve'), 'official rule keeps the names strict');
+});
+

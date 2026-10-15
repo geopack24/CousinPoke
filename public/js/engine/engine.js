@@ -108,9 +108,12 @@ function canEvolveTarget(g, m, rules, db) {
   return true;
 }
 export function evolvesFromName(db, cid) { return db[cid] && db[cid].ev; }
-export function matchesEvolution(db, cardId, m) {
+/** "Blaine's Charmander", "Dark Charmeleon", "Rocket's Zapdos" -> the plain species name. */
+export function baseSpecies(name) { return (name || '').replace(/^(?:[A-Z][A-Za-z.]*(?: [A-Z][A-Za-z.]*)?'s |Dark )/, ''); }
+export function evolutionNameMatches(rules, evFrom, targetName) { return R(rules).anyVersionEvolves ? baseSpecies(evFrom) === baseSpecies(targetName) : evFrom === targetName; }
+export function matchesEvolution(db, cardId, m, rules) {
   const c = db[cardId]; const t = db[m.c];
-  return !!(c && t && c.st === 'Pokémon' && c.ev && c.ev === t.name);
+  return !!(c && t && c.st === 'Pokémon' && c.ev && evolutionNameMatches(rules, c.ev, t.name));
 }
 /** One attachment per turn, except Blaine lets 2 Fire go onto a Blaine's Pokémon. Crystal Beam blocks a target. */
 export function canAttachNow(g, db, seat, card, m) {
@@ -163,7 +166,7 @@ export function legalActions(g, seat, db) {
     const card = db[c.c]; if (!card) continue;
     if (card.st === 'Energy') for (const m of mons(p)) if (!isDollLike(db, m) && canAttachNow(g, db, seat, c, m)) out.push({ type: 'attach', card: c.id, target: m.id });
     if (isBasicLike(card) && p.bench.length < benchLimit(g)) out.push({ type: 'playBasic', card: c.id });
-    if (card.st === 'Pokémon' && card.sub !== 'Basic') for (const m of mons(p)) if (matchesEvolution(db, c.c, m) && canEvolveTarget(g, m, r, db)) out.push({ type: 'evolve', card: c.id, target: m.id });
+    if (card.st === 'Pokémon' && card.sub !== 'Basic') for (const m of mons(p)) if (matchesEvolution(db, c.c, m, g.rules) && canEvolveTarget(g, m, r, db)) out.push({ type: 'evolve', card: c.id, target: m.id });
     if (card.st === 'Trainer' && !isBasicLike(card)) {
       const s = scriptOf(c.c);
       if (!s.trainer) continue; // unscripted: use an override
@@ -388,7 +391,7 @@ function runAction(ctx, a) {
     }
     case 'evolve': {
       const c = handCard(a.card); const f = findMon(g, a.target); must(f && f.seat === seat, 'Not your Pokémon');
-      must(matchesEvolution(db, c.c, f.m), `${nameOf(db, c.c)} doesn't evolve from ${nameOf(db, f.m.c)}`); must(canEvolveTarget(g, f.m, r, db), evolutionLocked(g, db) ? 'Evolution is blocked (Prehistoric Power)' : "That Pokémon can't evolve yet");
+      must(matchesEvolution(db, c.c, f.m, g.rules), `${nameOf(db, c.c)} doesn't evolve from ${nameOf(db, f.m.c)}`); must(canEvolveTarget(g, f.m, r, db), evolutionLocked(g, db) ? 'Evolution is blocked (Prehistoric Power)' : "That Pokémon can't evolve yet");
       doEvolve(ctx, f, c); checkKOs(ctx); return;
     }
     case 'playTrainer': {
