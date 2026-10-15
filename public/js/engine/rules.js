@@ -16,7 +16,7 @@ export const DEFAULT_RULES = {
   weaknessBonus: 10,           // Weakness adds this much damage (0 = official doubling)
   resistanceAmount: 20,        // Resistance takes this much off (official: 30)
   banned: ["Imposter Oak's Revenge", 'Lass', 'Scoop Up', 'Gust of Wind'],
-  limits: { 'Energy Removal': 2, 'Super Energy Removal': 2 },
+  limits: { 'Energy Removal': 2, 'Super Energy Removal': 2, 'Pokémon Center': 2 },
   notes: '',
 };
 export const R = (r) => Object.assign({}, DEFAULT_RULES, r || {});
