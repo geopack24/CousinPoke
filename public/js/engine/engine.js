@@ -262,7 +262,7 @@ function makeCtx(g, db, rng, events, seat, nextAnswer, action) {
     /** Effects remember what caused them (attack or Trainer name) so the table can label them. */
     addFx(m, fx) { if (fx.src == null) fx.src = ctx.attackName || (ctx.card ? nameOf(db, ctx.card.c) : null); m.fx.push(fx); },
     /* --- attached cards --- */
-    discardEnergy(m, cards) { const owner = findMon(g, m.id).seat; if (owner !== ctx.seat && m.tools.some((t) => scriptOf(t.c).protectEnergy)) { ctx.log(`Brock's Protection keeps the Energy on ${nameOf(db, m.c)}`); return; } for (const c of cards) { pullCard(g, c.id); P(g, owner).discard.push(c); } events.push({ t: 'discardEnergy', target: m.id, n: cards.length }); ctx.log(`Discarded ${cards.map((c) => nameOf(db, c.c)).join(', ')} from ${nameOf(db, m.c)}`); },
+    discardEnergy(m, cards) { if (!cards.length) return; const owner = findMon(g, m.id).seat; if (owner !== ctx.seat && m.tools.some((t) => scriptOf(t.c).protectEnergy)) { ctx.log(`Brock's Protection keeps the Energy on ${nameOf(db, m.c)}`); return; } for (const c of cards) { pullCard(g, c.id); P(g, owner).discard.push(c); } events.push({ t: 'discardEnergy', target: m.id, n: cards.length }); ctx.log(`Discarded ${cards.map((c) => nameOf(db, c.c)).join(', ')} from ${nameOf(db, m.c)}`); },
     /** Player `s` picks `n` energy cards attached to m (optionally filtered) and discards them. Skipped when copying (Metronome). */
     requireDiscardEnergy(m, n, filter, label) {
       if (ctx.copying) return [];
