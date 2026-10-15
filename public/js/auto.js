@@ -6,11 +6,13 @@ import { randomSeed } from './engine/rng.js';
 import { R } from './engine/rules.js';
 import { automationReport } from './engine/cards/index.js';
 import { playAttack, playKO, playHeal, playSelfHit, playCoins, attachLayer, isEnabled as fxEnabled, setEnabled as setFxEnabled, soundOn, setSoundVolume } from './fx.js';
+import { playBattleIntro } from './music.js';
 
 let PT = null;           // bridge from index.html
 let promptOpen = null;   // id of the prompt modal currently shown
 let seenFxId = null;     // id of the last doc.fx payload this client animated
 let pendingFx = null;
+const phaseSeen = {};     // doc id -> last phase this client saw (battle music plays when setup turns into main)
 
 export function install(bridge) { PT = bridge; return { render, startGame, submit, automationReport }; }
 
@@ -120,6 +122,8 @@ function playEvents(events, doc, scene) {
 /* ---------- rendering ---------- */
 export function render(main, doc) {
   const g = doc.state; const me = mySeat(doc); const bottom = me || 'a'; const top = other(bottom); const r = R(g.rules);
+  if (phaseSeen[doc.id] === 'setup' && g.phase === 'main') { playBattleIntro(10); if (fxEnabled()) PT.toast('Battle start!'); }
+  phaseSeen[doc.id] = g.phase;
   if (seenFxId === null) seenFxId = doc.fx ? doc.fx.id : '';
   else if (doc.fx && doc.fx.id !== seenFxId) { seenFxId = doc.fx.id; pendingFx = doc.fx.events; }
   const legal = me ? legalActions(g, me, PT.CARDS) : [];

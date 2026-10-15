@@ -7,6 +7,8 @@ let volume = (() => { try { const v = localStorage.getItem('pt_sfx'); return v =
 export const getVolume = () => volume;
 export function setVolume(v) { volume = Math.max(0, Math.min(1, v)); try { localStorage.setItem('pt_sfx', String(volume)); } catch (e) { /* ignore */ } if (master) master.gain.value = volume; }
 export const isOn = () => volume > 0;
+/** The shared context and master gain once audio is unlocked, else null. */
+export function audio() { unlock(); return ctx && master && ctx.state === 'running' && isOn() ? { ctx, master } : null; }
 
 function unlock() { if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); master = ctx.createGain(); master.gain.value = volume; master.connect(ctx.destination); } catch (e) { return; } } if (ctx.state === 'suspended') ctx.resume(); }
 if (typeof window !== 'undefined') for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(ev, unlock, { passive: true });

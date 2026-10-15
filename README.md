@@ -40,6 +40,10 @@ Tables created in "auto" mode run a rules engine (`public/js/engine/`) with scri
 
 `public/js/sfx.js` synthesises every sound with the Web Audio API (square and triangle chiptune tones plus filtered noise), so there are no recorded clips and nothing copyrighted. Each type has a launch and an impact sound, physical hits have swishes and thuds, and coins, knockouts, heals and Charizard's Fire Spin have their own. Browsers keep audio muted until the player has clicked something on the page once. Volume is under More… (on/off) and as a slider in the animation lab; it is remembered per device.
 
+## Match-start music
+
+When both players are ready and the first turn begins, `public/js/music.js` plays an original four-channel chiptune battle intro (two pulse waves, triangle bass, noise drums) for 10 seconds and fades it out. To use your own track instead, put a file named `battle.mp3` in `public/`; if it exists the game plays it with the same fade. The lab has a button to preview either.
+
 ## Attack animations
 
 `public/js/fx.js` draws attacks on a canvas over the board. Every attack gets a default animation for the attacker's type (Fire fireball, Water stream, Lightning strike, Grass leaves, Psychic rings, Fighting impact, Colorless slashes) after the attacking card jiggles. Signature moves live in `MOVE_FX` in the same file, keyed by attack name (`'Fire Spin'`) or by card and attack (`'base1-4|Fire Spin'`), and win over the type default. To add one, write a function `(fx, scene) => ({ impact, done })` using the toolkit on `fx` (`particle`, `burst`, `ring`, `bolt`, `beam`, `flash`, `glowSpot`, `slash`, `text`, `emitter`, `shake`, `at`). `scene.from` and `scene.targets[0]` are the attacker and defender rectangles. Both players' screens animate: the acting client stores the attack's events on the table document (`doc.fx`) and the other client plays them when it syncs. Players can turn animations off under More…. `/fx-lab.html` is a standalone page for trying animations: pick any two cards, click an attack, a type default or a signature move, and press space to replay.

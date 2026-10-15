@@ -66,11 +66,12 @@ code{background:#0f1218;padding:1px 5px;border-radius:4px}
     <div class="panel"><h3>Type defaults</h3><div class="chips" id="types"></div><span class="small">Plays the fallback animation for that type with the current cards, regardless of the attack.</span></div>
     <div class="panel"><h3>Basic physical hits</h3><div class="chips" id="basics"></div><span class="small">Used for attacks with plain names like Scratch, Tackle or Bite, whatever the Pokémon's type.</span></div>
     <div class="panel"><h3>Signature moves</h3><div class="chips" id="moves"></div><span class="small">Entries in <code>MOVE_FX</code>. Add more in <code>js/fx.js</code>.</span></div>
-    <div class="panel"><h3>Other effects</h3><div class="chips"><button data-x="coin1">1 coin</button><button data-x="coin3">3 coins</button><button data-x="ko">Knock Out</button><button data-x="heal">Heal</button><button data-x="self">Self damage</button></div></div>
+    <div class="panel"><h3>Other effects</h3><div class="chips"><button data-x="coin1">1 coin</button><button data-x="coin3">3 coins</button><button data-x="ko">Knock Out</button><button data-x="heal">Heal</button><button data-x="self">Self damage</button><button data-x="music" class="pri">Battle intro music</button><button data-x="stop">Stop music</button></div><span class="small">The intro plays for 10 seconds then fades. Drop a <code>battle.mp3</code> next to index.html to use your own.</span></div>
   </div>
 </div>
 <script type="module">
 import { playAttack, playKO, playHeal, playSelfHit, playCoins, MOVE_FX, TYPE_FX, BASIC_FX, resolveFx, soundVolume, setSoundVolume } from './js/fx.js';
+import { playBattleIntro, stopMusic } from './js/music.js';
 const $ = (s) => document.querySelector(s);
 const DATA = await fetch('cards.json').then((r) => r.json());
 const CARDS = Object.fromEntries(DATA.cards.map((c) => [c.id, c]));
@@ -112,6 +113,7 @@ $('#moves').onclick = (e) => { const b = e.target.closest('button'); if (!b) ret
 document.querySelector('.panel:last-child .chips').onclick = (e) => {
   const b = e.target.closest('button'); if (!b) return; const { from, targets } = rects(); const board = $('#board');
   if (b.dataset.x === 'coin1') playCoins(board, [Math.random() < 0.5]); if (b.dataset.x === 'coin3') playCoins(board, [0, 1, 2].map(() => Math.random() < 0.5));
+  if (b.dataset.x === 'music') playBattleIntro(10).then((ok) => { if (!ok) alert('Audio is still locked or muted: click the page once and check the volume slider.'); }); if (b.dataset.x === 'stop') stopMusic();
   if (b.dataset.x === 'ko') playKO(board, targets[0]); if (b.dataset.x === 'heal') playHeal(board, from); if (b.dataset.x === 'self') playSelfHit(board, from);
 };
 document.addEventListener('keydown', (e) => { if (e.key === ' ' && state.last && e.target.tagName !== 'INPUT') { e.preventDefault(); play(state.last); } });
