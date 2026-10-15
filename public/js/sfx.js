@@ -70,7 +70,7 @@ const FX = {
 /** Schedule a named effect `delayMs` from now. Extra args pass through (coin heads/tails). */
 function canPlay() {
   if (!isOn()) return false;
-  const active = typeof navigator !== 'undefined' && navigator.userActivation && navigator.userActivation.hasBeenActive;
+  const active = typeof navigator !== 'undefined' && navigator.userActivation ? navigator.userActivation.hasBeenActive : !!ctx;
   if (!ctx) { if (!active) return false; unlock(); if (!ctx) return false; }
   if (ctx.state !== 'running') { if (!active) return false; ctx.resume(); }
   return true;

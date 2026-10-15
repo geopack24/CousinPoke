@@ -73,12 +73,13 @@ function schedule(ctx, out, t0, lead, harmony, bass, drums, leadGain) {
 /** Play the battle intro: `seconds` of music, then a 2.5 s fade. Returns false if audio isn't unlocked yet. */
 export async function playBattleIntro(seconds = 10) {
   stopMusic();
-  const a = audio(); if (!a) return false; const { ctx, master } = a;
+  const a = audio(); if (!a) { console.log('battle intro: audio is locked or muted'); return false; } const { ctx, master } = a;
   const out = ctx.createGain(); out.gain.value = 0.55; out.connect(master);
   const t0 = ctx.currentTime + 0.05; const fadeAt = t0 + seconds, end = fadeAt + 2.5;
   out.gain.setValueAtTime(0.55, fadeAt); out.gain.linearRampToValueAtTime(0.0001, end);
   // custom file next to index.html wins
-  if (await playFile('battle.mp3', out, ctx, seconds)) return true;
+  if (await playFile('battle.mp3', out, ctx, seconds)) { console.log('battle intro: playing battle.mp3'); return true; }
+  console.log('battle intro: playing the built-in chiptune');
   const barLen = 16 * STEP; let t = t0;
   schedule(ctx, out, t, INTRO_LEAD, '- '.repeat(32), INTRO_BASS, DRUMS_INTRO, 0.16); t += 2 * barLen;
   while (t < end + 1) { schedule(ctx, out, t, LEAD, HARMONY, BASS, (DRUMS + ' ').repeat(8), 0.16); t += 8 * barLen; }

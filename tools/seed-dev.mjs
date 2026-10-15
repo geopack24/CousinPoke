@@ -19,7 +19,7 @@ g.p.a.active = mon(byName('Charmander'), [byName('Fire Energy'), byName('Fire En
 g.p.a.bench = [mon(byName('Electabuzz'), [byName('Lightning Energy'), byName('Lightning Energy')]), mon(byName('Pikachu'), [byName('Lightning Energy')])];
 g.p.b.active = mon(process.env.SEED_B_ACTIVE ? byName(process.env.SEED_B_ACTIVE) : byName('Pikachu'), [byName('Lightning Energy'), byName('Grass Energy')], { dmg: 10 });
 g.p.b.bench = [mon(byName('Electabuzz'), [byName('Lightning Energy')]), mon(byName('Charmander'), [byName('Fire Energy')])];
-g.phase = 'main'; g.status = 'playing'; g.turnNo = 3; g.turn = 'a'; g.p.a.attachedThisTurn = false;
+if (process.env.SEED_PHASE !== 'setup') { g.phase = 'main'; g.status = 'playing'; g.turnNo = 3; g.turn = 'a'; g.p.a.attachedThisTurn = false; } else { for (const s of ['a', 'b']) { const p = g.p[s]; p.setupDone = false; p.hand.push(...[p.active, ...p.bench].map((m) => ({ id: m.id, c: m.c }))); p.active = null; p.bench = []; } }
 
 await put('players/' + A, { name: 'Ann', updatedAt: Date.now() });
 await put('players/' + B, { name: 'Bob', updatedAt: Date.now() });
