@@ -381,3 +381,22 @@ test('house rule: evolutions fit any version of the species', () => {
   assert.ok(!has(legalActions(h, 'a', DB), 'evolve'), 'official rule keeps the names strict');
 });
 
+test('house rule: with no Pokémon left you draw until a Basic, and the opponent draws as many', () => {
+  // Pikachu (40 HP) alone with 30 damage; Hitmonchan's Jab finishes it; the deck has Bill, Bill, Chansey, Bill
+  let g = setup({ a: { active: { c: N['Hitmonchan'], en: [N['Fighting Energy']] }, deck: [N['Bill'], N['Bill'], N['Bill'], N['Bill']] }, b: { active: { c: N['Pikachu'], dmg: 30 }, deck: [N['Bill'], N['Bill'], N['Chansey'], N['Bill']] } });
+  g = act(g, { type: 'attack', index: 0 });
+  assert.ok(!g.winner, 'no winner: Bob was rescued');
+  assert.ok(g.p.b.active && g.p.b.active.c === N['Chansey'], 'Chansey came in as Active');
+  assert.equal(g.p.b.hand.length, 2, 'the two Bills drawn on the way went to hand');
+  assert.equal(g.p.a.hand.length, 3, 'Ann drew 3 cards too');
+  assert.ok(!g.pending.some((t) => t.t === 'promote'), 'no promote step left over');
+  // seven misses is a loss
+  let h = setup({ a: { active: { c: N['Hitmonchan'], en: [N['Fighting Energy']] }, deck: Array(8).fill(N['Bill']) }, b: { active: { c: N['Pikachu'], dmg: 30 }, deck: Array(8).fill(N['Bill']) } });
+  h = act(h, { type: 'attack', index: 0 });
+  assert.equal(h.winner, 'a', 'seven non-Basics means Bob loses');
+  // rule off: immediate loss
+  let k = setup({ a: { active: { c: N['Hitmonchan'], en: [N['Fighting Energy']] }, deck: [N['Bill']] }, b: { active: { c: N['Pikachu'], dmg: 30 }, deck: [N['Chansey']] }, rules: { benchRescue: false } });
+  k = act(k, { type: 'attack', index: 0 });
+  assert.equal(k.winner, 'a');
+});
+

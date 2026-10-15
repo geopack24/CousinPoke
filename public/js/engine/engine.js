@@ -584,8 +584,24 @@ function checkWin(ctx) {
   for (const s of ['a', 'b']) {
     const p = P(g, s);
     if (p.prizes.length === 0 && p.prizesTaken >= R(g.rules).prizes && !g.pending.some((t) => t.t === 'prize' && t.seat === s)) { g.winner = s; g.status = 'done'; ctx.log(`${ctx.name(s)} took the last prize and wins!`); ctx.event({ t: 'win', seat: s }); g.pending = []; return; }
+    if (!p.active && !p.bench.length && g.phase === 'main' && R(g.rules).benchRescue && benchRescue(ctx, s)) continue;
     if (!p.active && !p.bench.length && g.phase === 'main') { g.winner = other(s); g.status = 'done'; ctx.log(`${ctx.name(s)} has no Pokémon left. ${ctx.name(other(s))} wins!`); ctx.event({ t: 'win', seat: other(s) }); g.pending = []; return; }
   }
+}
+
+/** House rule: a player with no Pokémon in play draws until a Basic turns up (at most 7 cards) and puts it in as Active;
+ *  the other player draws the same number of cards. Returns false (a loss) when 7 draws or the deck run out without a Basic. */
+function benchRescue(ctx, s) {
+  const { g, db } = ctx; const p = P(g, s); const drawn = []; let basic = null;
+  while (drawn.length < 7 && p.deck.length) { const c = p.deck.shift(); drawn.push(c); if (isBasicLike(db[c.c])) { basic = c; break; } }
+  for (const c of drawn) if (c !== basic) p.hand.push(c);
+  ctx.event({ t: 'draw', seat: s, n: drawn.length });
+  if (!basic) { ctx.log(`${ctx.name(s)} had no Pokémon left and drew ${drawn.length} card${drawn.length === 1 ? '' : 's'} without finding a Basic Pokémon`); return false; }
+  p.active = toMon(basic, g.turnNo); g.pending = g.pending.filter((t) => !(t.t === 'promote' && t.seat === s));
+  ctx.log(`${ctx.name(s)} had no Pokémon left: drew ${drawn.length} card${drawn.length === 1 ? '' : 's'} and put ${nameOf(db, basic.c)} in as Active`);
+  ctx.event({ t: 'play', id: p.active.id, seat: s });
+  const n = ctx.draw(other(s), drawn.length); ctx.log(`${ctx.name(other(s))} draws ${n} card${n === 1 ? '' : 's'} as well`);
+  return true;
 }
 
 /* ---------- overrides (manual corrections, logged) ---------- */
