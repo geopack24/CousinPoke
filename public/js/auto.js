@@ -232,7 +232,8 @@ function monHTML(m, seat, active, promoteClick) {
   const stack = att.map((x, i) => `<div class="attc" style="top:${i * step}px;z-index:${i + 1}">${PT.cardHTML(x.c, sc)}</div>`).join('');
   const GL = { SLP: 'Zz', CNF: '?!', PAR: '⚡', PSN: '☠' }; const stChips = m.st.map((s) => `<span class="${s}" title="${STATUS_NAMES[s]}">${GL[s]} ${active ? STATUS_NAMES[s] : s}</span>`).join('');
   const fxChips = m.fx.map((f) => { const d = describeFx(f, PT.S.game.state); return `<span class="FX" title="${esc(d.desc)}" data-desc="${esc(d.desc)}">${esc(d.label)}</span>`; }).join('');
-  return `<div class="mon ${active ? 'active' : ''} ${promoteClick ? 'glow' : ''}" data-mon="${m.id}" tabindex="0"><div class="cdwrap" style="padding-top:${n * step}px">${stack}<div class="poke" style="z-index:${n + 1}">${PT.cardHTML(m.c, sc)}${hp ? `<span class="hp">${Math.max(0, hp - m.dmg)}/${hp}</span>` : ''}${m.dmg ? `<span class="dmg">${m.dmg}</span>` : ''}${m.st.length || fxChips ? `<div class="sts">${stChips}${fxChips}</div>` : ''}${m.un.length ? `<span class="stk">+${m.un.length} under</span>` : ''}</div></div>${n ? `<div class="attn">${n} attached</div>` : ''}</div>`;
+  const left = hp ? (hp - m.dmg) / hp : 1; const hurt = left <= 0.25 ? 'critical' : left <= 0.5 ? 'hurt' : '';
+  return `<div class="mon ${active ? 'active' : ''} ${promoteClick ? 'glow' : ''} ${hurt}" data-mon="${m.id}" tabindex="0"><div class="cdwrap" style="padding-top:${n * step}px">${stack}<div class="poke" style="z-index:${n + 1}">${PT.cardHTML(m.c, sc)}${hp ? `<span class="hp">${Math.max(0, hp - m.dmg)}/${hp}</span>` : ''}${m.dmg ? `<span class="dmg">${m.dmg}</span>` : ''}${m.st.length || fxChips ? `<div class="sts">${stChips}${fxChips}</div>` : ''}${m.un.length ? `<span class="stk">+${m.un.length} under</span>` : ''}</div></div>${n ? `<div class="attn">${n} attached</div>` : ''}</div>`;
 }
 
 /* ---------- menus ---------- */
