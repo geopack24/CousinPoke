@@ -78,18 +78,41 @@ export async function playBattleIntro(seconds = 10) {
   const t0 = ctx.currentTime + 0.05; const fadeAt = t0 + seconds, end = fadeAt + 2.5;
   out.gain.setValueAtTime(0.55, fadeAt); out.gain.linearRampToValueAtTime(0.0001, end);
   // custom file next to index.html wins
-  try {
-    const r = await fetch('battle.mp3', { method: 'HEAD' });
-    if (r.ok && /audio/.test(r.headers.get('content-type') || '')) {
-      const el = new Audio('battle.mp3'); el.volume = 1; const src = ctx.createMediaElementSource(el); src.connect(out); await el.play();
-      current = { stop: () => { try { el.pause(); } catch (e) { /* */ } out.disconnect(); }, timer: setTimeout(() => stopMusic(), (seconds + 2.6) * 1000) };
-      return true;
-    }
-  } catch (e) { /* no custom file */ }
+  if (await playFile('battle.mp3', out, ctx, seconds)) return true;
   const barLen = 16 * STEP; let t = t0;
   schedule(ctx, out, t, INTRO_LEAD, '- '.repeat(32), INTRO_BASS, DRUMS_INTRO, 0.16); t += 2 * barLen;
   while (t < end + 1) { schedule(ctx, out, t, LEAD, HARMONY, BASS, (DRUMS + ' ').repeat(8), 0.16); t += 8 * barLen; }
   current = { stop: () => out.disconnect(), timer: setTimeout(() => stopMusic(), (seconds + 2.6) * 1000) };
   return true;
+}
+/** Play an audio file through `out` for `seconds` then let the caller's fade finish. False if the file isn't there. */
+const fileCache = {};
+async function fileExists(url) {
+  if (url in fileCache) return fileCache[url];
+  try { const r = await fetch(url, { method: 'HEAD' }); fileCache[url] = r.ok && /audio/.test(r.headers.get('content-type') || ''); } catch (e) { fileCache[url] = false; }
+  return fileCache[url];
+}
+async function playFile(url, out, ctx, seconds) {
+  if (!(await fileExists(url))) return false;
+  try {
+    const el = new Audio(url); el.volume = 1; const src = ctx.createMediaElementSource(el); src.connect(out); await el.play();
+    current = { stop: () => { try { el.pause(); } catch (e) { /* */ } out.disconnect(); }, timer: setTimeout(() => stopMusic(), (seconds + 2.6) * 1000) };
+    return true;
+  } catch (e) { out.disconnect(); return false; }
+}
+/** File name for a Pokémon's music: "Blaine's Charizard" -> music/blaines-charizard.mp3, "Nidoran ♀" -> music/nidoran-f.mp3 */
+export function musicFileFor(cardName) {
+  const slug = cardName.toLowerCase().replace(/['’]/g, '').replace(/♀/g, ' f').replace(/♂/g, ' m').replace(/é/g, 'e').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return `music/${slug}.mp3`;
+}
+/** Play music/<pokemon>.mp3 if the player dropped one in; 10 s then a fade. Resolves false when there is no file. */
+export async function playPokemonMusic(cardName, seconds = 10) {
+  const base = musicFileFor(cardName).replace(/\.mp3$/, ''); let url = null;
+  for (const ext of ['mp3', 'ogg', 'wav', 'm4a']) { if (await fileExists(`${base}.${ext}`)) { url = `${base}.${ext}`; break; } }
+  if (!url) return false;
+  stopMusic(); const a = audio(); if (!a) return false; const { ctx, master } = a;
+  const out = ctx.createGain(); out.gain.value = 0.55; out.connect(master);
+  const t0 = ctx.currentTime + 0.05; const fadeAt = t0 + seconds; out.gain.setValueAtTime(0.55, fadeAt); out.gain.linearRampToValueAtTime(0.0001, fadeAt + 2.5);
+  return playFile(url, out, ctx, seconds);
 }
 export function stopMusic() { if (current) { clearTimeout(current.timer); try { current.stop(); } catch (e) { /* */ } current = null; } }
