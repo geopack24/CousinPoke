@@ -8,7 +8,7 @@ export const getVolume = () => volume;
 export function setVolume(v) { volume = Math.max(0, Math.min(1, v)); try { localStorage.setItem('pt_sfx', String(volume)); } catch (e) { /* ignore */ } if (master) master.gain.value = volume; }
 export const isOn = () => volume > 0;
 /** The shared context and master gain once audio is unlocked, else null. */
-export function audio() { unlock(); return ctx && master && ctx.state === 'running' && isOn() ? { ctx, master } : null; }
+export function audio() { if (!canPlay()) return null; return { ctx, master }; }
 
 function unlock() { if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); master = ctx.createGain(); master.gain.value = volume; master.connect(ctx.destination); } catch (e) { return; } } if (ctx.state === 'suspended') ctx.resume(); }
 if (typeof window !== 'undefined') for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(ev, unlock, { passive: true });
@@ -68,8 +68,15 @@ const FX = {
 };
 
 /** Schedule a named effect `delayMs` from now. Extra args pass through (coin heads/tails). */
+function canPlay() {
+  if (!isOn()) return false;
+  const active = typeof navigator !== 'undefined' && navigator.userActivation && navigator.userActivation.hasBeenActive;
+  if (!ctx) { if (!active) return false; unlock(); if (!ctx) return false; }
+  if (ctx.state !== 'running') { if (!active) return false; ctx.resume(); }
+  return true;
+}
 export function play(name, delayMs = 0, ...args) {
-  if (!ctx || !isOn() || ctx.state !== 'running') return;
+  if (!canPlay()) return;
   const f = FX[name]; if (!f) return;
   try { f(ctx.currentTime + delayMs / 1000, ...args); } catch (e) { console.warn('sfx failed:', name, e); }
 }

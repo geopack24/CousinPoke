@@ -162,6 +162,7 @@ export function render(main, doc) {
     ${legal.some((a) => a.type === 'useStadium') ? `<button type="button" data-act="useStadium">Use ${esc(C(g.stadium.c).name)}</button>` : ''}
     ${myTurn ? '<button type="button" class="pri" data-act="end">End turn</button>' : ''}
     ${inflightMine ? '<button type="button" class="pri" data-act="answer">Answer the prompt</button>' : ''}
+    <button type="button" data-act="sound" class="icon" title="${soundOn() ? 'Sound is on (click to mute)' : 'Sound is off (click to unmute)'}">${soundOn() ? '🔊' : '🔇'}</button>
     <button type="button" data-act="more">More…</button>` : '<span class="small">Watching</span>';
   main.innerHTML = `<div class="tablewrap"><div class="board auto">${sideHTML(top, true)}
     <div class="midbar"><span class="turn ${myTurn ? 'mine' : ''}">${statusLine}</span>${g.stadium ? `<span class="chip click" data-stadium="${g.stadium.c}" title="Stadium in play (click to read)">Stadium: ${esc(C(g.stadium.c).name)}</span>` : ''}${doc.inflight && !inflightMine ? `<span class="chip">Waiting for ${esc(g.seats[doc.inflight.prompt.seat].name)}…</span>` : ''}<span class="grow"></span>${buttons}</div>
@@ -208,6 +209,7 @@ function onButton(act, btn, doc, legal, me) {
   if (act === 'mulliganDraw0') return submit({ type: 'mulliganDraw', n: 0 });
   if (act === 'answer') return answerInflight(doc);
   if (act === 'useStadium') return submit({ type: 'useStadium' });
+  if (act === 'sound') { setSoundVolume(soundOn() ? 0 : 0.6); PT.toast(soundOn() ? 'Sound on' : 'Sound off'); return PT.render(); }
   if (act === 'rules') return PT.showModal('Rules at this table', `<p>${esc(PT.rulesSummary(g.rules))}</p>${g.rules.notes ? `<div class="notice info" style="white-space:pre-wrap">${esc(g.rules.notes)}</div>` : ''}<p class="small muted">Automated rules: the table enforces costs, timing, damage, conditions and prizes. Use "Fix" on a Pokémon or the More menu if a card isn't automated yet.</p>`);
   if (act === 'more') {
     const items = [];
