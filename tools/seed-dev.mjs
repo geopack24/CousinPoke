@@ -17,7 +17,7 @@ const g = newGame({ rules, seats: { a: { uid: A, name: 'Ann', cards: deck }, b: 
 for (const s of ['a', 'b']) { const p = g.p[s]; p.setupDone = true; }
 g.p.a.active = mon(byName('Charmander'), [byName('Fire Energy'), byName('Fire Energy'), byName('Fire Energy')]);
 g.p.a.bench = [mon(byName('Electabuzz'), [byName('Lightning Energy'), byName('Lightning Energy')]), mon(byName('Pikachu'), [byName('Lightning Energy')])];
-g.p.b.active = mon(byName('Pikachu'), [byName('Lightning Energy')], { dmg: 10 });
+g.p.b.active = mon(process.env.SEED_B_ACTIVE ? byName(process.env.SEED_B_ACTIVE) : byName('Pikachu'), [byName('Lightning Energy'), byName('Grass Energy')], { dmg: 10 });
 g.p.b.bench = [mon(byName('Electabuzz'), [byName('Lightning Energy')]), mon(byName('Charmander'), [byName('Fire Energy')])];
 g.phase = 'main'; g.status = 'playing'; g.turnNo = 3; g.turn = 'a'; g.p.a.attachedThisTurn = false;
 

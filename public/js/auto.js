@@ -167,7 +167,7 @@ export function render(main, doc) {
   main.innerHTML = `<div class="tablewrap"><div class="board auto">${sideHTML(top, true)}
     <div class="midbar"><span class="turn ${myTurn ? 'mine' : ''}">${statusLine}</span>${g.stadium ? `<span class="chip click" data-stadium="${g.stadium.c}" title="Stadium in play (click to read)">Stadium: ${esc(C(g.stadium.c).name)}</span>` : ''}${doc.inflight && !inflightMine ? `<span class="chip">Waiting for ${esc(g.seats[doc.inflight.prompt.seat].name)}…</span>` : ''}<span class="grow"></span>${buttons}</div>
     ${sideHTML(bottom, false)}
-    <div class="legend small"><span class="SLP">Zz Asleep</span><span class="CNF">?! Confused</span><span class="PAR">⚡ Paralyzed</span><span class="PSN">☠ Poisoned</span><span class="FX">SHIELD / BARRIER / DEF: protection in effect</span><span class="muted">Badges show only while a condition is on that Pokémon.</span></div></div>
+    <div class="legend small"><span class="SLP">Zz Asleep</span><span class="CNF">?! Confused</span><span class="PAR">⚡ Paralyzed</span><span class="PSN">☠ Poisoned</span><span class="FX">Effect tags</span><span class="muted">An effect tag names the attack or Trainer affecting that Pokémon. Hover or tap it to see what it does.</span></div></div>
     <aside class="logpane panel"><div class="row"><h3 class="grow">${esc(doc.name)}</h3><span class="chip">Auto rules</span><button class="sm" type="button" data-act="rules">Rules</button></div>
     <div class="entries" id="logentries">${g.log.slice().reverse().map((e) => `<div class="e ${e.k === 'chat' ? 'chat' : ''}">${e.k === 'chat' ? `<b>${esc(e.n)}:</b> ${esc(e.m)}` : esc(e.m)}<span class="t">${e.turn != null ? 'T' + e.turn : ''}</span></div>`).join('')}</div>
     ${me ? `<form id="chat"><input type="text" id="chatin" placeholder="Say something" maxlength="200" class="grow" autocomplete="off"><button class="sm" type="submit">Send</button></form>` : ''}</aside></div>`;
@@ -180,6 +180,7 @@ export function render(main, doc) {
     const t = e.target; const btn = t.closest('button');
     if (btn && btn.dataset.act) return onButton(btn.dataset.act, btn, doc, legal, me);
     const stEl = t.closest('[data-stadium]'); if (stEl) return PT.viewCard(stEl.dataset.stadium);
+    const chip = t.closest('.FX[data-desc]'); if (chip) return PT.toast(chip.dataset.desc);
     const hand = t.closest('[data-hand]'); if (hand && me) return handMenu(doc, legal, hand.dataset.hand, hand);
     const mon = t.closest('[data-mon]'); if (mon) return monMenu(doc, legal, mon.dataset.mon, mon, me);
     const prize = t.closest('[data-prize]'); if (prize && me && prize.dataset.seat === me && pending && pending.t === 'prize' && pending.seat === me) return submit({ type: 'takePrize', index: +prize.dataset.prize });
@@ -189,12 +190,48 @@ export function render(main, doc) {
   if (inflightMine && !promptOpen && !document.querySelector('#modal-bg')) answerInflight(doc);
 }
 
+/* ---------- effect tags ---------- */
+const FX_INFO = {
+  preventDamage: ['Shield', 'Prevents all damage done to it by attacks'],
+  preventAll: ['Barrier', 'Prevents all effects of attacks, including damage, done to it'],
+  preventSmall: ['Harden', 'Prevents damage of 30 or less done to it by attacks'],
+  reduce: ['Guard', (f) => `Damage done to it by attacks is reduced by ${f.amount}`],
+  halveNext: ['Deflect', 'Damage done to it by attacks is halved'],
+  defender: ['Defender', 'Damage done to it by attacks is reduced by 20'],
+  plusPower: ['PlusPower', 'Its attacks do 10 more damage this turn'],
+  destinyBond: ['Destiny Bond', 'If an attack Knocks it Out, the attacking Pokémon is Knocked Out too'],
+  sandAttack: ['Smokescreen', 'It must flip a coin before attacking; on tails the attack does nothing'],
+  noAttack: ['No attack', (f) => (f.attack ? `It can't use ${f.attack}` : "It can't attack")],
+  noRetreat: ['No retreat', "It can't retreat"],
+  noAttach: ['No energy', "Energy can't be attached to it"],
+  mirrorShell: ['Mirror', 'Damage done to it by attacks is also done to the attacker'],
+  focus: ['Focus', (f) => `Its ${f.attack} does double damage`],
+  swordsDance: ['Swords Dance', 'Its next Slash does double damage'],
+  shadowImages: ['Shadow Images', 'Attacks against it need a coin flip; on tails they do no damage'],
+  crosscounter: ['Crosscounter', 'If an attack damages it, flip a coin; heads deals double that damage back'],
+  firewall: ['Fire Wall', 'Any Pokémon that damages it takes 10 damage'],
+  charity: ['Charity', 'Its attack damage is reduced by the amount chosen'],
+  bonus: ['Boost', (f) => `Its attacks do ${f.amount} more damage`],
+  powerOff: ['Power off', 'Its Pokémon Power stops working'],
+};
+function describeFx(f, g) {
+  const info = FX_INFO[f.k] || [f.k, 'An effect from ' + (f.src || 'an attack')];
+  const what = typeof info[1] === 'function' ? info[1](f) : info[1];
+  let when = '';
+  if (f.until == null) when = f.benchClears ? ' until it is benched or evolves' : '';
+  else if (f.until <= g.turnNo) when = ' until the end of this turn';
+  else if (f.until === g.turnNo + 1) when = ' until the end of the next turn';
+  else when = ` for ${f.until - g.turnNo} more turns`;
+  const label = f.src || info[0];
+  return { label, desc: `${label}: ${what}${when}.` };
+}
+
 function monHTML(m, seat, active, promoteClick) {
   const c = C(m.c); const hp = c.hp; const sc = active ? .42 : .34; const step = Math.round(330 * sc * 0.13);
   const att = [...m.en, ...m.tools]; const n = att.length;
   const stack = att.map((x, i) => `<div class="attc" style="top:${i * step}px;z-index:${i + 1}">${PT.cardHTML(x.c, sc)}</div>`).join('');
   const GL = { SLP: 'Zz', CNF: '?!', PAR: '⚡', PSN: '☠' }; const stChips = m.st.map((s) => `<span class="${s}" title="${STATUS_NAMES[s]}">${GL[s]} ${active ? STATUS_NAMES[s] : s}</span>`).join('');
-  const fxChips = m.fx.filter((f) => ['preventDamage', 'preventAll', 'preventSmall', 'defender', 'plusPower', 'destinyBond', 'sandAttack', 'noAttack'].includes(f.k)).map((f) => `<span class="FX">${{ preventDamage: 'SHIELD', preventAll: 'BARRIER', preventSmall: 'HARDEN', defender: 'DEF', plusPower: '+10', destinyBond: 'BOND', sandAttack: 'SAND', noAttack: 'AMNESIA' }[f.k]}</span>`).join('');
+  const fxChips = m.fx.map((f) => { const d = describeFx(f, PT.S.game.state); return `<span class="FX" title="${esc(d.desc)}" data-desc="${esc(d.desc)}">${esc(d.label)}</span>`; }).join('');
   return `<div class="mon ${active ? 'active' : ''} ${promoteClick ? 'glow' : ''}" data-mon="${m.id}" tabindex="0"><div class="cdwrap" style="padding-top:${n * step}px">${stack}<div class="poke" style="z-index:${n + 1}">${PT.cardHTML(m.c, sc)}${hp ? `<span class="hp">${Math.max(0, hp - m.dmg)}/${hp}</span>` : ''}${m.dmg ? `<span class="dmg">${m.dmg}</span>` : ''}${m.st.length || fxChips ? `<div class="sts">${stChips}${fxChips}</div>` : ''}${m.un.length ? `<span class="stk">+${m.un.length} under</span>` : ''}</div></div>${n ? `<div class="attn">${n} attached</div>` : ''}</div>`;
 }
 

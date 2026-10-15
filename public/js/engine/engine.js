@@ -259,7 +259,8 @@ function makeCtx(g, db, rng, events, seat, nextAnswer, action) {
     status(code, target) { const tgt = target || ctx.opp.active; if (!tgt) return false; return applyStatus(ctx, tgt, code); },
     cure(m, codes) { m.st = m.st.filter((x) => codes ? !codes.includes(x) : false); delete m.flags.toxic; },
     heal(m, n) { const before = m.dmg; m.dmg = Math.max(0, m.dmg - (n == null ? m.dmg : n)); if (before !== m.dmg) { events.push({ t: 'heal', target: m.id, amount: before - m.dmg }); ctx.log(`${nameOf(db, m.c)} healed ${before - m.dmg}`); } },
-    addFx(m, fx) { m.fx.push(fx); },
+    /** Effects remember what caused them (attack or Trainer name) so the table can label them. */
+    addFx(m, fx) { if (fx.src == null) fx.src = ctx.attackName || (ctx.card ? nameOf(db, ctx.card.c) : null); m.fx.push(fx); },
     /* --- attached cards --- */
     discardEnergy(m, cards) { const owner = findMon(g, m.id).seat; if (owner !== ctx.seat && m.tools.some((t) => scriptOf(t.c).protectEnergy)) { ctx.log(`Brock's Protection keeps the Energy on ${nameOf(db, m.c)}`); return; } for (const c of cards) { pullCard(g, c.id); P(g, owner).discard.push(c); } events.push({ t: 'discardEnergy', target: m.id, n: cards.length }); ctx.log(`Discarded ${cards.map((c) => nameOf(db, c.c)).join(', ')} from ${nameOf(db, m.c)}`); },
     /** Player `s` picks `n` energy cards attached to m (optionally filtered) and discards them. Skipped when copying (Metronome). */
@@ -605,7 +606,7 @@ function runOverride(ctx, a) {
     case 'turn': { g.turn = a.seat || seat; g.attacked = false; tag(`set turn to ${ctx.name(g.turn)}`); return; }
     case 'endTurn': { g.pending = []; g.turnEnding = null; endTurn(ctx); tag('forced end of turn'); return; }
     case 'clearPending': { g.pending = []; g.turnEnding = null; tag('cleared pending steps'); return; }
-    case 'flag': { const f = findMon(g, a.target); if (!f) ctx.fail('No such Pokémon'); f.m.fx = f.m.fx.filter((x) => x.k !== a.k); if (a.on !== false) f.m.fx.push({ k: a.k, until: a.until }); tag(`${a.on === false ? 'removed' : 'set'} ${a.k} on ${nameOf(db, f.m.c)}`); return; }
+    case 'flag': { const f = findMon(g, a.target); if (!f) ctx.fail('No such Pokémon'); f.m.fx = f.m.fx.filter((x) => x.k !== a.k); if (a.on !== false) f.m.fx.push({ src: 'Fix', k: a.k, until: a.until }); tag(`${a.on === false ? 'removed' : 'set'} ${a.k} on ${nameOf(db, f.m.c)}`); return; }
     case 'attachedThisTurn': { P(g, seat).attachedThisTurn = !!a.value; tag(`attached-this-turn = ${!!a.value}`); return; }
     case 'winner': { g.winner = a.seat; g.status = 'done'; tag(`declared ${ctx.name(a.seat)} the winner`); return; }
     default: ctx.fail('Unknown override');
