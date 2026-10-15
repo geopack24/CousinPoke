@@ -5,15 +5,17 @@ import { newGame, other, mons, findMon } from './engine/state.js';
 import { randomSeed } from './engine/rng.js';
 import { R } from './engine/rules.js';
 import { automationReport } from './engine/cards/index.js';
-import { playAttack, playKO, playHeal, playSelfHit, playCoins, attachLayer, isEnabled as fxEnabled, setEnabled as setFxEnabled, soundOn, setSoundVolume } from './fx.js';
+import { playAttack, playKO, playHeal, playSelfHit, playCoins, playWin, attachLayer, isEnabled as fxEnabled, setEnabled as setFxEnabled, soundOn, setSoundVolume } from './fx.js';
 import { playBattleIntro, playPokemonMusic } from './music.js';
 
 let PT = null;           // bridge from index.html
 let promptOpen = null;   // id of the prompt modal currently shown
 let seenFxId = null;     // id of the last doc.fx payload this client animated
 let pendingFx = null;
+let pendingWin = null;
 const phaseSeen = {};     // doc id -> last phase this client saw (battle music plays when setup turns into main)
-const activeSeen = {};    // doc id -> { seat: active mon id } (a Pokémon's own music plays when it becomes Active)
+const activeSeen = {};
+const winSeen = {};       // doc id -> winner seen (the win celebration plays when a winner first appears)    // doc id -> { seat: active mon id } (a Pokémon's own music plays when it becomes Active)
 
 export function install(bridge) { PT = bridge; return { render, startGame, submit, automationReport }; }
 
@@ -126,6 +128,7 @@ export function render(main, doc) {
   const battleStart = phaseSeen[doc.id] === 'setup' && g.phase === 'main';
   if (battleStart) { playBattleIntro(10); if (fxEnabled()) PT.toast('Battle start!'); }
   phaseSeen[doc.id] = g.phase;
+  if (doc.id in winSeen && !winSeen[doc.id] && g.winner) { pendingWin = g.seats[g.winner].name; } winSeen[doc.id] = g.winner || null;
   { const prev = activeSeen[doc.id]; const now = { a: g.p.a.active ? g.p.a.active.id : null, b: g.p.b.active ? g.p.b.active.id : null }; activeSeen[doc.id] = now;
     if (prev && !battleStart && g.phase === 'main') for (const s of [other(bottom), bottom]) { const m = g.p[s].active; if (m && now[s] !== prev[s]) playPokemonMusic(C(m.c).name); } }
   if (seenFxId === null) seenFxId = doc.fx ? doc.fx.id : '';
@@ -177,6 +180,7 @@ export function render(main, doc) {
     ${me ? `<form id="chat"><input type="text" id="chatin" placeholder="Say something" maxlength="200" class="grow" autocomplete="off"><button class="sm" type="submit">Send</button></form>` : ''}</aside></div>`;
   const chatNew = main.querySelector('#chatin'); if (chatNew && chatPrev) { chatNew.value = chatPrev; if (chatFocus) chatNew.focus(); }
   attachLayer(main.querySelector('.board.auto'));
+  if (pendingWin) { const n = pendingWin; pendingWin = null; setTimeout(() => playWin(main.querySelector('.board.auto'), n), 400); }
   if (pendingFx) { const ev = pendingFx; pendingFx = null; playEvents(ev, doc, captureScene(ev, g)); }
   const chat = main.querySelector('#chat'); if (chat) chat.onsubmit = (e) => { e.preventDefault(); const i = chat.querySelector('#chatin'); const v = i.value.trim(); if (!v) return; i.value = ''; submit({ type: 'chat', text: v }); };
 

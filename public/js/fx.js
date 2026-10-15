@@ -68,6 +68,7 @@ class Layer {
       else if (p.shape === 'shard') { ctx.beginPath(); ctx.moveTo(sz * 1.8, 0); ctx.lineTo(-sz, sz * 0.8); ctx.lineTo(-sz * 0.4, 0); ctx.lineTo(-sz, -sz * 0.8); ctx.closePath(); ctx.fill(); }
       else if (p.shape === 'drop') { ctx.beginPath(); ctx.ellipse(0, 0, sz * 0.7, sz * 1.2, 0, 0, Math.PI * 2); ctx.fill(); }
       else if (p.shape === 'star') { ctx.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? sz * 0.45 : sz; const a2 = (i / 10) * Math.PI * 2; ctx.lineTo(Math.cos(a2) * r, Math.sin(a2) * r); } ctx.closePath(); ctx.fill(); }
+      else if (p.shape === 'rect') { ctx.fillRect(-sz, -sz * 0.6, sz * 2, sz * 1.2); }
       else if (p.shape === 'flake') { ctx.lineWidth = 1.2; for (let i = 0; i < 3; i++) { ctx.rotate(Math.PI / 3); ctx.beginPath(); ctx.moveTo(-sz, 0); ctx.lineTo(sz, 0); ctx.stroke(); } }
     };
     return this.add(p);
@@ -284,6 +285,16 @@ export function playAttack(boardEl, scene) {
 export function playKO(boardEl, rect) { sfx.play('ko'); if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); fx.burst(rect.cx, rect.cy, { n: 30, colors: ['#222', '#555', '#999', '#fff'], speed: 7, size: 6, life: 700, g: 0.1 }); fx.ring(rect.cx, rect.cy, { r0: 10, r1: 90, color: '#fff', width: 4, life: 400 }); fx.text(rect.cx, rect.cy - 20, 'KO', { color: '#ff5a5a', size: 40, life: 1100 }); }
 export function playHeal(boardEl, rect) { sfx.play('heal'); if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); for (let i = 0; i < 16; i++) fx.particle({ x: rect.cx + rnd(-rect.w / 2, rect.w / 2), y: rect.cy + rnd(-rect.h / 3, rect.h / 3), vy: rnd(-1.6, -0.6), size: rnd(2, 5), color: pick(['#c6ffd0', '#7ae58a', '#fff']), shape: 'star', life: rnd(500, 900), glow: 8, vr: 0.1 }); }
 export function playSelfHit(boardEl, rect) { sfx.play('self'); if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); fx.burst(rect.cx, rect.cy, { n: 16, colors: ['#ff5a5a', '#ffb0b0', '#fff'], speed: 5, size: 5, life: 500 }); }
+/** End of game: confetti over the whole board, a banner with the winner's name, and the fanfare. */
+export function playWin(boardEl, name) {
+  sfx.play('win'); if (!isEnabled() || !boardEl) return;
+  const fx = layerFor(boardEl); fx.sz = 1; const C = ['#ffcb05', '#ff5a5a', '#4fb0ff', '#7ae58a', '#e58bff', '#ffffff'];
+  for (let i = 0; i < 24; i++) fx.at(i * 120, () => { for (let k = 0; k < 10; k++) fx.particle({ x: rnd(0, fx.w), y: -10, vx: rnd(-1, 1), vy: rnd(1.5, 3.5), g: 0.04, drag: 0.995, size: rnd(4, 8), color: pick(C), shape: 'rect', rot: rnd(0, 6.3), vr: rnd(-0.25, 0.25), life: rnd(2200, 3200), shrink: false }); });
+  fx.at(300, () => { fx.flash({ life: 300, alpha: 0.35, color: '#fff' }); fx.burst(fx.w / 2, fx.h / 2, { n: 80, colors: C, speed: 12, size: 7, shape: 'rect', life: 1500, g: 0.08, drag: 0.96 }); });
+  const old = boardEl.querySelector('.winbanner'); if (old) old.remove();
+  const el = document.createElement('div'); el.className = 'winbanner'; el.innerHTML = `<div class="wb-name">${String(name).replace(/[<>&]/g, '')}</div><div class="wb-wins">WINS!</div>`; boardEl.appendChild(el);
+  setTimeout(() => el.remove(), 6000);
+}
 /** Spinning coin(s) in the middle of the board; returns the ms it takes. */
 export function playCoins(boardEl, results) {
   results.slice(0, 6).forEach((h, i) => sfx.play('coin', i * 150, h));

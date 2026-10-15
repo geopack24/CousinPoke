@@ -26,6 +26,11 @@ header a{color:var(--muted);text-decoration:none}header a:hover{color:var(--fg)}
 .mon.windup .poke{animation:windup .45s}
 .mon.charge .poke{animation:charge .7s}
 @keyframes charge{0%{transform:scale(1)}40%{transform:scale(1.1);filter:drop-shadow(0 0 16px #ff6a00) brightness(1.3)}70%{transform:scale(1.14) rotate(-2deg);filter:drop-shadow(0 0 26px #ff2a00) brightness(1.5)}100%{transform:scale(1);filter:none}}
+.winbanner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;z-index:45;animation:wbfade 6s forwards;text-shadow:0 4px 0 #7a4b00,0 10px 24px rgba(0,0,0,.6)}
+.winbanner .wb-name{font-family:var(--display);font-size:clamp(40px,9vw,96px);color:#ffcb05;line-height:1;animation:wbpop .7s cubic-bezier(.2,1.6,.4,1) both}
+.winbanner .wb-wins{font-family:var(--display);font-size:clamp(28px,6vw,64px);color:#fff;line-height:1.1;animation:wbpop .7s .25s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes wbpop{0%{transform:scale(0) rotate(-8deg);opacity:0}100%{transform:scale(1) rotate(-3deg);opacity:1}}
+@keyframes wbfade{0%,80%{opacity:1}100%{opacity:0}}
 .mon.hit .poke{animation:shake .5s}
 @keyframes windup{0%,100%{transform:rotate(0)}15%{transform:rotate(-7deg) scale(1.04)}30%{transform:rotate(7deg) scale(1.07)}45%{transform:rotate(-6deg) scale(1.07)}60%{transform:rotate(5deg) scale(1.05)}80%{transform:translateY(-12px) rotate(0)}}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
@@ -66,11 +71,11 @@ code{background:#0f1218;padding:1px 5px;border-radius:4px}
     <div class="panel"><h3>Type defaults</h3><div class="chips" id="types"></div><span class="small">Plays the fallback animation for that type with the current cards, regardless of the attack.</span></div>
     <div class="panel"><h3>Basic physical hits</h3><div class="chips" id="basics"></div><span class="small">Used for attacks with plain names like Scratch, Tackle or Bite, whatever the Pokémon's type.</span></div>
     <div class="panel"><h3>Signature moves</h3><div class="chips" id="moves"></div><span class="small">Entries in <code>MOVE_FX</code>. Add more in <code>js/fx.js</code>.</span></div>
-    <div class="panel"><h3>Other effects</h3><div class="chips"><button data-x="coin1">1 coin</button><button data-x="coin3">3 coins</button><button data-x="ko">Knock Out</button><button data-x="heal">Heal</button><button data-x="self">Self damage</button><button data-x="music" class="pri">Battle intro music</button><button data-x="pokemusic">Attacker's own music</button><button data-x="stop">Stop music</button></div><span class="small">The intro plays for 10 seconds then fades. Drop a <code>battle.mp3</code> next to index.html to use your own. A Pokémon's own music goes in <code>public/music/</code> named like <code id="musicName"></code>.</span></div>
+    <div class="panel"><h3>Other effects</h3><div class="chips"><button data-x="coin1">1 coin</button><button data-x="coin3">3 coins</button><button data-x="ko">Knock Out</button><button data-x="heal">Heal</button><button data-x="self">Self damage</button><button data-x="music" class="pri">Battle intro music</button><button data-x="pokemusic">Attacker's own music</button><button data-x="win">Win celebration</button><button data-x="stop">Stop music</button></div><span class="small">The intro plays for 10 seconds then fades. Drop a <code>battle.mp3</code> next to index.html to use your own. A Pokémon's own music goes in <code>public/music/</code> named like <code id="musicName"></code>.</span></div>
   </div>
 </div>
 <script type="module">
-import { playAttack, playKO, playHeal, playSelfHit, playCoins, MOVE_FX, TYPE_FX, BASIC_FX, resolveFx, soundVolume, setSoundVolume } from './js/fx.js';
+import { playAttack, playKO, playHeal, playSelfHit, playCoins, playWin, MOVE_FX, TYPE_FX, BASIC_FX, resolveFx, soundVolume, setSoundVolume } from './js/fx.js';
 import { playBattleIntro, stopMusic, playPokemonMusic, musicFileFor } from './js/music.js';
 const $ = (s) => document.querySelector(s);
 const DATA = await fetch('cards.json').then((r) => r.json());
@@ -116,6 +121,7 @@ document.querySelector('.panel:last-child .chips').onclick = (e) => {
   if (b.dataset.x === 'coin1') playCoins(board, [Math.random() < 0.5]); if (b.dataset.x === 'coin3') playCoins(board, [0, 1, 2].map(() => Math.random() < 0.5));
   if (b.dataset.x === 'pokemusic') playPokemonMusic(state.atk.name, 10).then((ok) => { if (!ok) alert('No file at ' + musicFileFor(state.atk.name) + ' (or audio is still locked).'); });
   if (b.dataset.x === 'music') playBattleIntro(10).then((ok) => { if (!ok) alert('Audio is still locked or muted: click the page once and check the volume slider.'); }); if (b.dataset.x === 'stop') stopMusic();
+  if (b.dataset.x === 'win') playWin(board, 'G BABY');
   if (b.dataset.x === 'ko') playKO(board, targets[0]); if (b.dataset.x === 'heal') playHeal(board, from); if (b.dataset.x === 'self') playSelfHit(board, from);
 };
 document.addEventListener('keydown', (e) => { if (e.key === ' ' && state.last && e.target.tagName !== 'INPUT') { e.preventDefault(); play(state.last); } });
