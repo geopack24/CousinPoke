@@ -16,6 +16,8 @@ export const DEFAULT_RULES = {
   evolveSameTurn: true,        // a Pokémon may evolve on the turn it was played (and on turn 1)
   benchRescue: true,           // no Pokémon left: draw until a Basic (max 7) and play it; the opponent draws as many; 7 misses loses
   anyVersionEvolves: true,     // an Evolution card may go on any version of its species (Blaine's Charmeleon on a plain Charmander)
+  energyPickup: true,          // instead of attaching an Energy this turn, you may take a basic Energy off one of your Pokémon back to hand
+  dceNoReturn: true,           // an attached Double Colorless never returns to hand: effects that would return it discard it instead
   charizardDoubleDiscard: true, // Base Set Charizard's Fire Spin may discard energy worth 2 (one Double Colorless) instead of 2 cards
   weaknessBonus: 10,           // Weakness adds this much damage (0 = official doubling)
   resistanceAmount: 20,        // Resistance takes this much off (official: 30)

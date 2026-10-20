@@ -411,3 +411,25 @@ test('house rule: a Pokémon may evolve the turn it is played', () => {
   assert.ok(!has(legalActions(h, 'a', DB), 'evolve'), 'official rule waits a turn');
 });
 
+test('house rule: an attached Double Colorless is discarded instead of returning to hand', () => {
+  const dce = 'base1-96'; const flow = DATA.cards.find((c) => c.name === 'Energy Flow').id;
+  let g = setup({ a: { hand: [flow], active: { c: N['Chansey'], en: [dce, N['Lightning Energy']] }, deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  const r = actWith(g, { type: 'playTrainer', card: g.p.a.hand[0].id }, [[g.p.a.active.en[0].id, g.p.a.active.en[1].id]]);
+  assert.ok(!r.error && !r.prompt, r.error || 'prompt?');
+  const names = (cards) => cards.map((c) => DB[c.c].name);
+  assert.ok(names(r.state.p.a.hand).includes('Lightning Energy'), 'the basic energy came back to hand');
+  assert.ok(!names(r.state.p.a.hand).includes('Double Colorless Energy'), 'the Double Colorless did not');
+  assert.ok(names(r.state.p.a.discard).includes('Double Colorless Energy'), 'it was discarded');
+});
+
+test('house rule: pick up a basic Energy instead of attaching, never a Double Colorless', () => {
+  const dce = 'base1-96';
+  let g = setup({ a: { hand: [N['Fire Energy']], active: { c: N['Chansey'], en: [dce, N['Lightning Energy']] }, deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  const la = legalActions(g, 'a', DB);
+  assert.ok(la.some((a) => a.type === 'pickupEnergy' && a.card === g.p.a.active.en[1].id), 'the Lightning can be picked up');
+  assert.ok(!la.some((a) => a.type === 'pickupEnergy' && a.card === g.p.a.active.en[0].id), 'the Double Colorless cannot');
+  g = act(g, { type: 'pickupEnergy', target: g.p.a.active.id, card: g.p.a.active.en[1].id });
+  assert.equal(g.p.a.active.en.length, 1); assert.equal(g.p.a.hand.length, 2, 'the energy is back in hand');
+  assert.ok(!has(legalActions(g, 'a', DB), 'attach'), 'that used up the turn\'s attachment');
+});
+

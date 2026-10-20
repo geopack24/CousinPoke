@@ -15,7 +15,7 @@ const byName = {
   Kangaskhan: { attacks: { Fetch: { effect: (ctx) => ctx.draw(ctx.seat, 1) }, 'Comet Punch': flipTimes(20, 4) } },
   'Mr. Mime': { passive: { preventDamage: ({ amount }) => amount >= 30 }, attacks: { Meditate: { effect: (ctx) => { const d = ctx.opp.active; ctx.damage(10 + 10 * (d ? countersOn(d) : 0)); } } } },
   Nidoqueen: { attacks: { Boyfriends: { effect: (ctx) => ctx.damage(20 + 20 * ownPokemon(ctx).filter((m) => nameOf(ctx.db, m.c) === 'Nidoking').length) } } },
-  Pidgeot: { attacks: { Hurricane: { effect: (ctx) => { const d = ctx.opp.active; if (!d) return; const dealt = ctx.damage(30); if (d.dmg < monHP(ctx.db, d, ctx.g)) { removeMon(ctx.g, d.id); ctx.opp.hand.push(...monCards(d)); ctx.log(`Hurricane: ${nameOf(ctx.db, d.c)} and its cards return to ${ctx.name(ctx.oppSeat)}'s hand`); ctx.g.pending.push({ t: 'promote', seat: ctx.oppSeat }); } } } } },
+  Pidgeot: { attacks: { Hurricane: { effect: (ctx) => { const d = ctx.opp.active; if (!d) return; const dealt = ctx.damage(30); if (d.dmg < monHP(ctx.db, d, ctx.g)) { removeMon(ctx.g, d.id); ctx.returnToHand(ctx.oppSeat, monCards(d)); ctx.log(`Hurricane: ${nameOf(ctx.db, d.c)} and its cards return to ${ctx.name(ctx.oppSeat)}'s hand`); ctx.g.pending.push({ t: 'promote', seat: ctx.oppSeat }); } } } } },
   Pinsir: { attacks: { Irongrip: flipStatus(20, 'PAR') } },
   Scyther: { attacks: { 'Swords Dance': { effect: (ctx, m) => { ctx.addFx(m, { k: 'swordsDance', until: T(ctx) + 2 }); ctx.log('Swords Dance: Slash does 60 next turn'); } }, Slash: { effect: (ctx, m) => ctx.damage(m.fx.some((f) => f.k === 'swordsDance') ? 60 : 30) } } },
   Snorlax: { passive: { immuneConditions: true }, attacks: { 'Body Slam': flipStatus(30, 'PAR') } },

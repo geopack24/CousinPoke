@@ -166,6 +166,11 @@ export function legalActions(g, seat, db) {
     const card = db[c.c]; if (!card) continue;
     if (card.st === 'Energy') for (const m of mons(p)) if (!isDollLike(db, m) && canAttachNow(g, db, seat, c, m)) out.push({ type: 'attach', card: c.id, target: m.id });
     if (isBasicLike(card) && p.bench.length < benchLimit(g)) out.push({ type: 'playBasic', card: c.id });
+  }
+  // house rule: pick an Energy up instead of attaching one
+  if (r.energyPickup && !p.attachedThisTurn) for (const m of mons(p)) for (const e of m.en) { if (db[e.c] && db[e.c].st === 'Energy' && !(r.dceNoReturn && db[e.c].name === 'Double Colorless Energy')) out.push({ type: 'pickupEnergy', target: m.id, card: e.id }); }
+  for (const c of p.hand) {
+    const card = db[c.c]; if (!card) continue;
     if (card.st === 'Pokémon' && card.sub !== 'Basic') for (const m of mons(p)) if (matchesEvolution(db, c.c, m, g.rules) && canEvolveTarget(g, m, r, db)) out.push({ type: 'evolve', card: c.id, target: m.id });
     if (card.st === 'Trainer' && !isBasicLike(card)) {
       const s = scriptOf(c.c);
@@ -255,6 +260,14 @@ function makeCtx(g, db, rng, events, seat, nextAnswer, action) {
     discardFromHand(s, iid) { const c = pullCard(g, iid); P(g, s).discard.push(c); events.push({ t: 'discard', seat: s, card: c }); return c; },
     discardHand(s) { const p = P(g, s); const n = p.hand.length; p.discard.push(...p.hand); p.hand = []; ctx.log(`${ctx.name(s)} discarded ${n} card${n === 1 ? '' : 's'}`); },
     toHand(s, c) { P(g, s).hand.push(c); },
+    /** Cards leaving play for a hand. Under the house rule an attached Double Colorless is discarded instead of returned. */
+    returnToHand(s, cards) {
+      const p = P(g, s); const kept = [], dropped = [];
+      for (const c of cards) { if (R(g.rules).dceNoReturn && db[c.c] && db[c.c].name === 'Double Colorless Energy') dropped.push(c); else kept.push(c); }
+      p.hand.push(...kept); p.discard.push(...dropped);
+      if (dropped.length) ctx.log(`${dropped.length} Double Colorless Energy discarded instead of returning to hand`);
+      return kept;
+    },
     /* --- damage & status --- */
     damage(amount, opts = {}) { const tgt = opts.target || ctx.opp.active; if (!tgt) return 0; return dealDamage(ctx, tgt, amount, { source: ctx.attacker, ...opts }); },
     selfDamage(amount) { return dealDamage(ctx, ctx.attacker, amount, { source: ctx.attacker, noWR: true, self: true }); },
@@ -376,6 +389,12 @@ function runAction(ctx, a) {
   if (g.phase === 'setup') return runSetup(ctx, a);
   must(g.phase === 'main' && g.turn === seat, 'Not your turn');
   switch (a.type) {
+    case 'pickupEnergy': {
+      must(r.energyPickup, 'Not allowed at this table'); must(!p.attachedThisTurn, 'Already attached (or picked up) Energy this turn');
+      const f = findMon(g, a.target); must(f && f.seat === seat, 'Not your Pokémon'); const e = f.m.en.find((x) => x.id === a.card); must(e, 'That Energy is not on that Pokémon');
+      must(!(r.dceNoReturn && db[e.c].name === 'Double Colorless Energy'), "A Double Colorless can't be picked up");
+      pullCard(g, e.id); p.hand.push(e); p.attachedThisTurn = true; ctx.log(`${ctx.name(seat)} picked up ${nameOf(db, e.c)} from ${nameOf(db, f.m.c)}`); ctx.event({ t: 'pickup', target: f.m.id, card: e }); return;
+    }
     case 'attach': {
       const c = handCard(a.card); must(db[c.c].st === 'Energy', 'Not an energy card');
       const f = findMon(g, a.target); must(f && f.seat === seat, 'Not your Pokémon'); must(!isDollLike(db, f.m), "Can't attach to that");
