@@ -228,7 +228,9 @@ textarea{width:100%;min-height:60px;resize:vertical}
 @keyframes wbpop{0%{transform:scale(0) rotate(-8deg);opacity:0}100%{transform:scale(1) rotate(-3deg);opacity:1}}
 @keyframes wbfade{0%,80%{opacity:1}100%{opacity:0}}
 /* drag and drop */
-.side.mine .hand .cd{touch-action:pan-x}
+.side.mine .hand .cd{touch-action:pan-x;cursor:grab}
+.side.mine .hand .cd:active,.dragghost{cursor:grabbing}
+.side.mine .benchz .mon{cursor:grab}
 .side.mine .benchz .mon{touch-action:none}
 .dragghost{position:fixed;z-index:1000;pointer-events:none;opacity:.92;transform:translate(-50%,-50%) scale(1.08);box-shadow:0 10px 24px rgba(0,0,0,.55)}
 .dragging{opacity:.4}
