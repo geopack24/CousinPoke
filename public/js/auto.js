@@ -85,7 +85,7 @@ function promptModal(prompt) {
 }
 
 /* ---------- events -> animations ---------- */
-const FX_EVENTS = ['attack', 'damage', 'heal', 'ko', 'flip', 'status'];
+const FX_EVENTS = ['attack', 'damage', 'heal', 'ko', 'flip', 'status', 'draw'];
 /** Store the interesting events on the doc so the other player's screen animates them too. */
 function publishFx(doc, events) {
   const ev = events.filter((e) => FX_EVENTS.includes(e.t)); if (!ev.length) { return; }
@@ -107,11 +107,38 @@ function captureScene(events, g) {
   rects[atk.attacker] = from;
   return { type: atk.type, name: atk.name, cardId: f ? f.m.c : null, attacker: atk.attacker, from, targets, rects };
 }
+/** Card backs fly from a seat's deck to its hand; the player's own new cards flip face up when they land. */
+function animateDraws(events, doc) {
+  const b = boardEl(); if (!b) return; const me = mySeat(doc);
+  const draws = events.filter((e) => e.t === 'draw' && e.n > 0); if (!draws.length) return;
+  let delay = 0;
+  for (const e of draws) {
+    const deck = b.querySelector(`[data-pile="deck"][data-seat="${e.seat}"]`); const zone = b.querySelector(`[data-handzone="${e.seat}"]`); if (!deck || !zone) continue;
+    const own = e.seat === me; const n = Math.min(e.n, 8);
+    const cards = own ? [...zone.querySelectorAll('[data-hand]')].slice(-n) : [];
+    cards.forEach((c) => c.classList.add('incoming'));
+    const from = deck.getBoundingClientRect();
+    for (let i = 0; i < n; i++) {
+      const target = own ? cards[i] : null; const tr = (target || zone).getBoundingClientRect();
+      const d = delay + i * 90;
+      setTimeout(() => {
+        const ghost = document.createElement('div'); ghost.className = 'cd back flycard';
+        const w = target ? tr.width : Math.max(40, from.width), h = target ? tr.height : Math.max(55, from.height);
+        ghost.style.cssText = `left:${from.left + from.width / 2 - w / 2}px;top:${from.top + from.height / 2 - h / 2}px;width:${w}px;height:${h}px`;
+        document.body.appendChild(ghost);
+        requestAnimationFrame(() => { ghost.style.transform = `translate(${tr.left + tr.width / 2 - (from.left + from.width / 2)}px,${tr.top + tr.height / 2 - (from.top + from.height / 2)}px) rotate(${own ? 0 : 180}deg)`; ghost.style.opacity = target ? '1' : '0.4'; });
+        setTimeout(() => { ghost.remove(); if (target) { target.classList.remove('incoming'); target.classList.add('flipin'); setTimeout(() => target.classList.remove('flipin'), 500); } }, 420);
+      }, d);
+    }
+    delay += n * 90 + 200;
+  }
+}
 function playEvents(events, doc, scene) {
   const b = boardEl();
   const flips = events.filter((e) => e.t === 'flip');
   if (flips.length) PT.toast(flips.map((e) => (e.heads ? 'Heads' : 'Tails')).join(', '));
   let delay = 30; if (flips.length && b) delay += Math.round(playCoins(b, flips.map((e) => e.heads)) * 0.7);
+  setTimeout(() => animateDraws(events, doc), 20);
   const atk = events.find((e) => e.t === 'attack');
   setTimeout(() => {
     let impact = 0; const board = boardEl();
@@ -158,20 +185,20 @@ export function render(main, doc) {
       <span class="ctr pile" data-pile="deck" data-seat="${seat}">Deck <b>${p.deck.length}</b></span>
       <span class="ctr pile" data-pile="discard" data-seat="${seat}">Discard <b>${p.discard.length}</b></span>
       ${prizeClick ? `<span class="ctr">Prizes ${p.prizes.map((c, i) => `<span class="pile glow" data-prize="${i}" data-seat="${seat}" style="--s:.14;display:inline-block;vertical-align:middle">${PT.backHTML(.14)}</span>`).join('')}</span>` : `<span class="ctr">Prizes <b>${p.prizes.length}</b></span>`}
-      ${own ? '' : `<span class="ctr">Hand <b>${p.hand.length}</b></span>`}
+      ${own ? '' : `<span class="ctr" data-handzone="${seat}">Hand <b>${p.hand.length}</b></span>`}
     </div>`;
     const rail = compact ? counters : `<div class="zone-row">
       ${pileHTML(seat, 'deck', 'Deck', p.deck.length, null)}
       ${pileHTML(seat, 'discard', 'Discard', p.discard.length, p.discard.length ? p.discard[p.discard.length - 1].c : null)}
       <div class="z"><span class="zlbl">Prizes${prizeClick ? ' · take one' : ''}</span><div class="row" style="gap:3px;flex-wrap:nowrap">${p.prizes.map((c, i) => `<div class="pile ${prizeClick ? 'glow' : ''}" data-prize="${i}" data-seat="${seat}" style="--s:.2">${PT.backHTML(.2)}</div>`).join('') || '<span class="small">none left</span>'}</div><span class="cnt">${p.prizes.length} left</span></div>
-      ${own ? '' : (me && seesOpponentHand(g, PT.CARDS, me)) ? `<div class="z" style="align-items:stretch"><span class="zlbl">Their hand (Clairvoyance) · ${p.hand.length}</span><div class="hand">${p.hand.map((c) => PT.cardHTML(c.c, .3)).join('') || '<span class="small">empty</span>'}</div></div>` : `<div class="z"><span class="zlbl">Hand</span><div class="row" style="gap:0">${p.hand.slice(0, 12).map((c, i) => `<div style="margin-left:${i ? '-14px' : 0}">${PT.backHTML(.2)}</div>`).join('') || '<span class="small">empty</span>'}</div><span class="cnt">${p.hand.length} cards</span></div>`}
+      ${own ? '' : (me && seesOpponentHand(g, PT.CARDS, me)) ? `<div class="z" style="align-items:stretch"><span class="zlbl">Their hand (Clairvoyance) · ${p.hand.length}</span><div class="hand">${p.hand.map((c) => PT.cardHTML(c.c, .3)).join('') || '<span class="small">empty</span>'}</div></div>` : `<div class="z" data-handzone="${seat}"><span class="zlbl">Hand</span><div class="row" style="gap:0">${p.hand.slice(0, 12).map((c, i) => `<div style="margin-left:${i ? '-14px' : 0}">${PT.backHTML(.2)}</div>`).join('') || '<span class="small">empty</span>'}</div><span class="cnt">${p.hand.length} cards</span></div>`}
     </div>`;
     const activeZ = `<div class="z" data-active-slot="${seat}"><span class="zlbl">Active</span>${active}</div>`;
     const benchZ = `<div class="z benchz"><span class="zlbl">Bench</span><div class="bench">${benchSlots.join('')}</div></div>`;
     // bench sits along the player's edge, the Active Pokémon in front of it toward the middle of the table
     const field = `<div class="field">${isTop ? benchZ + activeZ : activeZ + benchZ}</div>`;
     const name = `<div class="pname"><span>${esc(g.seats[seat].name)}${own ? ' (you)' : ''}</span>${g.phase === 'main' && g.turn === seat && !g.winner ? `<span class="chip">${own ? 'Your turn' : 'Their turn'}</span>` : ''}${g.phase === 'setup' ? `<span class="chip">${p.setupDone ? 'Ready' : 'Setting up'}</span>` : ''}${g.winner === seat ? '<span class="chip">Winner</span>' : ''}</div>`;
-    const hand = own ? `<div class="z" style="align-items:stretch"><span class="zlbl">${compact ? `Hand · ${p.hand.length} · drag to play` : `Your hand · ${p.hand.length} · drag a card onto a Pokémon or the bench, or tap it for options`}</span><div class="hand ${compact ? 'strip' : ''}">${p.hand.map((c) => PT.cardHTML(c.c, SC.hand, `data-hand="${c.id}"`, legal.some((a) => a.card === c.id) ? 'click can' : 'click')).join('') || '<span class="small muted">empty</span>'}</div></div>` : '';
+    const hand = own ? `<div class="z" style="align-items:stretch"><span class="zlbl">${compact ? `Hand · ${p.hand.length} · drag to play` : `Your hand · ${p.hand.length} · drag a card onto a Pokémon or the bench, or tap it for options`}</span><div class="hand ${compact ? 'strip' : ''}" data-handzone="${seat}">${p.hand.map((c) => PT.cardHTML(c.c, SC.hand, `data-hand="${c.id}"`, legal.some((a) => a.card === c.id) ? 'click can' : 'click')).join('') || '<span class="small muted">empty</span>'}</div></div>` : '';
     return isTop ? `<div class="side ${own ? 'mine' : ''}">${name}${rail}${field}</div>` : `<div class="side ${own ? 'mine' : ''}">${name}${field}${rail}${hand}</div>`;
   };
   const statusLine = g.winner ? `${esc(g.seats[g.winner].name)} wins` : g.phase === 'setup' ? 'Setup: place your Basic Pokémon' : pending ? `${esc(g.seats[pending.seat].name)}: ${pending.t === 'prize' ? 'take a prize' : pending.t === 'promote' ? 'promote a Pokémon' : 'mulligan draw'}` : `Turn ${g.turnNo} · ${esc(g.seats[g.turn].name)}${g.turn === me ? ' (you)' : ''}`;
