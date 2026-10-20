@@ -210,7 +210,7 @@ export function render(main, doc) {
   const waitingOnMe = me && !g.winner && g.phase === 'main' && ((pending && pending.seat === me) || (!pending && g.turn === me));
   const inflightMine = doc.inflight && doc.inflight.prompt && doc.inflight.prompt.seat === me;
   const buttons = me ? `
-    ${g.phase === 'setup' && legal.some((a) => a.type === 'mulligan') ? '<button type="button" data-act="mulligan">Mulligan (no Basic)</button>' : ''}
+    ${g.phase === 'setup' && legal.some((a) => a.type === 'mulligan') ? `<button type="button" data-act="mulligan">${legal.some((a) => a.type === 'placeActive') ? 'Mulligan too (optional)' : 'Mulligan (no Basic)'}</button>` : ''}
     ${g.phase === 'setup' && legal.some((a) => a.type === 'setupDone') ? '<button type="button" class="pri" data-act="setupDone">Ready</button>' : ''}
     ${pending && pending.t === 'mulliganDraw' && pending.seat === me ? `<button type="button" class="pri" data-act="mulliganDraw1">Draw ${pending.n} extra</button><button type="button" data-act="mulliganDraw0">Skip</button>` : ''}
     ${doc.prev && doc.prev.seat === me && !g.winner ? '<button type="button" data-act="undo" title="Undo your last move (only moves that revealed nothing)">Undo</button>' : ''}
@@ -340,10 +340,11 @@ async function botStep() {
 
 /* ---------- drag and drop ----------
    Drag a hand card onto one of your Pokémon (attach energy / evolve), a Basic onto your bench (play it), a Trainer onto the
-   board (play it), or a benched Pokémon onto your Active spot (retreat / promote). Taps still open the menus. */
+   field of play (either side, or the middle bar) to play it, or a benched Pokémon onto your Active spot (retreat / promote). Taps still open the menus. */
 function setupDrag(main, doc, legal, me) {
   const g = doc.state; const board = main.querySelector('.board.auto'); if (!board) return;
   const myActiveSlot = board.querySelector(`[data-active-slot="${me}"]`); const myBench = board.querySelector('.side.mine .benchz');
+  const playArea = [...board.querySelectorAll('.field, .midbar')]; // anywhere on the table (not the hand) plays a Trainer
   const monEl = (id) => board.querySelector(`[data-mon="${id}"]`);
   /** What a source can be dropped on: [{el, action}] */
   const targetsFor = (src) => {
@@ -353,7 +354,7 @@ function setupDrag(main, doc, legal, me) {
         if (a.card !== src.id) continue;
         if ((a.type === 'attach' || a.type === 'evolve') && monEl(a.target)) out.push({ el: monEl(a.target), action: a });
         if (a.type === 'playBasic' && myBench) out.push({ el: myBench, action: a });
-        if (a.type === 'playTrainer') { if (myActiveSlot) out.push({ el: myActiveSlot, action: a }); if (myBench) out.push({ el: myBench, action: a }); }
+        if (a.type === 'playTrainer') for (const el of playArea) out.push({ el, action: a });
         if ((a.type === 'placeActive' || a.type === 'placeBench') && (a.type === 'placeActive' ? myActiveSlot : myBench)) out.push({ el: a.type === 'placeActive' ? myActiveSlot : myBench, action: a });
       }
     } else {

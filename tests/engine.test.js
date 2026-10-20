@@ -203,7 +203,7 @@ test('deck-out damage instead of losing; override damage', () => {
 });
 
 test('setup phase: place basics, mulligan credit, first player draws', () => {
-  const g0 = newGame({ rules: {}, seats: { a: { uid: 'ua', name: 'Ann', cards: { [N['Bill']]: 60 } }, b: { uid: 'ub', name: 'Bob', cards: { [N['Pikachu']]: 60 } } }, seed: 3, first: 'b' });
+  const g0 = newGame({ rules: { mulliganRescue: false }, seats: { a: { uid: 'ua', name: 'Ann', cards: { [N['Bill']]: 60 } }, b: { uid: 'ub', name: 'Bob', cards: { [N['Pikachu']]: 60 } } }, seed: 3, first: 'b' });
   assert.equal(g0.p.a.hand.length, 7); assert.equal(g0.p.a.prizes.length, 6);
   assert.ok(has(legalActions(g0, 'a', DB), 'mulligan'));
   let g = act(g0, { type: 'mulligan' }, { seat: 'a' });
@@ -431,5 +431,29 @@ test('house rule: pick up a basic Energy instead of attaching, never a Double Co
   g = act(g, { type: 'pickupEnergy', target: g.p.a.active.id, card: g.p.a.active.en[1].id });
   assert.equal(g.p.a.active.en.length, 1); assert.equal(g.p.a.hand.length, 2, 'the energy is back in hand');
   assert.ok(!has(legalActions(g, 'a', DB), 'attach'), 'that used up the turn\'s attachment');
+});
+
+test('house mulligan: opponent may mulligan too; a second miss draws one at a time, 5 misses loses', () => {
+  const mk = (seed) => newGame({ rules: {}, seats: { a: { uid: 'ua', name: 'Ann', cards: { [N['Bill']]: 60 } }, b: { uid: 'ub', name: 'Bob', cards: { [N['Pikachu']]: 60 } } }, seed, first: 'b' });
+  let g = act(mk(3), { type: 'mulligan' }, { seat: 'a' });
+  assert.equal(g.p.b.mulliganCredits, 0, 'no extra draw under the house rule'); assert.equal(g.p.b.freeMulligans, 1);
+  assert.ok(has(legalActions(g, 'b', DB), 'mulligan'), 'Bob may mulligan too although he has Basics');
+  const before = g.p.b.hand.map((c) => c.id).join();
+  g = act(g, { type: 'mulligan' }, { seat: 'b' });
+  assert.equal(g.p.b.hand.length, 7); assert.notEqual(g.p.b.hand.map((c) => c.id).join(), before); assert.equal(g.p.b.freeMulligans, 0);
+  assert.ok(!has(legalActions(g, 'b', DB), 'mulligan'), 'only once');
+  // Ann's second miss: her deck is all Bill, so 5 draws find nothing and she loses
+  assert.ok(has(legalActions(g, 'a', DB), 'mulligan'));
+  const bobHand = g.p.b.hand.length;
+  g = act(g, { type: 'mulligan' }, { seat: 'a' });
+  assert.equal(g.p.a.hand.length, 7 + 5, 'drew 5 one at a time'); assert.equal(g.p.b.hand.length, bobHand + 5, 'Bob drew as many');
+  assert.equal(g.winner, 'b');
+  // a second miss that does find a Basic: stop there, opponent draws the same number
+  g = act(mk(3), { type: 'mulligan' }, { seat: 'a' });
+  g.p.a.deck.splice(2, 0, inst(N['Pikachu']));
+  const bh = g.p.b.hand.length;
+  g = act(g, { type: 'mulligan' }, { seat: 'a' });
+  assert.equal(g.winner, null); assert.equal(g.p.a.hand.length, 10, 'stopped at the third card'); assert.equal(g.p.b.hand.length, bh + 3);
+  assert.ok(has(legalActions(g, 'a', DB), 'placeActive'));
 });
 

@@ -3,7 +3,8 @@ export const DEFAULT_RULES = {
   deckSize: 60, prizes: 6, handSize: 7, benchSize: 5, maxCopies: 4,
   firstTurnAttack: false,      // the player who goes first may attack on turn 1
   autoDraw: true,              // draw at the start of each turn
-  mulliganDraw: 1,             // extra cards the opponent may draw per mulligan
+  mulliganDraw: 1,             // extra cards the opponent may draw per mulligan (ignored when mulliganRescue is on)
+  mulliganRescue: true,        // house mulligan: the opponent may mulligan too (no extra draw); a second miss draws one card at a time (max 5, opponent draws as many); 5 misses loses
   colorlessCosts: true,        // any energy pays any attack cost
   noAttackAfterRetreat: true,  // retreating ends your chance to attack this turn
   unlimitedTrainers: true,     // informational

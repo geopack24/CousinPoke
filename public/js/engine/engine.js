@@ -156,6 +156,7 @@ export function legalActions(g, seat, db) {
     if (p.setupDone) return out;
     const basics = p.hand.filter((c) => isBasicLike(db[c.c]));
     if (!basics.length && !p.active) { out.push({ type: 'mulligan' }); return out; }
+    if (r.mulliganRescue && !p.active && (p.freeMulligans || 0) > 0) out.push({ type: 'mulligan' });
     for (const c of basics) { if (!p.active) out.push({ type: 'placeActive', card: c.id }); else if (p.bench.length < r.benchSize) out.push({ type: 'placeBench', card: c.id }); }
     if (p.active) out.push({ type: 'setupDone' });
     return out;
@@ -492,9 +493,24 @@ function runSetup(ctx, a) {
   const { g, db, seat } = ctx; const r = R(g.rules); const p = P(g, seat); const must = (c, m) => { if (!c) ctx.fail(m); };
   must(!p.setupDone, 'Setup already done');
   if (a.type === 'mulligan') {
-    must(!p.hand.some((c) => isBasicLike(db[c.c])) && !p.active, 'You have a Basic Pokémon');
-    p.deck.push(...p.hand, ...p.prizes); p.hand = []; p.prizes = []; ctx.shuffle(seat);
-    p.hand = p.deck.splice(0, r.handSize); p.prizes = p.deck.splice(0, r.prizes); p.mulligans++;
+    must(!p.active, 'You already placed a Pokémon');
+    const noBasic = !p.hand.some((c) => isBasicLike(db[c.c]));
+    const redeal = () => { p.deck.push(...p.hand, ...p.prizes); p.hand = []; p.prizes = []; ctx.shuffle(seat); p.hand = p.deck.splice(0, r.handSize); p.prizes = p.deck.splice(0, r.prizes); };
+    if (r.mulliganRescue && !noBasic) { // the optional mulligan offered after the opponent's
+      must((p.freeMulligans || 0) > 0, 'You have a Basic Pokémon'); p.freeMulligans--; redeal();
+      ctx.log(`${ctx.name(seat)} chose to mulligan as well: new hand of ${r.handSize}`); return;
+    }
+    must(noBasic, 'You have a Basic Pokémon');
+    if (r.mulliganRescue && p.mulligans >= 1) { // second miss: one card at a time, at most 5
+      const drawn = []; let basic = null;
+      while (drawn.length < 5 && p.deck.length) { const c = p.deck.shift(); drawn.push(c); p.hand.push(c); if (isBasicLike(db[c.c])) { basic = c; break; } }
+      ctx.event({ t: 'draw', seat, n: drawn.length });
+      const n = ctx.draw(other(seat), drawn.length);
+      if (!basic) { ctx.log(`${ctx.name(seat)} drew ${drawn.length} card${drawn.length === 1 ? '' : 's'} one at a time without finding a Basic Pokémon. ${ctx.name(other(seat))} wins!`); g.winner = other(seat); g.status = 'done'; ctx.event({ t: 'win', seat: other(seat) }); return; }
+      ctx.log(`${ctx.name(seat)} still had no Basic Pokémon: drew ${drawn.length} card${drawn.length === 1 ? '' : 's'} one at a time until ${nameOf(db, basic.c)} turned up. ${ctx.name(other(seat))} draws ${n} as well.`); return;
+    }
+    redeal(); p.mulligans++;
+    if (r.mulliganRescue) { const op = P(g, other(seat)); op.freeMulligans = (op.freeMulligans || 0) + 1; ctx.log(`${ctx.name(seat)} had no Basic Pokémon: mulligan. ${ctx.name(other(seat))} may mulligan as well.`); return; }
     ctx.log(`${ctx.name(seat)} had no Basic Pokémon: mulligan (${p.mulligans}). ${ctx.name(other(seat))} may draw ${r.mulliganDraw} extra card${r.mulliganDraw === 1 ? '' : 's'}.`);
     if (r.mulliganDraw > 0) P(g, other(seat)).mulliganCredits += r.mulliganDraw; return;
   }

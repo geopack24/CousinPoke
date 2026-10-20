@@ -72,7 +72,7 @@ export function newGame({ rules, seats, seed, first }) {
     const deck = buildDeck(seats[s].cards, rng);
     g.p[s] = {
       deck, hand: deck.splice(0, Math.min(r.handSize, deck.length)), prizes: deck.splice(0, Math.min(r.prizes, deck.length)),
-      discard: [], active: null, bench: [], setupDone: false, mulligans: 0, mulliganCredits: 0,
+      discard: [], active: null, bench: [], setupDone: false, mulligans: 0, mulliganCredits: 0, freeMulligans: 0,
       attachedThisTurn: false, retreatedThisTurn: false, prizesTaken: 0,
     };
   }
