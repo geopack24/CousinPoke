@@ -516,7 +516,7 @@ function rulesSummary(r){r=R(r);const bits=[`${r.deckSize}-card decks`,`${r.priz
 
 function renderLobby(main){
   const online=S.online;
-  const games=S.games.filter(g=>g.status!=='done'||g.host===uid);
+  const games=S.games.filter(g=>g.status!=='done'||g.host===uid||(g.seats&&((g.seats.a||{}).uid===uid||(g.seats.b||{}).uid===uid)));
   main.innerHTML=`
   ${!online?`<div class="notice" style="margin-bottom:16px"><b>Can't reach the game server.</b> Check your connection; the page reconnects on its own. Saving decks and playing need the server.</div>`:''}
   <div class="grid2">
