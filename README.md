@@ -36,6 +36,10 @@ Tables created in "auto" mode run a rules engine (`public/js/engine/`) with scri
 - `npm test` runs the engine tests.
 - `npm run smoke` runs every scripted attack, power and trainer with auto-answered prompts and reports crashes.
 
+## Playing from another device
+
+Decks belong to a player id stored in the browser. To carry yours to a phone or another PC, open "Set your name", enter a PIN or passphrase and press "Set PIN"; on the other device enter the same PIN and press "Sign in with PIN". That device then plays as you, with your name and decks. The PIN itself is never stored, only a hash that points at your player.
+
 ## Phones, drag and drop
 
 Under 700px wide the table switches to a compact layout that fits one phone screen: smaller cards, the opponent's piles as a row of counters, your hand as a sideways-scrolling strip, the log behind a Log button. On any screen you can drag a hand card onto one of your Pokémon to attach energy or evolve it, drag a Basic onto your bench to play it, drag a Trainer onto the board to play it, or drag a benched Pokémon onto your Active spot to retreat into it or promote it. Valid drop targets light up while you drag; tapping a card still opens its menu for attacks and everything else.
