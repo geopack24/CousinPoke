@@ -227,6 +227,53 @@ textarea{width:100%;min-height:60px;resize:vertical}
 .winbanner .wb-wins{font-family:var(--display);font-size:clamp(28px,6vw,64px);color:#fff;line-height:1.1;animation:wbpop .7s .25s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes wbpop{0%{transform:scale(0) rotate(-8deg);opacity:0}100%{transform:scale(1) rotate(-3deg);opacity:1}}
 @keyframes wbfade{0%,80%{opacity:1}100%{opacity:0}}
+/* drag and drop */
+.side.mine .hand .cd{touch-action:pan-x}
+.side.mine .benchz .mon{touch-action:none}
+.dragghost{position:fixed;z-index:1000;pointer-events:none;opacity:.92;transform:translate(-50%,-50%) scale(1.08);box-shadow:0 10px 24px rgba(0,0,0,.55)}
+.dragging{opacity:.4}
+.drop-ok{outline:3px dashed var(--accent);outline-offset:3px;border-radius:10px}
+.drop-hover{outline:4px solid var(--accent);outline-offset:3px;box-shadow:0 0 0 6px rgba(255,203,5,.25);border-radius:10px}
+.benchz.drop-ok .bench,.z.drop-ok{background:rgba(255,203,5,.08)}
+/* compact (phone) table */
+.counters{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center;padding:2px 0}
+.counters .ctr{background:rgba(0,0,0,.28);color:var(--felt-fg);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+.counters .ctr b{font-variant-numeric:tabular-nums}
+.counters .ctr.pile{cursor:pointer}
+.hand.strip{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;padding:6px 4px 10px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+.hand.strip .cd{scroll-snap-align:center}
+.logpane.compact{position:static;max-height:none}
+.logpane.compact .entries{display:none}
+.logpane.compact.open .entries{display:flex;max-height:40vh}
+@media (max-width:700px){
+  .board{padding:6px;gap:4px;border-radius:10px}
+  .board .side{gap:3px}
+  .board .field{gap:4px}
+  .board .zlbl{font-size:9px;margin-bottom:1px}
+  .bench{gap:5px;padding:2px 0 3px}
+  .pname{font-size:13px}
+  .midbar{padding:4px 2px;gap:6px}
+  .midbar .turn{font-size:15px}
+  .board button{padding:4px 9px;font-size:13px}
+  .mon .hp{font-size:10px;padding:0 4px;top:-6px}
+  .mon .dmg{min-width:20px;height:20px;font-size:11px;top:-5px;right:-5px}
+  .mon .sts span{font-size:9px;padding:1px 4px}
+  .mon .attn{font-size:9px;margin-top:1px}
+  .slot{font-size:10px}
+  .tablewrap{gap:8px}
+  .midbar{flex-wrap:nowrap;overflow:hidden}
+  .midbar .turn{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .midbar .chip{display:none}
+  .board button{padding:4px 8px;font-size:12px;white-space:nowrap}
+  .board button.icon{font-size:14px;padding:3px 6px}
+  .hand.strip{padding:4px 4px 6px}
+  .counters .ctr{font-size:11px;padding:2px 8px}
+  #hdr{padding:4px 8px;gap:6px}
+  #hdr .logo{font-size:16px}
+  #hdr .logo i{width:14px;height:14px}
+  #hdr nav button{padding:4px 8px;font-size:12px}
+  #hdr .who button{padding:4px 8px;font-size:12px}
+}
 .mon.hit .poke{animation:shake .5s}
 .mon.lunge .poke{animation:lunge .45s}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}

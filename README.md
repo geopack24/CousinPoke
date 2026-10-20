@@ -36,6 +36,10 @@ Tables created in "auto" mode run a rules engine (`public/js/engine/`) with scri
 - `npm test` runs the engine tests.
 - `npm run smoke` runs every scripted attack, power and trainer with auto-answered prompts and reports crashes.
 
+## Phones, drag and drop
+
+Under 700px wide the table switches to a compact layout that fits one phone screen: smaller cards, the opponent's piles as a row of counters, your hand as a sideways-scrolling strip, the log behind a Log button. On any screen you can drag a hand card onto one of your Pokémon to attach energy or evolve it, drag a Basic onto your bench to play it, drag a Trainer onto the board to play it, or drag a benched Pokémon onto your Active spot to retreat into it or promote it. Valid drop targets light up while you drag; tapping a card still opens its menu for attacks and everything else.
+
 ## Sound
 
 `public/js/sfx.js` synthesises every sound with the Web Audio API (square and triangle chiptune tones plus filtered noise), so there are no recorded clips and nothing copyrighted. Each type has a launch and an impact sound, physical hits have swishes and thuds, and coins, knockouts, heals and Charizard's Fire Spin have their own. Browsers keep audio muted until the player has clicked something on the page once. Volume is under More… (on/off) and as a slider in the animation lab; it is remembered per device.

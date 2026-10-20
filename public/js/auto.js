@@ -13,6 +13,11 @@ let promptOpen = null;   // id of the prompt modal currently shown
 let seenFxId = null;     // id of the last doc.fx payload this client animated
 let pendingFx = null;
 let pendingWin = null;
+let logOpen = false;      // compact mode: whether the log is expanded
+let suppressClick = false; // a drag just finished: swallow the click that follows
+const isCompact = () => window.innerWidth < 700;
+let wasCompact = null;
+if (typeof window !== 'undefined') window.addEventListener('resize', () => { const c = isCompact(); if (wasCompact !== null && c !== wasCompact && PT) PT.render(); wasCompact = c; });
 const phaseSeen = {};     // doc id -> last phase this client saw (battle music plays when setup turns into main)
 const activeSeen = {};
 const winSeen = {};       // doc id -> winner seen (the win celebration plays when a winner first appears)    // doc id -> { seat: active mon id } (a Pokémon's own music plays when it becomes Active)
@@ -125,6 +130,8 @@ function playEvents(events, doc, scene) {
 /* ---------- rendering ---------- */
 export function render(main, doc) {
   const g = doc.state; const me = mySeat(doc); const bottom = me || 'a'; const top = other(bottom); const r = R(g.rules);
+  const compact = isCompact(); wasCompact = compact;
+  const SC = compact ? { active: .3, bench: .22, hand: .36, pile: .22, opp: .26 } : { active: .42, bench: .34, hand: .42, pile: .34, opp: .34 };
   const battleStart = phaseSeen[doc.id] === 'setup' && g.phase === 'main';
   if (battleStart) { playBattleIntro(10); if (fxEnabled()) PT.toast('Battle start!'); }
   phaseSeen[doc.id] = g.phase;
@@ -138,14 +145,21 @@ export function render(main, doc) {
   const myTurn = me && g.phase === 'main' && g.turn === me && !g.pending.length && !g.winner;
   const chatEl = main.querySelector('#chatin'); const chatPrev = chatEl ? chatEl.value : ''; const chatFocus = chatEl && document.activeElement === chatEl;
 
-  const pileHTML = (seat, z, label, count, faceUp) => `<div class="z"><span class="zlbl">${label}</span><div class="pile" data-pile="${z}" data-seat="${seat}">${count ? (faceUp ? PT.cardHTML(faceUp, .34) : PT.backHTML(.34)) : `<div class="slot">empty</div>`}${count ? `<span class="n">${count}</span>` : ''}</div></div>`;
+  const pileHTML = (seat, z, label, count, faceUp) => `<div class="z"><span class="zlbl">${label}</span><div class="pile" data-pile="${z}" data-seat="${seat}">${count ? (faceUp ? PT.cardHTML(faceUp, SC.pile) : PT.backHTML(SC.pile)) : `<div class="slot">empty</div>`}${count ? `<span class="n">${count}</span>` : ''}</div></div>`;
   const sideHTML = (seat, isTop) => {
     const p = g.p[seat]; const own = seat === me;
     const prizeClick = pending && pending.t === 'prize' && pending.seat === seat && own;
     const promoteClick = pending && pending.t === 'promote' && pending.seat === seat && own;
-    const benchSlots = []; for (let i = 0; i < Math.max(r.benchSize, p.bench.length); i++) benchSlots.push(p.bench[i] ? monHTML(p.bench[i], seat, false, promoteClick) : `<div class="slot">bench</div>`);
-    const active = p.active ? monHTML(p.active, seat, true, false) : `<div class="slot big">${promoteClick ? 'promote from bench' : 'active'}</div>`;
-    const rail = `<div class="zone-row">
+    const scB = compact && !own ? SC.opp * 0.85 : SC.bench; const scA = compact && !own ? SC.opp : SC.active;
+    const benchSlots = []; for (let i = 0; i < Math.max(r.benchSize, p.bench.length); i++) benchSlots.push(p.bench[i] ? monHTML(p.bench[i], seat, false, promoteClick, scB) : `<div class="slot" style="--s:${scB}">bench</div>`);
+    const active = p.active ? monHTML(p.active, seat, true, false, scA) : `<div class="slot big" style="--s:${scA}">${promoteClick ? 'promote from bench' : 'active'}</div>`;
+    const counters = `<div class="counters">
+      <span class="ctr pile" data-pile="deck" data-seat="${seat}">Deck <b>${p.deck.length}</b></span>
+      <span class="ctr pile" data-pile="discard" data-seat="${seat}">Discard <b>${p.discard.length}</b></span>
+      ${prizeClick ? `<span class="ctr">Prizes ${p.prizes.map((c, i) => `<span class="pile glow" data-prize="${i}" data-seat="${seat}" style="--s:.14;display:inline-block;vertical-align:middle">${PT.backHTML(.14)}</span>`).join('')}</span>` : `<span class="ctr">Prizes <b>${p.prizes.length}</b></span>`}
+      ${own ? '' : `<span class="ctr">Hand <b>${p.hand.length}</b></span>`}
+    </div>`;
+    const rail = compact ? counters : `<div class="zone-row">
       ${pileHTML(seat, 'deck', 'Deck', p.deck.length, null)}
       ${pileHTML(seat, 'discard', 'Discard', p.discard.length, p.discard.length ? p.discard[p.discard.length - 1].c : null)}
       <div class="z"><span class="zlbl">Prizes${prizeClick ? ' · take one' : ''}</span><div class="row" style="gap:3px;flex-wrap:nowrap">${p.prizes.map((c, i) => `<div class="pile ${prizeClick ? 'glow' : ''}" data-prize="${i}" data-seat="${seat}" style="--s:.2">${PT.backHTML(.2)}</div>`).join('') || '<span class="small">none left</span>'}</div><span class="cnt">${p.prizes.length} left</span></div>
@@ -156,8 +170,8 @@ export function render(main, doc) {
     // bench sits along the player's edge, the Active Pokémon in front of it toward the middle of the table
     const field = `<div class="field">${isTop ? benchZ + activeZ : activeZ + benchZ}</div>`;
     const name = `<div class="pname"><span>${esc(g.seats[seat].name)}${own ? ' (you)' : ''}</span>${g.phase === 'main' && g.turn === seat && !g.winner ? `<span class="chip">${own ? 'Your turn' : 'Their turn'}</span>` : ''}${g.phase === 'setup' ? `<span class="chip">${p.setupDone ? 'Ready' : 'Setting up'}</span>` : ''}${g.winner === seat ? '<span class="chip">Winner</span>' : ''}</div>`;
-    const hand = own ? `<div class="z" style="align-items:stretch"><span class="zlbl">Your hand · ${p.hand.length}</span><div class="hand">${p.hand.map((c) => PT.cardHTML(c.c, .42, `data-hand="${c.id}"`, legal.some((a) => a.card === c.id) ? 'click can' : 'click')).join('') || '<span class="small muted">empty</span>'}</div></div>` : '';
-    return isTop ? `<div class="side">${name}${rail}${field}</div>` : `<div class="side">${name}${field}${rail}${hand}</div>`;
+    const hand = own ? `<div class="z" style="align-items:stretch"><span class="zlbl">${compact ? `Hand · ${p.hand.length} · drag to play` : `Your hand · ${p.hand.length}`}</span><div class="hand ${compact ? 'strip' : ''}">${p.hand.map((c) => PT.cardHTML(c.c, SC.hand, `data-hand="${c.id}"`, legal.some((a) => a.card === c.id) ? 'click can' : 'click')).join('') || '<span class="small muted">empty</span>'}</div></div>` : '';
+    return isTop ? `<div class="side ${own ? 'mine' : ''}">${name}${rail}${field}</div>` : `<div class="side ${own ? 'mine' : ''}">${name}${field}${rail}${hand}</div>`;
   };
   const statusLine = g.winner ? `${esc(g.seats[g.winner].name)} wins` : g.phase === 'setup' ? 'Setup: place your Basic Pokémon' : pending ? `${esc(g.seats[pending.seat].name)}: ${pending.t === 'prize' ? 'take a prize' : pending.t === 'promote' ? 'promote a Pokémon' : 'mulligan draw'}` : `Turn ${g.turnNo} · ${esc(g.seats[g.turn].name)}${g.turn === me ? ' (you)' : ''}`;
   const inflightMine = doc.inflight && doc.inflight.prompt && doc.inflight.prompt.seat === me;
@@ -170,12 +184,12 @@ export function render(main, doc) {
     ${myTurn ? '<button type="button" class="pri" data-act="end">End turn</button>' : ''}
     ${inflightMine ? '<button type="button" class="pri" data-act="answer">Answer the prompt</button>' : ''}
     <button type="button" data-act="sound" class="icon" title="${soundOn() ? 'Sound is on (click to mute)' : 'Sound is off (click to unmute)'}">${soundOn() ? '🔊' : '🔇'}</button>
-    <button type="button" data-act="more">More…</button>` : '<span class="small">Watching</span>';
+    <button type="button" data-act="more">${compact ? '⋯' : 'More…'}</button>` : '<span class="small">Watching</span>';
   main.innerHTML = `<div class="tablewrap"><div class="board auto">${sideHTML(top, true)}
     <div class="midbar"><span class="turn ${myTurn ? 'mine' : ''}">${statusLine}</span>${g.stadium ? `<span class="chip click" data-stadium="${g.stadium.c}" title="Stadium in play (click to read)">Stadium: ${esc(C(g.stadium.c).name)}</span>` : ''}${doc.inflight && !inflightMine ? `<span class="chip">Waiting for ${esc(g.seats[doc.inflight.prompt.seat].name)}…</span>` : ''}<span class="grow"></span>${buttons}</div>
     ${sideHTML(bottom, false)}
-    <div class="legend small"><span class="SLP">Zz Asleep</span><span class="CNF">?! Confused</span><span class="PAR">⚡ Paralyzed</span><span class="PSN">☠ Poisoned</span><span class="FX">Effect tags</span><span class="muted">An effect tag names the attack or Trainer affecting that Pokémon. Hover or tap it to see what it does.</span></div></div>
-    <aside class="logpane panel"><div class="row"><h3 class="grow">${esc(doc.name)}</h3><span class="chip">Auto rules</span><button class="sm" type="button" data-act="rules">Rules</button></div>
+    ${compact ? '' : `<div class="legend small"><span class="SLP">Zz Asleep</span><span class="CNF">?! Confused</span><span class="PAR">⚡ Paralyzed</span><span class="PSN">☠ Poisoned</span><span class="FX">Effect tags</span><span class="muted">An effect tag names the attack or Trainer affecting that Pokémon. Hover or tap it to see what it does.</span></div>`}</div>
+    <aside class="logpane panel ${compact ? 'compact' : ''} ${logOpen ? 'open' : ''}"><div class="row"><h3 class="grow">${esc(doc.name)}</h3>${compact ? `<button class="sm" type="button" data-act="toggleLog">${logOpen ? 'Hide log' : 'Log'}</button>` : '<span class="chip">Auto rules</span>'}<button class="sm" type="button" data-act="rules">Rules</button></div>
     <div class="entries" id="logentries">${g.log.slice().reverse().map((e) => `<div class="e ${e.k === 'chat' ? 'chat' : ''}">${e.k === 'chat' ? `<b>${esc(e.n)}:</b> ${esc(e.m)}` : esc(e.m)}<span class="t">${e.turn != null ? 'T' + e.turn : ''}</span></div>`).join('')}</div>
     ${me ? `<form id="chat"><input type="text" id="chatin" placeholder="Say something" maxlength="200" class="grow" autocomplete="off"><button class="sm" type="submit">Send</button></form>` : ''}</aside></div>`;
   const chatNew = main.querySelector('#chatin'); if (chatNew && chatPrev) { chatNew.value = chatPrev; if (chatFocus) chatNew.focus(); }
@@ -184,7 +198,9 @@ export function render(main, doc) {
   if (pendingFx) { const ev = pendingFx; pendingFx = null; playEvents(ev, doc, captureScene(ev, g)); }
   const chat = main.querySelector('#chat'); if (chat) chat.onsubmit = (e) => { e.preventDefault(); const i = chat.querySelector('#chatin'); const v = i.value.trim(); if (!v) return; i.value = ''; submit({ type: 'chat', text: v }); };
 
+  if (me) setupDrag(main, doc, legal, me);
   main.onclick = (e) => {
+    if (suppressClick) { suppressClick = false; return; }
     const t = e.target; const btn = t.closest('button');
     if (btn && btn.dataset.act) return onButton(btn.dataset.act, btn, doc, legal, me);
     const stEl = t.closest('[data-stadium]'); if (stEl) return PT.viewCard(stEl.dataset.stadium);
@@ -234,14 +250,74 @@ function describeFx(f, g) {
   return { label, desc: `${label}: ${what}${when}.` };
 }
 
-function monHTML(m, seat, active, promoteClick) {
-  const c = C(m.c); const hp = c.hp; const sc = active ? .42 : .34; const step = Math.round(330 * sc * 0.13);
+function monHTML(m, seat, active, promoteClick, scale) {
+  const c = C(m.c); const hp = c.hp; const sc = scale || (active ? .42 : .34); const compact = isCompact(); const step = Math.round(330 * sc * (compact ? 0.09 : 0.13));
   const att = [...m.en, ...m.tools]; const n = att.length;
   const stack = att.map((x, i) => `<div class="attc" style="top:${i * step}px;z-index:${i + 1}">${PT.cardHTML(x.c, sc)}</div>`).join('');
   const GL = { SLP: 'Zz', CNF: '?!', PAR: '⚡', PSN: '☠' }; const stChips = m.st.map((s) => `<span class="${s}" title="${STATUS_NAMES[s]}">${GL[s]} ${active ? STATUS_NAMES[s] : s}</span>`).join('');
   const fxChips = m.fx.map((f) => { const d = describeFx(f, PT.S.game.state); return `<span class="FX" title="${esc(d.desc)}" data-desc="${esc(d.desc)}">${esc(d.label)}</span>`; }).join('');
   const left = hp ? (hp - m.dmg) / hp : 1; const hurt = left <= 0.25 ? 'critical' : left <= 0.5 ? 'hurt' : '';
-  return `<div class="mon ${active ? 'active' : ''} ${promoteClick ? 'glow' : ''} ${hurt}" data-mon="${m.id}" tabindex="0"><div class="cdwrap" style="padding-top:${n * step}px">${stack}<div class="poke" style="z-index:${n + 1}">${PT.cardHTML(m.c, sc)}${hp ? `<span class="hp">${Math.max(0, hp - m.dmg)}/${hp}</span>` : ''}${m.dmg ? `<span class="dmg">${m.dmg}</span>` : ''}${m.st.length || fxChips ? `<div class="sts">${stChips}${fxChips}</div>` : ''}${m.un.length ? `<span class="stk">+${m.un.length} under</span>` : ''}</div></div>${n ? `<div class="attn">${n} attached</div>` : ''}</div>`;
+  return `<div class="mon ${active ? 'active' : ''} ${promoteClick ? 'glow' : ''} ${hurt}" data-mon="${m.id}" tabindex="0"><div class="cdwrap" style="padding-top:${n * step}px">${stack}<div class="poke" style="z-index:${n + 1}">${PT.cardHTML(m.c, sc)}${hp ? `<span class="hp">${Math.max(0, hp - m.dmg)}/${hp}</span>` : ''}${m.dmg ? `<span class="dmg">${m.dmg}</span>` : ''}${m.st.length || fxChips ? `<div class="sts">${stChips}${fxChips}</div>` : ''}${m.un.length ? `<span class="stk">+${m.un.length} under</span>` : ''}</div></div>${n && !compact ? `<div class="attn">${n} attached</div>` : ''}</div>`;
+}
+
+/* ---------- drag and drop ----------
+   Drag a hand card onto one of your Pokémon (attach energy / evolve), a Basic onto your bench (play it), a Trainer onto the
+   board (play it), or a benched Pokémon onto your Active spot (retreat / promote). Taps still open the menus. */
+function setupDrag(main, doc, legal, me) {
+  const g = doc.state; const board = main.querySelector('.board.auto'); if (!board) return;
+  const myActiveSlot = board.querySelector(`[data-active-slot="${me}"]`); const myBench = board.querySelector('.side.mine .benchz');
+  const monEl = (id) => board.querySelector(`[data-mon="${id}"]`);
+  /** What a source can be dropped on: [{el, action}] */
+  const targetsFor = (src) => {
+    const out = [];
+    if (src.kind === 'hand') {
+      for (const a of legal) {
+        if (a.card !== src.id) continue;
+        if ((a.type === 'attach' || a.type === 'evolve') && monEl(a.target)) out.push({ el: monEl(a.target), action: a });
+        if (a.type === 'playBasic' && myBench) out.push({ el: myBench, action: a });
+        if (a.type === 'playTrainer') { if (myActiveSlot) out.push({ el: myActiveSlot, action: a }); if (myBench) out.push({ el: myBench, action: a }); }
+        if ((a.type === 'placeActive' || a.type === 'placeBench') && (a.type === 'placeActive' ? myActiveSlot : myBench)) out.push({ el: a.type === 'placeActive' ? myActiveSlot : myBench, action: a });
+      }
+    } else {
+      for (const a of legal) if ((a.type === 'retreat' || a.type === 'promote') && a.target === src.id && myActiveSlot) out.push({ el: myActiveSlot, action: a });
+    }
+    return out;
+  };
+  const sources = [...main.querySelectorAll('.side.mine [data-hand], .side.mine .benchz [data-mon]')];
+  for (const el of sources) {
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button != null && e.button !== 0) return;
+      const src = el.dataset.hand ? { kind: 'hand', id: el.dataset.hand } : { kind: 'mon', id: el.dataset.mon };
+      const targets = targetsFor(src); if (!targets.length) return;
+      const sx = e.clientX, sy = e.clientY; let dragging = false, ghost = null, hover = null;
+      const strip = el.closest('.hand.strip');
+      const move = (ev) => {
+        const dx = ev.clientX - sx, dy = ev.clientY - sy;
+        if (!dragging) {
+          if (Math.hypot(dx, dy) < 10) return;
+          if (strip && Math.abs(dx) > Math.abs(dy) * 1.5) { cleanup(); return; } // horizontal swipe on the hand strip: let it scroll
+          dragging = true; try { el.setPointerCapture(ev.pointerId); } catch (x) { /* ignore */ }
+          const cd = el.classList.contains('cd') ? el : el.querySelector('.poke .cd') || el;
+          ghost = cd.cloneNode(true); ghost.className = 'cd dragghost'; ghost.style.cssText += `;--s:${getComputedStyle(cd).getPropertyValue('--s') || .4}`; document.body.appendChild(ghost);
+          for (const t of targets) t.el.classList.add('drop-ok'); el.classList.add('dragging');
+        }
+        ghost.style.left = ev.clientX + 'px'; ghost.style.top = ev.clientY + 'px';
+        const under = document.elementFromPoint(ev.clientX, ev.clientY); const hit = under && targets.find((t) => t.el === under || t.el.contains(under));
+        if (hover && hover !== (hit && hit.el)) hover.classList.remove('drop-hover'); hover = hit ? hit.el : null; if (hover) hover.classList.add('drop-hover');
+        ev.preventDefault();
+      };
+      const up = (ev) => {
+        const was = dragging; let hit = null;
+        if (was) { ghost.remove(); const under = document.elementFromPoint(ev.clientX, ev.clientY); hit = under && targets.find((t) => t.el === under || t.el.contains(under)); }
+        cleanup();
+        if (!was) return;
+        suppressClick = true; setTimeout(() => { suppressClick = false; }, 400);
+        if (hit) { const a = { ...hit.action }; delete a.name; submit(a); }
+      };
+      const cleanup = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up); for (const t of targets) { t.el.classList.remove('drop-ok'); t.el.classList.remove('drop-hover'); } el.classList.remove('dragging'); if (ghost && ghost.isConnected) ghost.remove(); };
+      document.addEventListener('pointermove', move); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
+    });
+  }
 }
 
 /* ---------- menus ---------- */
@@ -255,6 +331,7 @@ function onButton(act, btn, doc, legal, me) {
   if (act === 'mulliganDraw0') return submit({ type: 'mulliganDraw', n: 0 });
   if (act === 'answer') return answerInflight(doc);
   if (act === 'useStadium') return submit({ type: 'useStadium' });
+  if (act === 'toggleLog') { logOpen = !logOpen; return PT.render(); }
   if (act === 'sound') { setSoundVolume(soundOn() ? 0 : 0.6); PT.toast(soundOn() ? 'Sound on' : 'Sound off'); return PT.render(); }
   if (act === 'rules') return PT.showModal('Rules at this table', `<p>${esc(PT.rulesSummary(g.rules))}</p>${g.rules.notes ? `<div class="notice info" style="white-space:pre-wrap">${esc(g.rules.notes)}</div>` : ''}<p class="small muted">Automated rules: the table enforces costs, timing, damage, conditions and prizes. Use "Fix" on a Pokémon or the More menu if a card isn't automated yet.</p>`);
   if (act === 'more') {
