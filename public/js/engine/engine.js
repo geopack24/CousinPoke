@@ -103,7 +103,7 @@ function canEvolveTarget(g, m, rules, db) {
   if (db && evolutionLocked(g, db)) return false;
   if (m.flags.shapeOf) return false;
   if (m.flags.giovanniTurn === g.turnNo) return true;
-  if (m.playedTurn >= g.turnNo) return false; // must have been in play since last turn (setup placements are turn 0)
+  if (m.playedTurn >= g.turnNo && !R(rules).evolveSameTurn) return false; // officially it must have been in play since last turn (setup placements are turn 0)
   if (!R(rules).multiEvolve && m.evolvedTurn === g.turnNo) return false;
   return true;
 }

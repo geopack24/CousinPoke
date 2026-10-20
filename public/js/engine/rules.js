@@ -13,6 +13,7 @@ export const DEFAULT_RULES = {
   confusedRetreatFlip: true,   // confused Pokémon flip to retreat (tails: self damage)
   confusionSelfDamage: 20,     // damage a Confused Pokémon does to itself on a failed flip
   conditionsStack: true,       // Asleep, Confused and Paralyzed can all be on one Pokémon at once
+  evolveSameTurn: true,        // a Pokémon may evolve on the turn it was played (and on turn 1)
   benchRescue: true,           // no Pokémon left: draw until a Basic (max 7) and play it; the opponent draws as many; 7 misses loses
   anyVersionEvolves: true,     // an Evolution card may go on any version of its species (Blaine's Charmeleon on a plain Charmander)
   charizardDoubleDiscard: true, // Base Set Charizard's Fire Spin may discard energy worth 2 (one Double Colorless) instead of 2 cards

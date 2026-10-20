@@ -400,3 +400,14 @@ test('house rule: with no Pokémon left you draw until a Basic, and the opponent
   assert.equal(k.winner, 'a');
 });
 
+test('house rule: a Pokémon may evolve the turn it is played', () => {
+  let g = setup({ a: { hand: [N['Charmander'], N['Charmeleon']], active: N['Chansey'], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  g = act(g, { type: 'playBasic', card: g.p.a.hand[0].id });
+  assert.ok(has(legalActions(g, 'a', DB), 'evolve'), 'Charmeleon can go on the Charmander played this turn');
+  g = act(g, { type: 'evolve', card: g.p.a.hand[0].id, target: g.p.a.bench[0].id });
+  assert.equal(DB[g.p.a.bench[0].c].name, 'Charmeleon');
+  let h = setup({ a: { hand: [N['Charmander'], N['Charmeleon']], active: N['Chansey'], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] }, rules: { evolveSameTurn: false } });
+  h = act(h, { type: 'playBasic', card: h.p.a.hand[0].id });
+  assert.ok(!has(legalActions(h, 'a', DB), 'evolve'), 'official rule waits a turn');
+});
+

@@ -246,4 +246,4 @@ function breederMatch(db, stage2Id, m, rules) {
   const basic = db[m.c]; if (!basic || basic.sub !== 'Basic') return false;
   const mids = Object.values(db).filter((c) => c.st === 'Pokémon' && evolutionNameMatches(rules, s2.ev, c.name)); return mids.some((mid) => evolutionNameMatches(rules, mid.ev, basic.name));
 }
-function canEvolveLoose(g, m) { return m.playedTurn < g.turnNo; }
+function canEvolveLoose(g, m) { return m.playedTurn < g.turnNo || !!g.rules.evolveSameTurn; }
