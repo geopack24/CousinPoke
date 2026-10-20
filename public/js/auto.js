@@ -5,7 +5,7 @@ import { newGame, other, mons, findMon } from './engine/state.js';
 import { randomSeed } from './engine/rng.js';
 import { R } from './engine/rules.js';
 import { automationReport } from './engine/cards/index.js';
-import { playAttack, playKO, playHeal, playSelfHit, playCoins, playWin, attachLayer, isEnabled as fxEnabled, setEnabled as setFxEnabled, soundOn, setSoundVolume } from './fx.js';
+import { playAttack, playKO, playHeal, playSelfHit, playCoins, playWin, playTurnChime, attachLayer, isEnabled as fxEnabled, setEnabled as setFxEnabled, soundOn, setSoundVolume } from './fx.js';
 import { playBattleIntro, playPokemonMusic } from './music.js';
 import { BOT_UID, BOT_DECKS, botDeckCards, botAction, botAnswer, key as botKey } from './bot.js';
 
@@ -14,6 +14,7 @@ let promptOpen = null;   // id of the prompt modal currently shown
 let seenFxId = null;     // id of the last doc.fx payload this client animated
 let pendingFx = null;
 let pendingWin = null;
+let pendingTurn = false;
 let logOpen = false;      // compact mode: whether the log is expanded
 let suppressClick = false; // a drag just finished: swallow the click that follows
 const isCompact = () => window.innerWidth < 700;
@@ -21,7 +22,8 @@ let wasCompact = null;
 if (typeof window !== 'undefined') window.addEventListener('resize', () => { const c = isCompact(); if (wasCompact !== null && c !== wasCompact && PT) PT.render(); wasCompact = c; });
 const phaseSeen = {};     // doc id -> last phase this client saw (battle music plays when setup turns into main)
 const activeSeen = {};
-const winSeen = {};       // doc id -> winner seen (the win celebration plays when a winner first appears)    // doc id -> { seat: active mon id } (a Pokémon's own music plays when it becomes Active)
+const winSeen = {};
+const turnSeen = {};      // doc id -> last 'waiting on me' state, to announce when the turn passes to me       // doc id -> winner seen (the win celebration plays when a winner first appears)    // doc id -> { seat: active mon id } (a Pokémon's own music plays when it becomes Active)
 
 export function install(bridge) { PT = bridge; return { render, startGame, submit, automationReport, BOT_UID, BOT_DECKS, botDeckCards }; }
 
@@ -164,6 +166,7 @@ export function render(main, doc) {
   if (battleStart) { playBattleIntro(10); if (fxEnabled()) PT.toast('Battle start!'); }
   phaseSeen[doc.id] = g.phase;
   if (doc.id in winSeen && !winSeen[doc.id] && g.winner) { pendingWin = g.seats[g.winner].name; } winSeen[doc.id] = g.winner || null;
+  { const mine = !!(me && !g.winner && g.phase === 'main' && !g.pending.length && g.turn === me); if (doc.id in turnSeen && !turnSeen[doc.id] && mine) pendingTurn = true; turnSeen[doc.id] = mine; }
   { const prev = activeSeen[doc.id]; const now = { a: g.p.a.active ? g.p.a.active.id : null, b: g.p.b.active ? g.p.b.active.id : null }; activeSeen[doc.id] = now;
     if (prev && !battleStart && g.phase === 'main') for (const s of [other(bottom), bottom]) { const m = g.p[s].active; if (m && now[s] !== prev[s]) playPokemonMusic(C(m.c).name); } }
   if (seenFxId === null) seenFxId = doc.fx ? doc.fx.id : '';
@@ -199,9 +202,12 @@ export function render(main, doc) {
     const field = `<div class="field">${isTop ? benchZ + activeZ : activeZ + benchZ}</div>`;
     const name = `<div class="pname"><span>${esc(g.seats[seat].name)}${own ? ' (you)' : ''}</span>${g.phase === 'main' && g.turn === seat && !g.winner ? `<span class="chip">${own ? 'Your turn' : 'Their turn'}</span>` : ''}${g.phase === 'setup' ? `<span class="chip">${p.setupDone ? 'Ready' : 'Setting up'}</span>` : ''}${g.winner === seat ? '<span class="chip">Winner</span>' : ''}</div>`;
     const hand = own ? `<div class="z" style="align-items:stretch"><span class="zlbl">${compact ? `Hand · ${p.hand.length} · drag to play` : `Your hand · ${p.hand.length} · drag a card onto a Pokémon or the bench, or tap it for options`}</span><div class="hand ${compact ? 'strip' : ''}" data-handzone="${seat}">${p.hand.map((c) => PT.cardHTML(c.c, SC.hand, `data-hand="${c.id}"`, legal.some((a) => a.card === c.id) ? 'click can' : 'click')).join('') || '<span class="small muted">empty</span>'}</div></div>` : '';
-    return isTop ? `<div class="side ${own ? 'mine' : ''}">${name}${rail}${field}</div>` : `<div class="side ${own ? 'mine' : ''}">${name}${field}${rail}${hand}</div>`;
+    const live = g.phase === 'main' && !g.winner && ((pending && pending.seat === seat) || (!pending && g.turn === seat));
+    const cls = `side ${own ? 'mine' : ''} ${live ? 'live' : (g.phase === 'main' && !g.winner ? 'idle' : '')}`;
+    return isTop ? `<div class="${cls}">${name}${rail}${field}</div>` : `<div class="${cls}">${name}${field}${rail}${hand}</div>`;
   };
-  const statusLine = g.winner ? `${esc(g.seats[g.winner].name)} wins` : g.phase === 'setup' ? 'Setup: place your Basic Pokémon' : pending ? `${esc(g.seats[pending.seat].name)}: ${pending.t === 'prize' ? 'take a prize' : pending.t === 'promote' ? 'promote a Pokémon' : 'mulligan draw'}` : `Turn ${g.turnNo} · ${esc(g.seats[g.turn].name)}${g.turn === me ? ' (you)' : ''}`;
+  const statusLine = g.winner ? `${esc(g.seats[g.winner].name)} wins` : g.phase === 'setup' ? 'Setup: place your Basic Pokémon' : pending ? `${pending.seat === me ? 'YOU' : esc(g.seats[pending.seat].name)}: ${pending.t === 'prize' ? 'take a prize' : pending.t === 'promote' ? 'promote a Pokémon' : 'mulligan draw'}` : g.turn === me ? `YOUR TURN · turn ${g.turnNo}` : `${esc(g.seats[g.turn].name)}'s turn · ${g.turnNo}`;
+  const waitingOnMe = me && !g.winner && g.phase === 'main' && ((pending && pending.seat === me) || (!pending && g.turn === me));
   const inflightMine = doc.inflight && doc.inflight.prompt && doc.inflight.prompt.seat === me;
   const buttons = me ? `
     ${g.phase === 'setup' && legal.some((a) => a.type === 'mulligan') ? '<button type="button" data-act="mulligan">Mulligan (no Basic)</button>' : ''}
@@ -214,7 +220,7 @@ export function render(main, doc) {
     <button type="button" data-act="sound" class="icon" title="${soundOn() ? 'Sound is on (click to mute)' : 'Sound is off (click to unmute)'}">${soundOn() ? '🔊' : '🔇'}</button>
     <button type="button" data-act="more">${compact ? '⋯' : 'More…'}</button>` : '<span class="small">Watching</span>';
   main.innerHTML = `<div class="tablewrap"><div class="board auto">${sideHTML(top, true)}
-    <div class="midbar"><span class="turn ${myTurn ? 'mine' : ''}">${statusLine}</span>${g.stadium ? `<span class="chip click" data-stadium="${g.stadium.c}" title="Stadium in play (click to read)">Stadium: ${esc(C(g.stadium.c).name)}</span>` : ''}${doc.inflight && !inflightMine ? `<span class="chip">Waiting for ${esc(g.seats[doc.inflight.prompt.seat].name)}…</span>` : ''}<span class="grow"></span>${buttons}</div>
+    <div class="midbar ${waitingOnMe ? 'mine' : ''}"><span class="turn ${waitingOnMe ? 'mine' : ''}">${statusLine}</span>${g.stadium ? `<span class="chip click" data-stadium="${g.stadium.c}" title="Stadium in play (click to read)">Stadium: ${esc(C(g.stadium.c).name)}</span>` : ''}${doc.inflight && !inflightMine ? `<span class="chip">Waiting for ${esc(g.seats[doc.inflight.prompt.seat].name)}…</span>` : ''}<span class="grow"></span>${buttons}</div>
     ${sideHTML(bottom, false)}
     ${compact ? '' : `<div class="legend small"><span class="SLP">Zz Asleep</span><span class="CNF">?! Confused</span><span class="PAR">⚡ Paralyzed</span><span class="PSN">☠ Poisoned</span><span class="FX">Effect tags</span><span class="muted">An effect tag names the attack or Trainer affecting that Pokémon. Hover or tap it to see what it does.</span></div>`}</div>
     <aside class="logpane panel ${compact ? 'compact' : ''} ${logOpen ? 'open' : ''}"><div class="row"><h3 class="grow">${esc(doc.name)}</h3>${compact ? `<button class="sm" type="button" data-act="toggleLog">${logOpen ? 'Hide log' : 'Log'}</button>` : '<span class="chip">Auto rules</span>'}<button class="sm" type="button" data-act="rules">Rules</button></div>
@@ -223,6 +229,7 @@ export function render(main, doc) {
   const chatNew = main.querySelector('#chatin'); if (chatNew && chatPrev) { chatNew.value = chatPrev; if (chatFocus) chatNew.focus(); }
   attachLayer(main.querySelector('.board.auto'));
   if (pendingWin) { const n = pendingWin; pendingWin = null; setTimeout(() => playWin(main.querySelector('.board.auto'), n), 400); }
+  if (pendingTurn) { pendingTurn = false; const b = main.querySelector('.board.auto'); if (b) { const el = document.createElement('div'); el.className = 'turnbanner'; el.textContent = 'YOUR TURN'; b.appendChild(el); setTimeout(() => el.remove(), 1600); } playTurnChime(); }
   if (pendingFx) { const ev = pendingFx; pendingFx = null; playEvents(ev, doc, captureScene(ev, g)); }
   maybeRunBot(doc);
   const chat = main.querySelector('#chat'); if (chat) chat.onsubmit = (e) => { e.preventDefault(); const i = chat.querySelector('#chatin'); const v = i.value.trim(); if (!v) return; i.value = ''; submit({ type: 'chat', text: v }); };

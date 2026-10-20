@@ -58,6 +58,7 @@ const FX = {
   ko: (t) => { arp(t, [660, 550, 440, 330, 220], 0.1, { type: 'square', g: 0.14 }); noise(t, { dur: 0.5, type: 'lowpass', f: 1500, to: 200, g: 0.3 }); },
   heal: (t) => arp(t, [523, 659, 784, 1047, 1319], 0.07, { type: 'sine', g: 0.14 }),
   self: (t) => { noise(t, { dur: 0.15, type: 'lowpass', f: 400, g: 0.3 }); tone(t, { type: 'square', f: 200, to: 80, dur: 0.2, g: 0.1 }); },
+  turn: (t) => arp(t, [784, 1047, 1319], 0.09, { type: 'triangle', g: 0.14 }),
   win: (t) => arp(t, [523, 659, 784, 1047, 784, 1047, 1319], 0.11, { type: 'square', g: 0.14 }),
   // Charizard's Fire Spin: charge, roar, stream, tornado, blast
   'firespin.charge': (t) => { tone(t, { type: 'sawtooth', f: 50, to: 220, dur: 0.6, g: 0.18, filter: { f: 900 }, shape: 8 }); noise(t, { dur: 0.6, type: 'highpass', f: 4000, to: 800, g: 0.12 }); },

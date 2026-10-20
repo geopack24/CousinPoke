@@ -282,6 +282,7 @@ export function playAttack(boardEl, scene) {
   for (const t of scene.targets.slice(1)) fx.at(times.impact, () => fx.burst(t.cx, t.cy, { n: 12, colors: PAL[scene.type] || PAL.Colorless, speed: 4, size: 5, life: 450 }));
   return times;
 }
+export function playTurnChime() { sfx.play('turn'); }
 export function playKO(boardEl, rect) { sfx.play('ko'); if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); fx.burst(rect.cx, rect.cy, { n: 30, colors: ['#222', '#555', '#999', '#fff'], speed: 7, size: 6, life: 700, g: 0.1 }); fx.ring(rect.cx, rect.cy, { r0: 10, r1: 90, color: '#fff', width: 4, life: 400 }); fx.text(rect.cx, rect.cy - 20, 'KO', { color: '#ff5a5a', size: 40, life: 1100 }); }
 export function playHeal(boardEl, rect) { sfx.play('heal'); if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); for (let i = 0; i < 16; i++) fx.particle({ x: rect.cx + rnd(-rect.w / 2, rect.w / 2), y: rect.cy + rnd(-rect.h / 3, rect.h / 3), vy: rnd(-1.6, -0.6), size: rnd(2, 5), color: pick(['#c6ffd0', '#7ae58a', '#fff']), shape: 'star', life: rnd(500, 900), glow: 8, vr: 0.1 }); }
 export function playSelfHit(boardEl, rect) { sfx.play('self'); if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); fx.burst(rect.cx, rect.cy, { n: 16, colors: ['#ff5a5a', '#ffb0b0', '#fff'], speed: 5, size: 5, life: 500 }); }

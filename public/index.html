@@ -281,6 +281,16 @@ textarea{width:100%;min-height:60px;resize:vertical}
 .hand .cd.incoming{opacity:0}
 .hand .cd.flipin{animation:flipin .45s ease-out}
 @keyframes flipin{0%{transform:rotateY(90deg) scale(.9);opacity:.2}60%{transform:rotateY(-12deg) scale(1.03);opacity:1}100%{transform:rotateY(0) scale(1)}}
+/* whose turn it is */
+.board .side{border-radius:12px;transition:box-shadow .3s,opacity .3s;padding:4px}
+.board .side.live{box-shadow:0 0 0 3px var(--accent),0 0 22px rgba(255,203,5,.45);animation:livepulse 2s ease-in-out infinite}
+.board .side.idle{opacity:.82}
+@keyframes livepulse{0%,100%{box-shadow:0 0 0 3px var(--accent),0 0 16px rgba(255,203,5,.35)}50%{box-shadow:0 0 0 3px var(--accent),0 0 30px rgba(255,203,5,.7)}}
+.midbar.mine{background:rgba(255,203,5,.14);border-radius:8px}
+.midbar .turn.mine{color:var(--accent);font-size:22px;letter-spacing:.02em}
+.turnbanner{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:var(--display);font-size:clamp(34px,7vw,72px);color:var(--accent);text-shadow:0 4px 0 #7a4b00,0 10px 24px rgba(0,0,0,.6);pointer-events:none;z-index:46;animation:turnpop 1.6s ease-out forwards}
+@keyframes turnpop{0%{opacity:0;transform:translate(-50%,-50%) scale(.6)}15%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}30%{transform:translate(-50%,-50%) scale(1)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-60%) scale(1)}}
+@media (max-width:700px){.midbar .turn.mine{font-size:16px}.board .side{padding:2px}}
 .mon.hit .poke{animation:shake .5s}
 .mon.lunge .poke{animation:lunge .45s}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
