@@ -7,6 +7,7 @@ import { R } from './engine/rules.js';
 import { automationReport } from './engine/cards/index.js';
 import { playAttack, playKO, playHeal, playSelfHit, playCoins, playWin, attachLayer, isEnabled as fxEnabled, setEnabled as setFxEnabled, soundOn, setSoundVolume } from './fx.js';
 import { playBattleIntro, playPokemonMusic } from './music.js';
+import { BOT_UID, BOT_DECKS, botDeckCards, botAction, botAnswer, key as botKey } from './bot.js';
 
 let PT = null;           // bridge from index.html
 let promptOpen = null;   // id of the prompt modal currently shown
@@ -22,7 +23,7 @@ const phaseSeen = {};     // doc id -> last phase this client saw (battle music 
 const activeSeen = {};
 const winSeen = {};       // doc id -> winner seen (the win celebration plays when a winner first appears)    // doc id -> { seat: active mon id } (a Pokémon's own music plays when it becomes Active)
 
-export function install(bridge) { PT = bridge; return { render, startGame, submit, automationReport }; }
+export function install(bridge) { PT = bridge; return { render, startGame, submit, automationReport, BOT_UID, BOT_DECKS, botDeckCards }; }
 
 const esc = (s) => PT.esc(s);
 const C = (cid) => PT.CARDS[cid] || { name: '?', st: '', atk: [] };
@@ -196,6 +197,7 @@ export function render(main, doc) {
   attachLayer(main.querySelector('.board.auto'));
   if (pendingWin) { const n = pendingWin; pendingWin = null; setTimeout(() => playWin(main.querySelector('.board.auto'), n), 400); }
   if (pendingFx) { const ev = pendingFx; pendingFx = null; playEvents(ev, doc, captureScene(ev, g)); }
+  maybeRunBot(doc);
   const chat = main.querySelector('#chat'); if (chat) chat.onsubmit = (e) => { e.preventDefault(); const i = chat.querySelector('#chatin'); const v = i.value.trim(); if (!v) return; i.value = ''; submit({ type: 'chat', text: v }); };
 
   if (me) setupDrag(main, doc, legal, me);
@@ -258,6 +260,48 @@ function monHTML(m, seat, active, promoteClick, scale) {
   const fxChips = m.fx.map((f) => { const d = describeFx(f, PT.S.game.state); return `<span class="FX" title="${esc(d.desc)}" data-desc="${esc(d.desc)}">${esc(d.label)}</span>`; }).join('');
   const left = hp ? (hp - m.dmg) / hp : 1; const hurt = left <= 0.25 ? 'critical' : left <= 0.5 ? 'hurt' : '';
   return `<div class="mon ${active ? 'active' : ''} ${promoteClick ? 'glow' : ''} ${hurt}" data-mon="${m.id}" tabindex="0"><div class="cdwrap" style="padding-top:${n * step}px">${stack}<div class="poke" style="z-index:${n + 1}">${PT.cardHTML(m.c, sc)}${hp ? `<span class="hp">${Math.max(0, hp - m.dmg)}/${hp}</span>` : ''}${m.dmg ? `<span class="dmg">${m.dmg}</span>` : ''}${m.st.length || fxChips ? `<div class="sts">${stChips}${fxChips}</div>` : ''}${m.un.length ? `<span class="stk">+${m.un.length} under</span>` : ''}</div></div>${n && !compact ? `<div class="attn">${n} attached</div>` : ''}</div>`;
+}
+
+/* ---------- the computer opponent ----------
+   When a seat belongs to the computer, the human opponent's browser makes its moves: one action per step with a short
+   pause so the table animates, prompts answered by the bot module, parked prompts for the bot answered the same way. */
+const botSeat = (doc) => (doc.seats.a.uid === BOT_UID ? 'a' : doc.seats.b.uid === BOT_UID ? 'b' : null);
+let botTimer = null; const botSkip = new Set(); let botSkipTurn = -1;
+function botNeedsToAct(doc, bs) {
+  const g = doc.state; if (!g || g.winner) return false;
+  if (doc.inflight) return doc.inflight.prompt && doc.inflight.prompt.seat === bs;
+  if (g.phase === 'setup') return !g.p[bs].setupDone;
+  if (g.pending.length) return g.pending[0].seat === bs;
+  return g.turn === bs;
+}
+function maybeRunBot(doc) {
+  const bs = botSeat(doc); if (!bs || !doc.state) return;
+  if (mySeat(doc) !== other(bs)) return;
+  if (!botNeedsToAct(doc, bs) || botTimer) return;
+  botTimer = setTimeout(() => { botTimer = null; botStep().catch((e) => console.warn('bot step failed', e)); }, doc.state.phase === 'setup' ? 400 : 900);
+}
+async function botStep() {
+  const doc = PT.S.game; if (!doc || !doc.state) return; const bs = botSeat(doc); if (!bs || !botNeedsToAct(doc, bs)) return;
+  const g = doc.state; if (botSkipTurn !== g.turnNo) { botSkip.clear(); botSkipTurn = g.turnNo; }
+  let action;
+  if (doc.inflight) { const inf = doc.inflight; action = { ...inf.action, answers: [...(inf.action.answers || []), botAnswer(inf.prompt, g, bs, PT.CARDS)] }; }
+  else {
+    const a = botAction(g, bs, PT.CARDS, botSkip);
+    if (!a) { if (g.turn === bs && g.phase === 'main' && !g.pending.length) action = { type: 'endTurn', seat: bs, seed: randomSeed(), answers: [] }; else return; }
+    else { const { name, ...rest } = a; action = { ...rest, seat: bs, seed: randomSeed(), answers: [] }; }
+  }
+  for (let i = 0; i < 16; i++) {
+    const r = apply(doc.state, action, PT.CARDS);
+    if (r.error) { console.warn('computer: refused', r.error, action); botSkip.add(botKey(action)); maybeRunBot(doc); return; }
+    if (r.prompt) {
+      if (r.prompt.seat === bs) { action = { ...action, answers: [...action.answers, botAnswer(r.prompt, doc.state, bs, PT.CARDS)] }; continue; }
+      doc.inflight = { action, prompt: r.prompt }; await PT.saveGame(doc); PT.render(); return; // the human has to answer
+    }
+    const scene = captureScene(r.events, doc.state);
+    doc.prev = null; doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner;
+    publishFx(doc, r.events); PT.render(); playEvents(r.events, doc, scene); await PT.saveGame(doc); return;
+  }
+  console.warn('computer: gave up on a prompt loop', action); botSkip.add(botKey(action)); maybeRunBot(doc);
 }
 
 /* ---------- drag and drop ----------

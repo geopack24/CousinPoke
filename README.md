@@ -36,6 +36,10 @@ Tables created in "auto" mode run a rules engine (`public/js/engine/`) with scri
 - `npm test` runs the engine tests.
 - `npm run smoke` runs every scripted attack, power and trainer with auto-answered prompts and reports crashes.
 
+## Practice against the computer
+
+New table → "Practice against the computer" puts a computer opponent in seat B with one of three built-in decks (Haymaker, Rain Dance, Charizard) or any of your own decks. It plays with the same rules engine, choosing from the table's legal actions: it benches Basics, evolves, attaches energy where it is needed, draws with Bill, Oak and Computer Search, uses PlusPower, Defender and Energy Removal when they matter, retreats a stuck Active, and picks the strongest attack, going for knockouts. Its moves run in your browser one at a time, so you see every animation. `public/js/bot.js` holds the policy; prompts it cannot reason about get a sensible default answer.
+
 ## Playing from another device
 
 Decks belong to a player id stored in the browser. To carry yours to a phone or another PC, open "Set your name", enter a PIN or passphrase and press "Set PIN"; on the other device enter the same PIN and press "Sign in with PIN". That device then plays as you, with your name and decks. The PIN itself is never stored, only a hash that points at your player.
