@@ -75,7 +75,43 @@ async function undo(doc) {
 }
 
 /* ---------- prompts ---------- */
+/* ---------- pick a Pokémon on the board ----------
+   When a choice is "one of these Pokémon in play", the board lights them up and you click the one you mean
+   (no more guessing which of two Hitmonchan a list item is). A bar at the top of the board says what you're
+   picking and has Cancel (and None when allowed). The mode survives re-renders. */
+let boardPickState = null;
+function boardHasMons(ids) { const b = boardEl(); return !!b && ids.length > 0 && ids.every((id) => b.querySelector(`[data-mon="${id}"]`)); }
+function applyBoardPick() {
+  const b = boardEl(); if (!b || !boardPickState) return;
+  for (const id of boardPickState.ids) { const el = b.querySelector(`[data-mon="${id}"]`); if (el) el.classList.add('pickable'); }
+  b.classList.add('picking');
+  if (!b.querySelector('.pickbar')) {
+    const bar = document.createElement('div'); bar.className = 'pickbar';
+    bar.innerHTML = `<span class="grow">${esc(boardPickState.title)}<span class="small muted"> · click a highlighted Pokémon</span></span>${boardPickState.allowNone ? '<button type="button" class="sm" data-pick="none">None</button>' : ''}<button type="button" class="sm" data-pick="cancel">Cancel</button>`;
+    b.appendChild(bar);
+  }
+}
+function endBoardPick(result) {
+  const st = boardPickState; boardPickState = null; const b = boardEl();
+  if (b) { b.classList.remove('picking'); b.querySelectorAll('.pickable').forEach((el) => el.classList.remove('pickable')); const bar = b.querySelector('.pickbar'); if (bar) bar.remove(); }
+  if (st) st.resolve(result);
+}
+/** Resolves with the chosen Pokémon id, 'none' or null (cancelled). */
+function boardPick(title, ids, opts = {}) {
+  if (boardPickState) endBoardPick(null);
+  return new Promise((resolve) => { boardPickState = { title, ids, allowNone: !!opts.allowNone, resolve }; applyBoardPick(); });
+}
+function boardPickClick(t) {
+  if (!boardPickState) return false;
+  const pb = t.closest('[data-pick]'); if (pb) { endBoardPick(pb.dataset.pick === 'none' ? 'none' : null); return true; }
+  const mon = t.closest('[data-mon]'); if (mon && boardPickState.ids.includes(mon.dataset.mon)) { endBoardPick(mon.dataset.mon); return true; }
+  return true; // swallow other clicks on the board while picking
+}
+
 function promptModal(prompt) {
+  if (prompt.max === 1 && !prompt.ordered && boardHasMons(prompt.options.map((o) => o.key))) {
+    return boardPick(prompt.title, prompt.options.map((o) => o.key), { allowNone: prompt.min === 0 }).then((k) => (k === null ? null : k === 'none' ? [] : [k]));
+  }
   return new Promise((resolve) => {
     promptOpen = prompt.id + ':' + prompt.title;
     const picked = []; const multi = prompt.max > 1 || prompt.ordered;
@@ -263,6 +299,7 @@ export function render(main, doc) {
     ${me ? `<form id="chat"><input type="text" id="chatin" placeholder="Say something" maxlength="200" class="grow" autocomplete="off"><button class="sm" type="submit">Send</button></form>` : ''}</aside></div>`;
   const chatNew = main.querySelector('#chatin'); if (chatNew && chatPrev) { chatNew.value = chatPrev; if (chatFocus) chatNew.focus(); }
   attachLayer(main.querySelector('.board.auto'));
+  if (boardPickState) { if (boardHasMons(boardPickState.ids)) applyBoardPick(); else endBoardPick(null); }
   if (pendingWin) { const n = pendingWin; pendingWin = null; setTimeout(() => { const bd = main.querySelector('.board.auto'); playEventMusic('victory', 30).then((ok) => playWin(bd, n, { quiet: ok }), () => playWin(bd, n)); }, 400); }
   if (pendingTurn) { pendingTurn = false; const b = main.querySelector('.board.auto'); if (b) { const el = document.createElement('div'); el.className = 'turnbanner'; el.textContent = 'YOUR TURN'; b.appendChild(el); setTimeout(() => el.remove(), 1600); } playTurnChime(); }
   if (pendingFx) { const ev = pendingFx; pendingFx = null; const sc = pendingScene; pendingScene = null; playEvents(ev, doc, mergeScene(sc, captureScene(ev, g))); }
@@ -272,7 +309,7 @@ export function render(main, doc) {
   if (me) setupDrag(main, doc, legal, me);
   main.onclick = (e) => {
     if (suppressClick) { suppressClick = false; return; }
-    const t = e.target; const btn = t.closest('button');
+    const t = e.target; if (boardPickClick(t)) return; const btn = t.closest('button');
     if (btn && btn.dataset.act) return onButton(btn.dataset.act, btn, doc, legal, me);
     const stEl = t.closest('[data-stadium]'); if (stEl) return PT.viewCard(stEl.dataset.stadium);
     const chip = t.closest('.FX[data-desc]'); if (chip) return PT.toast(chip.dataset.desc);
@@ -491,7 +528,7 @@ function monMenu(doc, legal, pid, anchor, me) {
     const atks = (c.atk || []).map((a, i) => ({ a, i, chk: canAttack(g, me, i, PT.CARDS) }));
     if (f.p.active && f.p.active.id === pid && atks.length) { items.push({ sep: true }); for (const { a, i, chk } of atks) items.push({ label: `${a.n} ${a.d || ''} (${a.c.length} energy)${chk.ok ? '' : ' — ' + chk.why}`, disabled: !chk.ok, fn: () => chk.ok && submit({ type: 'attack', index: i }) }); }
     const pws = legal.filter((a) => a.type === 'usePower' && a.pokemon === pid); for (const a of pws) items.push({ label: `Use ${a.power}`, fn: () => submit({ type: 'usePower', pokemon: pid, power: a.power }) });
-    const rts = legal.filter((a) => a.type === 'retreat'); if (f.p.active && f.p.active.id === pid && rts.length) items.push({ label: 'Retreat…', fn: () => PT.showMenu(rts.map((a) => ({ label: `Switch to ${nm(findMon(g, a.target).m)}`, fn: () => submit({ type: 'retreat', target: a.target }) })), anchor, 'Retreat') });
+    const rts = legal.filter((a) => a.type === 'retreat'); if (f.p.active && f.p.active.id === pid && rts.length) items.push({ label: 'Retreat…', fn: () => boardPick('Retreat: which Pokémon comes in?', rts.map((a) => a.target)).then((k) => { if (k && k !== 'none') submit({ type: 'retreat', target: k }); }) });
     const pks = legal.filter((a) => a.type === 'pickupEnergy' && a.target === pid); if (pks.length) items.push({ label: 'Pick up an Energy… (instead of attaching)', fn: () => PT.showMenu(pks.map((a) => ({ label: `Take ${nm(m.en.find((e) => e.id === a.card))} to hand`, fn: () => submit({ type: 'pickupEnergy', target: pid, card: a.card }) })), anchor, 'Pick up') });
     if (legal.some((a) => a.type === 'promote' && a.target === pid)) items.push({ label: 'Promote to Active', fn: () => submit({ type: 'promote', target: pid }) });
     if (legal.some((a) => a.type === 'discardDoll' && a.pokemon === pid)) items.push({ label: 'Discard', fn: () => submit({ type: 'discardDoll', pokemon: pid }) });
