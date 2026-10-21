@@ -155,30 +155,39 @@ function placeGhosts(scene) {
   }
   return out;
 }
-function playEvents(events, doc, scene) {
+/** Animate one move's events. A Confused attacker goes: ??? swirl, its confusion coin, then the attack (heads) or the self-hit (tails). */
+async function playEvents(events, doc, scene) {
   const b = boardEl(); const ghosts = placeGhosts(scene);
-  setTimeout(() => { for (const el of Object.values(ghosts)) if (el.isConnected) el.remove(); }, 6000); // safety net
-  const flips = events.filter((e) => e.t === 'flip');
-  if (flips.length) PT.toast(flips.map((e) => (e.heads ? 'Heads' : 'Tails')).join(', '));
-  let delay = 30; if (flips.length && b) delay += Math.round(playCoins(b, flips.map((e) => e.heads)) * 0.7);
+  setTimeout(() => { for (const el of Object.values(ghosts)) if (el.isConnected) el.remove(); }, 8000); // safety net
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const rect = (id) => (scene && scene.rects && scene.rects[id]) || rectOf(id);
   setTimeout(() => animateDraws(events, doc), 20);
   const atk = events.find((e) => e.t === 'attack');
-  setTimeout(() => {
-    let impact = 0; const board = boardEl();
-    const conf = events.find((e) => e.t === 'confused');
-    if (conf && board) impact = playConfused(board, (scene && scene.rects && scene.rects[conf.attacker]) || rectOf(conf.attacker));
-    else if (atk && scene && board) { scene.fromEl = board.querySelector(`[data-mon="${atk.attacker}"]`); impact = playAttack(board, scene).impact; }
-    else if (atk) { const el = board && board.querySelector(`[data-mon="${atk.attacker}"]`); if (el) { el.classList.add('lunge'); setTimeout(() => el.classList.remove('lunge'), 500); } }
-    const rect = (id) => (scene && scene.rects && scene.rects[id]) || rectOf(id);
-    setTimeout(() => {
-      for (const e of events) {
-        if (e.t === 'damage') { const el = document.querySelector(`[data-mon="${e.target}"]`) || ghosts[e.target]; if (el) { el.classList.add('hit'); const f = document.createElement('div'); f.className = 'float-dmg'; f.textContent = '-' + e.amount; el.appendChild(f); setTimeout(() => { el.classList.remove('hit'); f.remove(); }, 900); } if (e.self) playSelfHit(board, rect(e.target)); }
-        if (e.t === 'heal') { const el = document.querySelector(`[data-mon="${e.target}"]`); if (el) { const f = document.createElement('div'); f.className = 'float-dmg heal'; f.textContent = '+' + e.amount; el.appendChild(f); setTimeout(() => f.remove(), 900); } playHeal(board, rect(e.target)); }
-        if (e.t === 'ko') setTimeout(() => { playKO(board, rect(e.id)); const gh = ghosts[e.id]; if (gh) { gh.classList.add('gone'); setTimeout(() => gh.remove(), 650); } }, 250);
-      }
-      if (events.some((e) => e.t === 'status' && e.code === 'CNF')) playEventMusic('confusion');
-    }, impact);
-  }, delay);
+  const confFlip = atk ? events.find((e) => e.t === 'flip' && e.label === 'confusion') : null;
+  const flips = events.filter((e) => e.t === 'flip' && e !== confFlip);
+  const landHits = () => {
+    const board = boardEl();
+    for (const e of events) {
+      if (e.t === 'damage') { const el = document.querySelector(`[data-mon="${e.target}"]`) || ghosts[e.target]; if (el) { el.classList.add('hit'); const f = document.createElement('div'); f.className = 'float-dmg'; f.textContent = '-' + e.amount; el.appendChild(f); setTimeout(() => { el.classList.remove('hit'); f.remove(); }, 900); } if (e.self) playSelfHit(board, rect(e.target)); }
+      if (e.t === 'heal') { const el = document.querySelector(`[data-mon="${e.target}"]`); if (el) { const f = document.createElement('div'); f.className = 'float-dmg heal'; f.textContent = '+' + e.amount; el.appendChild(f); setTimeout(() => f.remove(), 900); } playHeal(board, rect(e.target)); }
+      if (e.t === 'ko') setTimeout(() => { playKO(board, rect(e.id)); const gh = ghosts[e.id]; if (gh) { gh.classList.add('gone'); setTimeout(() => gh.remove(), 650); } }, 250);
+    }
+    if (events.some((e) => e.t === 'status' && e.code === 'CNF')) playEventMusic('confusion');
+  };
+  await wait(30);
+  if (confFlip) {
+    // 1. the ??? around the Confused Pokémon  2. its coin  3. tails: the self-hit and nothing else
+    if (b) await wait(playConfused(boardEl() || b, rect(atk.attacker)));
+    PT.toast(`Confusion: ${confFlip.heads ? 'Heads' : 'Tails'}`);
+    const cb = boardEl(); if (cb) await wait(Math.round(playCoins(cb, [confFlip.heads]) * 0.8));
+    if (!confFlip.heads) { landHits(); return; }
+  }
+  if (flips.length) { PT.toast(flips.map((e) => (e.heads ? 'Heads' : 'Tails')).join(', ')); const fb = boardEl(); if (fb) await wait(Math.round(playCoins(fb, flips.map((e) => e.heads)) * 0.7)); }
+  let impact = 0; const board = boardEl();
+  if (atk && scene && board) { scene.fromEl = board.querySelector(`[data-mon="${atk.attacker}"]`); impact = playAttack(board, scene).impact; }
+  else if (atk) { const el = board && board.querySelector(`[data-mon="${atk.attacker}"]`); if (el) { el.classList.add('lunge'); setTimeout(() => el.classList.remove('lunge'), 500); } }
+  await wait(impact);
+  landHits();
 }
 
 /* ---------- rendering ---------- */
