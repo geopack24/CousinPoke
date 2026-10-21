@@ -538,3 +538,21 @@ test('promos: Solar Power, Devolution Beam and Pure Body', () => {
   s = actWith(s, { type: 'attach', card: s.p.a.hand[0].id, target: s.p.a.active.id }, [[s.p.a.active.en[0].id]]).state;
   assert.equal(s.p.a.active.en.length, 1, 'Pure Body: attach one, discard one'); assert.equal(s.p.a.discard.length, 1);
 });
+
+test('house rule: any basic Energy counts as any type for card text, Colorless does not', () => {
+  const G = N['Grass Energy'], F = N['Fire Energy'], W = N['Water Energy'], dce = 'base1-96';
+  // Rocket's Zapdos Plasma: "attach a Lightning Energy from your discard pile"
+  const mk = (rules) => { const g = setup({ a: { active: { c: 'gym2-15', en: [G] }, deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] }, rules }); g.p.a.discard = [inst(G), inst(dce)]; return g; };
+  const m1 = mk({}); const grassInDiscard = m1.p.a.discard[0].id;
+  let g = actWith(m1, { type: 'attack', index: 0 }, [[grassInDiscard]]).state;
+  assert.equal(g.p.a.active.en.length, 2, 'a Grass Energy counts as Lightning for Plasma');
+  assert.ok(g.p.a.discard.some((c) => DB[c.c].name === 'Double Colorless Energy'), 'Double Colorless is not a Lightning Energy');
+  const m2 = mk({ basicEnergyAnyType: false });
+  g = act(m2, { type: 'attack', index: 0 });
+  assert.equal(g.p.a.active.en.length, 1, 'with the rule off only real Lightning counts');
+  // Rain Dance: "attach a Water Energy card" — a Fire Energy counts as Water
+  let r = setup({ a: { hand: [F, dce], active: N['Blastoise'], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  assert.ok(has(legalActions(r, 'a', DB), 'usePower', { power: 'Rain Dance' }), 'Rain Dance accepts a Fire Energy');
+  r = act(r, { type: 'usePower', pokemon: r.p.a.active.id, power: 'Rain Dance' });
+  assert.equal(r.p.a.active.en.length, 1); assert.equal(DB[r.p.a.hand[0].c].name, 'Double Colorless Energy', 'the Double Colorless stays in hand');
+});

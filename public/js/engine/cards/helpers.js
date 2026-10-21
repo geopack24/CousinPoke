@@ -1,14 +1,14 @@
 // Shared building blocks for card scripts. ctx is the engine context (see engine.js makeCtx).
-import { energyTypesOf, nameOf, monHP, hasFx, scriptOf } from '../engine.js';
+import { energyTypesOf, nameOf, monHP, hasFx, scriptOf, energyIs } from '../engine.js';
 import { findMon, mons, pullCard, P, other, toMon, removeMon, monCards } from '../state.js';
 
 export const T = (ctx) => ctx.g.turnNo;
 export const TYPES6 = ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting'];
-export const hasType = (ctx, e, type) => (ctx.g.rules.energyTextAnyType ? true : energyTypesOf(ctx.db, e).includes(type));
+export const hasType = (ctx, e, type) => (ctx.g.rules.energyTextAnyType ? true : energyIs(ctx.db, e, type, ctx.g.rules));
 export const typeFilter = (ctx, type) => (e) => hasType(ctx, e, type);
-export const countType = (ctx, m, type) => m.en.reduce((k, e) => k + energyTypesOf(ctx.db, e).filter((t) => t === type).length, 0);
+export const countType = (ctx, m, type) => m.en.reduce((k, e) => { const n = energyTypesOf(ctx.db, e).filter((t) => t === type).length; return k + (n || (energyIs(ctx.db, e, type, ctx.g.rules) ? 1 : 0)); }, 0);
 /** Water Energy for "extra Water" attacks; under the house rule a Double Colorless counts as 2 Water. */
-export const countWater = (ctx, m) => m.en.reduce((k, e) => k + (ctx.g.rules && ctx.g.rules.dceCountsAsWater !== false && ctx.db[e.c] && ctx.db[e.c].name === 'Double Colorless Energy' ? 2 : energyTypesOf(ctx.db, e).filter((t) => t === 'Water').length), 0);
+export const countWater = (ctx, m) => m.en.reduce((k, e) => k + (ctx.g.rules && ctx.g.rules.dceCountsAsWater !== false && ctx.db[e.c] && ctx.db[e.c].name === 'Double Colorless Energy' ? 2 : (energyTypesOf(ctx.db, e).filter((t) => t === 'Water').length || (energyIs(ctx.db, e, 'Water', ctx.g.rules) ? 1 : 0))), 0);
 export const countersOn = (m) => m.dmg / 10;
 export const ownPokemon = (ctx) => mons(ctx.me);
 export const typeOptions = () => TYPES6.map((t) => ({ key: t, label: t }));
@@ -54,4 +54,4 @@ export const noAttackNext = (needFlip) => ({ effect: (ctx) => { const d = ctx.op
 export const smokescreen = (n) => ({ effect: (ctx) => { ctx.damage(n); const d = ctx.opp.active; if (d) { ctx.addFx(d, { k: 'sandAttack', until: T(ctx) + 1 }); ctx.log(`${nameOf(ctx.db, d.c)} must flip to attack next turn`); } } });
 export const onceStatusSelf = (n, code) => ({ effect: (ctx, m) => { ctx.damage(n); ctx.status(code, m); } });
 export const asDoll = { asPokemon: { noPrize: true, noConditions: true, noRetreat: true, canDiscard: true } };
-export { findMon, mons, pullCard, P, other, toMon, removeMon, monCards, nameOf, monHP, hasFx, energyTypesOf, scriptOf };
+export { findMon, mons, pullCard, P, other, toMon, removeMon, monCards, nameOf, monHP, hasFx, energyTypesOf, scriptOf, energyIs };

@@ -1,6 +1,6 @@
 // Wizards Black Star Promos (basep). Keyed by card id; a few reuse scripts from the main sets (see promoScripts).
 import * as H from './helpers.js';
-import { energyUnits, baseSpecies } from '../engine.js';
+import { energyUnits, baseSpecies, energyIs } from '../engine.js';
 import { replaceMon } from '../state.js';
 const { T, flipStatus, sureStatus, flipTimes, headsPlus, tailsNothing, reduceNext, noAttackNext, drain, oppSwitches, hasType, typeFilter, countersOn, ownPokemon, TYPES6, findMon, mons, pullCard, P, other, toMon, removeMon, monCards, nameOf, monHP } = H;
 
@@ -42,7 +42,7 @@ const S = {
   'basep-14': { attacks: { 'Energy Absorption': energyAbsorption, Psyburn: plain(40) } },
   // 4 Pikachu
   'basep-4': { attacks: {
-    Recharge: { effect: (ctx, m) => { const got = ctx.searchDeck(ctx.seat, 'Recharge: attach a Lightning Energy', (c) => c.st === 'Energy' && c.sub === 'Basic' && /Lightning/.test(c.name), { min: 0, max: 1 }); for (const c of got) { m.en.push(c); ctx.event({ t: 'attach', card: c, target: m.id }); ctx.log('Recharge: Lightning Energy attached'); } ctx.shuffle(ctx.seat); } },
+    Recharge: { effect: (ctx, m) => { const got = ctx.searchDeck(ctx.seat, 'Recharge: attach a Lightning Energy', (c) => c.st === 'Energy' && c.sub === 'Basic' && energyIs(null, c, 'Lightning'), { min: 0, max: 1 }); for (const c of got) { m.en.push(c); ctx.event({ t: 'attach', card: c, target: m.id }); ctx.log('Recharge: Lightning Energy attached'); } ctx.shuffle(ctx.seat); } },
     Thunderbolt: thunderboltAll(50) } },
   // 5 Dragonite
   'basep-5': { powers: { 'Special Delivery': oncePerTurn('specialDelivery', { canUse: ({ g, seat }) => (P(g, seat).deck.length ? true : 'Your deck is empty'), use: (ctx) => {
@@ -51,7 +51,7 @@ const S = {
   } }) }, attacks: { 'Supersonic Flight': tailsNothing(60) } },
   // 6 Arcanine
   'basep-6': { attacks: { 'Quick Attack': quickAttack, 'Flames of Rage': {
-    canUse: ({ g, db, m }) => ((g.rules.energyTextAnyType ? m.en.length : m.en.filter((e) => H.energyTypesOf(db, e).includes('Fire')).length) >= 2 ? null : 'Needs 2 Fire Energy to discard'),
+    canUse: ({ g, db, m }) => ((g.rules.energyTextAnyType ? m.en.length : m.en.filter((e) => H.energyIs(db, e, 'Fire')).length) >= 2 ? null : 'Needs 2 Fire Energy to discard'),
     effect: (ctx, m) => { ctx.requireDiscardEnergy(m, 2, typeFilter(ctx, 'Fire')); ctx.damage(40 + 10 * countersOn(m)); } } } },
   // 7 Jigglypuff
   'basep-7': { attacks: { 'First Aid': { effect: (ctx, m) => ctx.heal(m, 10) }, 'Double-edge': { effect: (ctx) => { ctx.damage(40); ctx.selfDamage(20); } } } },

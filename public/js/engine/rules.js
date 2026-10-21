@@ -17,6 +17,7 @@ export const DEFAULT_RULES = {
   evolveSameTurn: true,        // a Pokémon may evolve on the turn it was played (and on turn 1)
   benchRescue: true,           // no Pokémon left: draw until a Basic (max 7) and play it; the opponent draws as many; 7 misses loses
   anyVersionEvolves: true,     // an Evolution card may go on any version of its species (Blaine's Charmeleon on a plain Charmander)
+  basicEnergyAnyType: true,    // any basic Energy card counts as any type for card text (search, attach, discard, move, count); Colorless doesn't
   energyPickup: true,          // instead of attaching an Energy this turn, you may take a basic Energy off one of your Pokémon back to hand
   dceCountsAsWater: true,      // Hydro Pump / Water Gun bonus: an attached Double Colorless counts as 2 Water
   dceNoReturn: true,           // an attached Double Colorless never returns to hand: effects that would return it discard it instead

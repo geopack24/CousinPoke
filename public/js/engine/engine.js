@@ -31,6 +31,15 @@ export function energyTypesOf(db, card) {
   if (/Double Colorless/.test(c.name)) return ['Colorless', 'Colorless'];
   return ['Colorless'];
 }
+let CUR_RULES = null; // rules of the game being worked on (set by the engine's entry points) for energyIs
+/** Does this Energy card (an instance or a card) count as `type` for card text? Under the house rule any basic Energy
+ *  counts as any type except Colorless; special Energy only counts as what it provides. */
+export function energyIs(db, x, type, rules) {
+  if (!x) return false; const card = x.c && db ? db[x.c] : x; if (!card || card.st !== 'Energy') return false;
+  if ((x.c && db ? energyTypesOf(db, x) : []).includes(type) || new RegExp('^' + type + ' Energy$').test(card.name)) return true;
+  return !!(R(rules || CUR_RULES).basicEnergyAnyType && card.sub === 'Basic' && type !== 'Colorless');
+}
+export function setRulesContext(rules) { CUR_RULES = rules || null; }
 export function energyUnits(db, m) { return m.en.reduce((n, e) => n + energyTypesOf(db, e).length, 0); }
 export function canPay(db, rules, m, cost) {
   cost = cost || [];
@@ -123,7 +132,7 @@ export function matchesEvolution(db, cardId, m, rules) {
 /** One attachment per turn, except Blaine lets 2 Fire go onto a Blaine's Pokémon. Crystal Beam blocks a target. */
 export function canAttachNow(g, db, seat, card, m) {
   const p = P(g, seat); if (hasFx(m, 'noAttach')) return false;
-  const blaine = p.blaineTurn === g.turnNo && energyTypesOf(db, card).includes('Fire') && nameHas(db, m, "Blaine's");
+  const blaine = p.blaineTurn === g.turnNo && energyIs(db, card, 'Fire') && nameHas(db, m, "Blaine's");
   if (blaine) return (p.blaineAttached || 0) < 2 && (!p.attachedThisTurn || p.blaineAttached > 0);
   return !p.attachedThisTurn;
 }
@@ -152,6 +161,7 @@ export function canAttack(g, seat, idx, db, srcCid) {
 
 /** Everything `seat` may do right now, as action templates. */
 export function legalActions(g, seat, db) {
+  setRulesContext(g.rules);
   const out = []; const r = R(g.rules); const p = P(g, seat); const op = P(g, other(seat));
   if (g.winner) return out;
   if (g.pending.length) {
@@ -220,6 +230,7 @@ export function legalActions(g, seat, db) {
 
 /* ---------- the action runner ---------- */
 export function apply(state, action, db) {
+  setRulesContext(state && state.rules);
   const g = clone(state); const rng = mulberry32((action.seed || 1) >>> 0);
   const events = []; let ai = 0; const answers = action.answers || [];
   const seat = action.seat;
@@ -414,7 +425,7 @@ function runAction(ctx, a) {
       const c = handCard(a.card); must(db[c.c].st === 'Energy', 'Not an energy card');
       const f = findMon(g, a.target); must(f && f.seat === seat, 'Not your Pokémon'); must(!isDollLike(db, f.m), "Can't attach to that");
       must(canAttachNow(g, db, seat, c, f.m), hasFx(f.m, 'noAttach') ? "Energy can't be attached to that Pokémon this turn" : 'Already attached energy this turn');
-      pullCard(g, c.id); f.m.en.push(c); p.attachedThisTurn = true; if (p.blaineTurn === g.turnNo && energyTypesOf(db, c).includes('Fire') && nameHas(db, f.m, "Blaine's")) p.blaineAttached = (p.blaineAttached || 0) + 1;
+      pullCard(g, c.id); f.m.en.push(c); p.attachedThisTurn = true; if (p.blaineTurn === g.turnNo && energyIs(db, c, 'Fire') && nameHas(db, f.m, "Blaine's")) p.blaineAttached = (p.blaineAttached || 0) + 1;
       { const ts = scriptOf(f.m.c).passive; if (ts && ts.onEnergyAttached && powersActive(g, db) && !conditioned(f.m)) ts.onEnergyAttached(ctx, f.m, c); } ctx.log(`${ctx.name(seat)} attached ${nameOf(db, c.c)} to ${nameOf(db, f.m.c)}`); ctx.event({ t: 'attach', card: c, target: f.m.id });
       { const es = scriptOf(c.c); if (es.onAttach) es.onAttach(ctx, c, f.m); } checkKOs(ctx); return;
     }

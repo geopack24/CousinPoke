@@ -1,11 +1,11 @@
 // Base Set scripts. Attacks with plain damage need no script; everything with text is here.
 // ctx API: see engine.js makeCtx. `m` is the attacking Pokémon, `T` the current turn number.
-import { energyTypesOf, nameOf, monHP, hasFx, runAttack, evolutionNameMatches, towerLocked } from '../engine.js';
+import { energyTypesOf, nameOf, monHP, hasFx, runAttack, evolutionNameMatches, towerLocked, energyIs } from '../engine.js';
 import { findMon, mons, pullCard, removeMon, monCards, P, other, toMon } from '../state.js';
 import { countWater } from './helpers.js';
 
 const T = (ctx) => ctx.g.turnNo;
-const hasType = (ctx, e, type) => (ctx.g.rules.energyTextAnyType ? true : energyTypesOf(ctx.db, e).includes(type));
+const hasType = (ctx, e, type) => (ctx.g.rules.energyTextAnyType ? true : energyIs(ctx.db, e, type, ctx.g.rules));
 const typeFilter = (ctx, type) => (e) => hasType(ctx, e, type);
 const dmg = (n) => ({ effect: (ctx) => ctx.damage(n) });
 const flipStatus = (n, code) => ({ effect: (ctx) => { if (n) ctx.damage(n); if (ctx.flip()) ctx.status(code); } });
@@ -40,9 +40,9 @@ export const base1 = {
   },
   'base1-2': { // Blastoise
     powers: { 'Rain Dance': {
-      canUse: ({ g, db, seat }) => { const p = P(g, seat); const w = p.hand.some((c) => db[c.c].st === 'Energy' && energyTypesOf(db, c).includes('Water')); const t = mons(p).some((m) => (db[m.c].types || []).includes('Water')); return w && t ? true : 'Needs a Water Energy in hand and a Water Pokémon'; },
+      canUse: ({ g, db, seat }) => { const p = P(g, seat); const w = p.hand.some((c) => db[c.c].st === 'Energy' && energyIs(db, c, 'Water')); const t = mons(p).some((m) => (db[m.c].types || []).includes('Water')); return w && t ? true : 'Needs a Water Energy in hand and a Water Pokémon'; },
       use: (ctx) => {
-        const ws = ctx.me.hand.filter((c) => ctx.db[c.c].st === 'Energy' && energyTypesOf(ctx.db, c).includes('Water'));
+        const ws = ctx.me.hand.filter((c) => ctx.db[c.c].st === 'Energy' && energyIs(ctx.db, c, 'Water'));
         // pick as many Water Energy as you like in one go; they all go to the same Water Pokémon (use the power again for another)
         const cards = ctx.chooseCards('Rain Dance: attach which Water Energy? (pick as many as you like)', ws, { id: 'rainCard', min: 1, max: ws.length });
         const tgt = ctx.chooseMon('To which Water Pokémon?', ownPokemon(ctx).filter((m) => (ctx.db[m.c].types || []).includes('Water')), { id: 'rainTo' })[0];
@@ -84,7 +84,7 @@ export const base1 = {
   'base1-9': { attacks: { 'Thunder Wave': flipStatus(30, 'PAR'), Selfdestruct: selfDestruct(80, 20) } },
   'base1-10': { attacks: {
     Psychic: { effect: (ctx) => { const d = ctx.opp.active; ctx.damage(10 + 10 * (d ? d.en.length : 0)); } },
-    Barrier: { canUse: ({ g, db, m }) => (g.rules.energyTextAnyType ? m.en.length : m.en.filter((e) => energyTypesOf(db, e).includes('Psychic')).length) ? null : 'Needs a Psychic Energy to discard', effect: (ctx, m) => { ctx.requireDiscardEnergy(m, 1, typeFilter(ctx, 'Psychic')); ctx.addFx(m, { k: 'preventAll', until: T(ctx) + 1 }); ctx.log('Barrier: Mewtwo is protected from all effects of attacks next turn'); } },
+    Barrier: { canUse: ({ g, db, m }) => (g.rules.energyTextAnyType ? m.en.length : m.en.filter((e) => energyIs(db, e, 'Psychic')).length) ? null : 'Needs a Psychic Energy to discard', effect: (ctx, m) => { ctx.requireDiscardEnergy(m, 1, typeFilter(ctx, 'Psychic')); ctx.addFx(m, { k: 'preventAll', until: T(ctx) + 1 }); ctx.log('Barrier: Mewtwo is protected from all effects of attacks next turn'); } },
   } },
   'base1-11': { attacks: {
     Thrash: { effect: (ctx) => { if (ctx.flip()) ctx.damage(40); else { ctx.damage(30); ctx.selfDamage(10); } } },
@@ -97,10 +97,10 @@ export const base1 = {
   'base1-13': { attacks: { 'Water Gun': extraWater(30, 3, 2), Whirlpool: discardDefenderEnergy(40) } },
   'base1-14': { attacks: { Agility: { effect: (ctx, m) => { ctx.damage(20); if (ctx.flip()) { ctx.addFx(m, { k: 'preventAll', until: T(ctx) + 1 }); ctx.log('Agility: Raichu is protected next turn'); } } }, Thunder: tailsSelf(60, 30) } },
   'base1-15': { powers: { 'Energy Trans': {
-    canUse: ({ g, db, seat }) => (mons(P(g, seat)).some((m) => m.en.some((e) => energyTypesOf(db, e).includes('Grass'))) ? true : 'No Grass Energy to move'),
+    canUse: ({ g, db, seat }) => (mons(P(g, seat)).some((m) => m.en.some((e) => energyIs(db, e, 'Grass'))) ? true : 'No Grass Energy to move'),
     use: (ctx) => {
-      const from = ctx.chooseMon('Take a Grass Energy from…', ownPokemon(ctx).filter((m) => m.en.some((e) => energyTypesOf(ctx.db, e).includes('Grass'))), { id: 'transFrom' })[0];
-      const fm = findMon(ctx.g, from).m; const card = ctx.chooseCards('Which Grass Energy?', fm.en.filter((e) => energyTypesOf(ctx.db, e).includes('Grass')), { id: 'transCard' })[0];
+      const from = ctx.chooseMon('Take a Grass Energy from…', ownPokemon(ctx).filter((m) => m.en.some((e) => energyIs(ctx.db, e, 'Grass'))), { id: 'transFrom' })[0];
+      const fm = findMon(ctx.g, from).m; const card = ctx.chooseCards('Which Grass Energy?', fm.en.filter((e) => energyIs(ctx.db, e, 'Grass')), { id: 'transCard' })[0];
       const to = ctx.chooseMon('…to which Pokémon?', ownPokemon(ctx).filter((m) => m.id !== from), { id: 'transTo' })[0];
       const c = pullCard(ctx.g, card); findMon(ctx.g, to).m.en.push(c); ctx.log(`Energy Trans: moved Grass Energy from ${nameOf(ctx.db, fm.c)} to ${nameOf(ctx.db, findMon(ctx.g, to).m.c)}`);
     } } } },
@@ -155,7 +155,7 @@ export const base1 = {
   'base1-46': { attacks: { Ember: discardTypeThen('Fire', 1, 30) } },
   'base1-48': { attacks: { 'Fury Attack': flipTimes(10, 2) } },
   'base1-49': { attacks: { 'Confuse Ray': flipStatus(10, 'CNF') } },
-  'base1-50': { attacks: { 'Sleeping Gas': flipStatus(0, 'SLP'), 'Destiny Bond': { canUse: ({ g, db, m }) => (g.rules.energyTextAnyType ? m.en.length : m.en.filter((e) => energyTypesOf(db, e).includes('Psychic')).length) ? null : 'Needs a Psychic Energy to discard', effect: (ctx, m) => { ctx.requireDiscardEnergy(m, 1, typeFilter(ctx, 'Psychic')); ctx.addFx(m, { k: 'destinyBond', until: T(ctx) + 1 }); ctx.log('Destiny Bond is set'); } } } },
+  'base1-50': { attacks: { 'Sleeping Gas': flipStatus(0, 'SLP'), 'Destiny Bond': { canUse: ({ g, db, m }) => (g.rules.energyTextAnyType ? m.en.length : m.en.filter((e) => energyIs(db, e, 'Psychic')).length) ? null : 'Needs a Psychic Energy to discard', effect: (ctx, m) => { ctx.requireDiscardEnergy(m, 1, typeFilter(ctx, 'Psychic')); ctx.addFx(m, { k: 'destinyBond', until: T(ctx) + 1 }); ctx.log('Destiny Bond is set'); } } } },
   'base1-51': { attacks: { 'Foul Gas': { effect: (ctx) => { ctx.damage(10); ctx.status(ctx.flip() ? 'PSN' : 'CNF'); } } } },
   'base1-53': { attacks: { 'Thunder Wave': flipStatus(10, 'PAR'), Selfdestruct: selfDestruct(40, 10) } },
   'base1-54': { attacks: { Stiffen: preventNext('preventDamage'), 'Stun Spore': flipStatus(20, 'PAR') } },
