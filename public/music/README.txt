@@ -10,6 +10,7 @@ When that Pokémon becomes a player's Active Pokémon, its track plays for about
 The animation lab (fx-lab.html) shows the exact file name for whichever attacker you pick.
 
 Event music: confusion.mp3 plays when a Pokémon becomes Confused (about 10 seconds, then a fade).
+victory.mp3 plays when someone wins (about 30 seconds, then a fade) in place of the built-in win jingle.
 
 Starting a track partway in: add a file named start-times.json in this folder, listing where each track should start.
 Use seconds or minutes:seconds, keyed by the file name without .mp3 ("battle" is the match-start battle.mp3):

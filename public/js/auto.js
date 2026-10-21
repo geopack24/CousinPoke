@@ -231,7 +231,7 @@ export function render(main, doc) {
     ${me ? `<form id="chat"><input type="text" id="chatin" placeholder="Say something" maxlength="200" class="grow" autocomplete="off"><button class="sm" type="submit">Send</button></form>` : ''}</aside></div>`;
   const chatNew = main.querySelector('#chatin'); if (chatNew && chatPrev) { chatNew.value = chatPrev; if (chatFocus) chatNew.focus(); }
   attachLayer(main.querySelector('.board.auto'));
-  if (pendingWin) { const n = pendingWin; pendingWin = null; setTimeout(() => playWin(main.querySelector('.board.auto'), n), 400); }
+  if (pendingWin) { const n = pendingWin; pendingWin = null; setTimeout(() => { const bd = main.querySelector('.board.auto'); playEventMusic('victory', 30).then((ok) => playWin(bd, n, { quiet: ok }), () => playWin(bd, n)); }, 400); }
   if (pendingTurn) { pendingTurn = false; const b = main.querySelector('.board.auto'); if (b) { const el = document.createElement('div'); el.className = 'turnbanner'; el.textContent = 'YOUR TURN'; b.appendChild(el); setTimeout(() => el.remove(), 1600); } playTurnChime(); }
   if (pendingFx) { const ev = pendingFx; pendingFx = null; playEvents(ev, doc, captureScene(ev, g)); }
   maybeRunBot(doc);

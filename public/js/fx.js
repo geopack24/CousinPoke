@@ -287,8 +287,8 @@ export function playKO(boardEl, rect) { sfx.play('ko'); if (!isEnabled() || !boa
 export function playHeal(boardEl, rect) { sfx.play('heal'); if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); for (let i = 0; i < 16; i++) fx.particle({ x: rect.cx + rnd(-rect.w / 2, rect.w / 2), y: rect.cy + rnd(-rect.h / 3, rect.h / 3), vy: rnd(-1.6, -0.6), size: rnd(2, 5), color: pick(['#c6ffd0', '#7ae58a', '#fff']), shape: 'star', life: rnd(500, 900), glow: 8, vr: 0.1 }); }
 export function playSelfHit(boardEl, rect) { sfx.play('self'); if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); fx.burst(rect.cx, rect.cy, { n: 16, colors: ['#ff5a5a', '#ffb0b0', '#fff'], speed: 5, size: 5, life: 500 }); }
 /** End of game: confetti over the whole board, a banner with the winner's name, and the fanfare. */
-export function playWin(boardEl, name) {
-  sfx.play('win'); if (!isEnabled() || !boardEl) return;
+export function playWin(boardEl, name, opts = {}) {
+  if (!opts.quiet) sfx.play('win'); // quiet when a victory track is playing instead if (!isEnabled() || !boardEl) return;
   const fx = layerFor(boardEl); fx.sz = 1; const C = ['#ffcb05', '#ff5a5a', '#4fb0ff', '#7ae58a', '#e58bff', '#ffffff'];
   for (let i = 0; i < 24; i++) fx.at(i * 120, () => { for (let k = 0; k < 10; k++) fx.particle({ x: rnd(0, fx.w), y: -10, vx: rnd(-1, 1), vy: rnd(1.5, 3.5), g: 0.04, drag: 0.995, size: rnd(4, 8), color: pick(C), shape: 'rect', rot: rnd(0, 6.3), vr: rnd(-0.25, 0.25), life: rnd(2200, 3200), shrink: false }); });
   fx.at(300, () => { fx.flash({ life: 300, alpha: 0.35, color: '#fff' }); fx.burst(fx.w / 2, fx.h / 2, { n: 80, colors: C, speed: 12, size: 7, shape: 'rect', life: 1500, g: 0.08, drag: 0.96 }); });
