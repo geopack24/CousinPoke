@@ -1,6 +1,6 @@
 // Base Set scripts. Attacks with plain damage need no script; everything with text is here.
 // ctx API: see engine.js makeCtx. `m` is the attacking Pokémon, `T` the current turn number.
-import { energyTypesOf, nameOf, monHP, hasFx, runAttack, evolutionNameMatches } from '../engine.js';
+import { energyTypesOf, nameOf, monHP, hasFx, runAttack, evolutionNameMatches, towerLocked } from '../engine.js';
 import { findMon, mons, pullCard, removeMon, monCards, P, other, toMon } from '../state.js';
 import { countWater } from './helpers.js';
 
@@ -189,7 +189,7 @@ export const base1 = {
     ctx.log(`Devolution Spray: ${nameOf(ctx.db, m.c)} devolved to ${nameOf(ctx.db, keep.c)}`);
   } },
   'base1-73': { trainer: (ctx) => { const op = ctx.opp; op.deck.push(...op.hand); op.hand = []; ctx.shuffle(ctx.oppSeat); ctx.draw(ctx.oppSeat, 7); } },
-  'base1-74': { canPlay: ({ g, db, seat }) => (P(g, seat).hand.length >= 3 && P(g, seat).discard.some((c) => db[c.c].st === 'Trainer') ? true : 'Needs 2 other cards to discard and a Trainer in the discard pile'), trainer: (ctx) => {
+  'base1-74': { canPlay: ({ g, db, seat }) => towerLocked(g) ? 'Pokémon Tower: nothing comes back from the discard pile' : (P(g, seat).hand.length >= 3 && P(g, seat).discard.some((c) => db[c.c].st === 'Trainer') ? true : 'Needs 2 other cards to discard and a Trainer in the discard pile'), trainer: (ctx) => {
     const others = ctx.me.hand.filter((c) => c.id !== ctx.card.id); const k = ctx.chooseCards('Discard 2 cards for Item Finder', others, { min: 2, max: 2, id: 'ifDiscard' }); for (const id of k) ctx.discardFromHand(ctx.seat, id);
     const trainers = ctx.me.discard.filter((c) => ctx.db[c.c].st === 'Trainer'); const got = ctx.chooseCards('Take a Trainer from your discard pile', trainers, { min: 0, max: 1, id: 'ifPick' });
     for (const id of got) ctx.toHand(ctx.seat, pullCard(ctx.g, id)); ctx.log(`Item Finder: ${got.length ? 'took ' + nameOf(ctx.db, ctx.me.hand[ctx.me.hand.length - 1].c) : 'took nothing'}`);
@@ -219,7 +219,7 @@ export const base1 = {
     const tc = ctx.chooseCards('Discard up to 2 Energy', tm.en, { min: 1, max: 2, id: 'serTheirCards' }); ctx.discardEnergy(tm, tm.en.filter((e) => tc.includes(e.id)));
   } },
   'base1-80': { canPlay: ({ g, seat }) => (mons(P(g, seat)).length ? true : 'No Pokémon in play'), trainer: (ctx) => { const tgt = ctx.chooseMon('Attach Defender to…', ownPokemon(ctx), { id: 'defender' })[0]; const m = findMon(ctx.g, tgt).m; m.tools.push(ctx.card); m.fx.push({ k: 'defender', src: 'Defender', card: ctx.card.id, until: T(ctx) + 1 }); ctx.log(`Defender on ${nameOf(ctx.db, m.c)}`); return true; } },
-  'base1-81': { canPlay: ({ g, db, seat }) => (P(g, seat).hand.length >= 2 && P(g, seat).discard.some((c) => db[c.c].st === 'Energy' && db[c.c].sub === 'Basic') ? true : 'Needs a card to discard and basic Energy in the discard pile'), trainer: (ctx) => {
+  'base1-81': { canPlay: ({ g, db, seat }) => towerLocked(g) ? 'Pokémon Tower: nothing comes back from the discard pile' : (P(g, seat).hand.length >= 2 && P(g, seat).discard.some((c) => db[c.c].st === 'Energy' && db[c.c].sub === 'Basic') ? true : 'Needs a card to discard and basic Energy in the discard pile'), trainer: (ctx) => {
     const others = ctx.me.hand.filter((c) => c.id !== ctx.card.id); const k = ctx.chooseCards('Discard 1 card for Energy Retrieval', others, { id: 'erDiscard' }); ctx.discardFromHand(ctx.seat, k[0]);
     const basics = ctx.me.discard.filter((c) => ctx.db[c.c].st === 'Energy' && ctx.db[c.c].sub === 'Basic'); const got = ctx.chooseCards('Take up to 2 basic Energy', basics, { min: 1, max: 2, id: 'erPick' }); for (const id of got) ctx.toHand(ctx.seat, pullCard(ctx.g, id)); ctx.log(`Energy Retrieval: took ${got.length} Energy`);
   } },

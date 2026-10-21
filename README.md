@@ -1,6 +1,6 @@
 # Poké Table
 
-A tabletop-style site for playing the original Pokémon TCG sets (Base Set, Jungle, Fossil, Team Rocket, Gym Heroes, Gym Challenge) with family on separate devices. Deck builder, house rules per table, shared game board with a move log.
+A tabletop-style site for playing the original Pokémon TCG sets (Base Set, Jungle, Fossil, Team Rocket, Gym Heroes, Gym Challenge, and the Wizards Black Star Promos) with family on separate devices. Deck builder, house rules per table, shared game board with a move log.
 
 The site runs on Cloudflare Pages. The static page lives in `public/`, and a single Pages Function in `functions/api/` stores tables, decks and player names in a Cloudflare D1 database. Players poll the server every couple of seconds while at a table, so moves show up for everyone within a moment.
 
@@ -31,7 +31,7 @@ Card data comes from the PokemonTCG/pokemon-tcg-data project and images.pokemont
 
 ## Automated tables
 
-Tables created in "auto" mode run a rules engine (`public/js/engine/`) with scripts for every card in all six sets (`public/js/engine/cards/`). Stadium cards sit in the middle bar; cards that can't be fully automated (Lt. Surge's Secret Plan, Sabrina's ESP re-flips, Chaos Gym's "opponent may use it" clause) are noted in the log and can be settled with the Fix menu.
+Tables created in "auto" mode run a rules engine (`public/js/engine/`) with scripts for every card in all seven sets (`public/js/engine/cards/`; promos are in `promo.js`). Stadium cards sit in the middle bar; cards that can't be fully automated (Lt. Surge's Secret Plan, Sabrina's ESP re-flips, Chaos Gym's "opponent may use it" clause) are noted in the log and can be settled with the Fix menu.
 
 - `npm test` runs the engine tests.
 - `npm run smoke` runs every scripted attack, power and trainer with auto-answered prompts and reports crashes.
@@ -63,3 +63,14 @@ Each Pokémon can have its own track too: drop `charizard.mp3` (or `.ogg`, `.wav
 `public/js/fx.js` draws attacks on a canvas over the board. Every attack gets a default animation for the attacker's type (Fire fireball, Water stream, Lightning strike, Grass leaves, Psychic rings, Fighting impact, Colorless slashes) after the attacking card jiggles. Signature moves live in `MOVE_FX` in the same file, keyed by attack name (`'Fire Spin'`) or by card and attack (`'base1-4|Fire Spin'`), and win over the type default. To add one, write a function `(fx, scene) => ({ impact, done })` using the toolkit on `fx` (`particle`, `burst`, `ring`, `bolt`, `beam`, `flash`, `glowSpot`, `slash`, `text`, `emitter`, `shake`, `at`). `scene.from` and `scene.targets[0]` are the attacker and defender rectangles. Both players' screens animate: the acting client stores the attack's events on the table document (`doc.fx`) and the other client plays them when it syncs. Players can turn animations off under More…. `/fx-lab.html` is a standalone page for trying animations: pick any two cards, click an attack, a type default or a signature move, and press space to replay.
 
 Local testing: `python tools/devserver.py public 8766`, then `node tools/seed-dev.mjs` seeds a ready-to-attack table and `node tools/act-dev.mjs fxtest b '{"type":"attack","index":0}'` plays the other seat's move.
+
+## Adding a set
+
+`tools/import_set.py` adds a set from the [pokemon-tcg-data](https://github.com/PokemonTCG/pokemon-tcg-data) JSON: it converts the cards into `public/cards.json`, downloads the card images once and packs them into `public/<set>.webp`. Then write the set's scripts in `public/js/engine/cards/` and register them in `index.js`; `npm run smoke` shows anything that crashes.
+
+```
+python tools/import_set.py basep.json basep "Wizards Black Star Promos" <image cache folder>
+```
+
+The promos brought a few rules from later sets: Baby Pokémon (played like Basics; attacks on them need heads; Cleffa, Pichu and Igglybuff evolve into Clefairy, Pikachu and Jigglypuff), the Burned condition (flip between turns, tails is 20 damage), and Poké-Bodies (Suicune). Unown [J]'s [Join] needs other Unown that aren't in these sets yet, so it can't be used.
+

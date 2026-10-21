@@ -476,3 +476,65 @@ test('house rule: Double Colorless counts as 2 Water for Hydro Pump', () => {
   assert.equal(g.p.b.active.dmg, 40, 'without the rule the DCE adds nothing');
 });
 
+
+/* ---------- Wizards Black Star Promos ---------- */
+test('promos: Baby Pokémon play as Basics, evolve into their Basic, and attacks on them need heads', () => {
+  const pichu = 'basep-35';
+  let g = setup({ a: { hand: [pichu, N['Pikachu']], active: N['Chansey'], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  assert.ok(has(legalActions(g, 'a', DB), 'playBasic', { card: g.p.a.hand[0].id }), 'Pichu goes to the bench like a Basic');
+  g = act(g, { type: 'playBasic', card: g.p.a.hand[0].id });
+  const baby = g.p.a.bench[0].id;
+  assert.ok(has(legalActions(g, 'a', DB), 'evolve', { target: baby }), 'Pikachu evolves from Pichu');
+  // tails on the Baby Rule flip: the attack does nothing
+  let k = setup({ a: { active: { c: N['Pikachu'], en: [N['Lightning Energy']] }, deck: [N['Bill']] }, b: { active: pichu, deck: [N['Bill']] } });
+  k = act(k, { type: 'attack', index: 0 }, { seed: TAILS });
+  assert.equal(k.p.b.active.dmg, 0, 'tails: nothing happens to the Baby');
+  let h = setup({ a: { active: { c: N['Pikachu'], en: [N['Lightning Energy']] }, deck: [N['Bill']] }, b: { active: pichu, deck: [N['Bill']] } });
+  h = act(h, { type: 'attack', index: 0 }, { seed: HEADS });
+  assert.ok(h.p.b.active === null || h.p.b.active.dmg > 0, 'heads: the attack goes through');
+});
+
+test('promos: Burned deals 20 between turns on tails', () => {
+  const F = N['Fire Energy']; const seed = seedRun([true, false]);
+  let g = setup({ a: { active: { c: 'basep-51', en: [F, F, F] }, deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  g = act(g, { type: 'attack', index: 1 }, { seed });
+  assert.ok(g.p.b.active.st.includes('BRN'), 'Super Singe heads: Burned');
+  assert.equal(g.p.b.active.dmg, 30 + 20, 'tails on the burn check: 20 more');
+});
+
+test("promos: Snorlax's Guard stops retreat, Articuno's Aurora Veil shields the bench, Mew's Neutral Shield blocks evolved attackers", () => {
+  const W = N['Water Energy'];
+  const g = setup({ a: { active: { c: N['Chansey'], en: [W] }, bench: [N['Squirtle']], deck: [N['Bill']] }, b: { active: 'basep-49', deck: [N['Bill']] } });
+  assert.ok(!has(legalActions(g, 'a', DB), 'retreat'), 'no retreat against Guard');
+  let v = setup({ a: { active: { c: 'basep-23', en: [W, W, W] }, deck: [N['Bill']] }, b: { active: 'basep-48', bench: [N['Chansey']], deck: [N['Bill']] } });
+  v = act(v, { type: 'attack', index: 0 }, { seed: HEADS });
+  assert.equal(v.p.b.bench[0].dmg, 0, 'Lightning Burn bench damage stopped by Aurora Veil');
+  assert.equal(v.p.b.active.dmg, 30, 'the Active still takes the hit');
+  let m = setup({ a: { active: { c: N['Wartortle'], en: [W, W, W] }, deck: [N['Bill']] }, b: { active: 'basep-47', deck: [N['Bill']] } });
+  m = act(m, { type: 'attack', index: 1 });
+  assert.equal(m.p.b.active.dmg, 0, 'an evolved Pokémon cannot hurt Mew');
+});
+
+test('promos: Pokémon Tower blocks Energy Retrieval; Computer Error draws for both and ends the turn', () => {
+  const t = setup({ a: { hand: [N['Energy Retrieval'], N['Bill']], active: N['Chansey'], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  t.p.a.discard = [inst(N['Water Energy'])]; t.stadium = { id: 'tw1', c: 'basep-42', owner: 'b' };
+  assert.ok(!has(legalActions(t, 'a', DB), 'playTrainer', { card: t.p.a.hand[0].id }), 'Tower: nothing back from the discard pile');
+  let g = setup({ a: { hand: ['basep-16'], active: N['Chansey'], deck: Array(8).fill(N['Bill']) }, b: { active: N['Chansey'], deck: Array(8).fill(N['Bill']) } });
+  const bHand = g.p.b.hand.length;
+  g = actWith(g, { type: 'playTrainer', card: g.p.a.hand[0].id }, ['3', '2']).state;
+  assert.equal(g.p.a.hand.length, 3, 'drew 3'); assert.equal(g.turn, 'b', 'turn over');
+  assert.equal(g.p.b.hand.length, bHand + 2 + 1, 'opponent drew 2, plus the turn draw');
+});
+
+test('promos: Solar Power, Devolution Beam and Pure Body', () => {
+  const W = N['Water Energy'];
+  let g = setup({ a: { active: { c: N['Chansey'], st: ['PSN'] }, bench: ['basep-13'], deck: [N['Bill']] }, b: { active: { c: N['Chansey'], st: ['CNF'] }, deck: [N['Bill']] } });
+  g = act(g, { type: 'usePower', pokemon: g.p.a.bench[0].id, power: 'Solar Power' });
+  assert.deepEqual([g.p.a.active.st, g.p.b.active.st], [[], []], 'both Actives cured');
+  let d = setup({ a: { active: { c: 'basep-8', en: [W, W] }, deck: [N['Bill']] }, b: { active: { c: N['Wartortle'], un: [{ id: 'sq1', c: N['Squirtle'] }] }, deck: [N['Bill']] } });
+  d = act(d, { type: 'attack', index: 1 });
+  assert.equal(DB[d.p.b.active.c].name, 'Squirtle'); assert.ok(d.p.b.hand.some((c) => DB[c.c].name === 'Wartortle'), 'Wartortle back in hand');
+  let s = setup({ a: { hand: [W], active: { c: 'basep-53', en: [W] }, deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  s = actWith(s, { type: 'attach', card: s.p.a.hand[0].id, target: s.p.a.active.id }, [[s.p.a.active.en[0].id]]).state;
+  assert.equal(s.p.a.active.en.length, 1, 'Pure Body: attach one, discard one'); assert.equal(s.p.a.discard.length, 1);
+});

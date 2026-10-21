@@ -5,8 +5,10 @@ import { rocket } from './rocket.js';
 import { gym1 } from './gym1.js';
 import { gym2 } from './gym2.js';
 import { fossil } from './fossil.js';
+import { promoScripts } from './promo.js';
 
 export const CARD_SCRIPTS = Object.assign({}, base1, jungle, fossil, rocket, gym1, gym2);
+Object.assign(CARD_SCRIPTS, promoScripts(CARD_SCRIPTS)); // Wizards Black Star Promos
 
 /** Which cards of a set are fully automated: those with no text, or with a script. */
 export function automationReport(db) {

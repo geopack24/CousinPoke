@@ -30,7 +30,7 @@ export const DEFAULT_RULES = {
 export const R = (r) => Object.assign({}, DEFAULT_RULES, r || {});
 
 export function isBasicLike(card) {
-  return (card.st === 'Pokémon' && card.sub === 'Basic') || (card.st === 'Trainer' && /as if it were a Basic/i.test(card.txt || ''));
+  return (card.st === 'Pokémon' && (card.sub === 'Basic' || card.sub === 'Baby')) || (card.st === 'Trainer' && /as if it were a Basic/i.test(card.txt || ''));
 }
 
 export function deckCount(cards) { return Object.values(cards || {}).reduce((a, b) => a + b, 0); }
