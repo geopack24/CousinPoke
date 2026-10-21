@@ -93,10 +93,26 @@ async function fileExists(url) {
   try { const r = await fetch(url, { method: 'HEAD' }); fileCache[url] = r.ok && /audio/.test(r.headers.get('content-type') || ''); } catch (e) { fileCache[url] = false; }
   return fileCache[url];
 }
+/** Optional music/start-times.json: { "battle": 42, "charizard": "1:05" } — where each track starts (seconds or m:ss).
+ *  Keys are the file name without its extension. A missing or broken file just means "start at the beginning". */
+let startTimes = null;
+export function parseTime(v) {
+  if (typeof v === 'number') return v > 0 ? v : 0;
+  const m = String(v || '').trim().match(/^(?:(\d+):)?(\d+(?:\.\d+)?)$/); if (!m) return 0;
+  return (m[1] ? +m[1] * 60 : 0) + +m[2];
+}
+async function startTimeFor(url) {
+  if (!startTimes) { try { const r = await fetch('music/start-times.json', { cache: 'no-store' }); startTimes = /json/.test(r.headers.get('content-type') || '') ? await r.json() : {}; } catch (e) { startTimes = {}; } }
+  const key = url.split('/').pop().replace(/\.[a-z0-9]+$/i, '');
+  return parseTime(startTimes[key]);
+}
 async function playFile(url, out, ctx, seconds) {
   if (!(await fileExists(url))) return false;
   try {
-    const el = new Audio(url); el.volume = 1; const src = ctx.createMediaElementSource(el); src.connect(out); await el.play();
+    const at = await startTimeFor(url);
+    const el = new Audio(at ? `${url}#t=${at}` : url); el.volume = 1; const src = ctx.createMediaElementSource(el); src.connect(out);
+    if (at) await new Promise((res) => { const go = () => { try { if (Math.abs(el.currentTime - at) > 0.5) el.currentTime = at; } catch (e) { /* */ } res(); }; if (el.readyState >= 1) go(); else { el.addEventListener('loadedmetadata', go, { once: true }); setTimeout(res, 3000); } });
+    await el.play();
     current = { stop: () => { try { el.pause(); } catch (e) { /* */ } out.disconnect(); }, timer: setTimeout(() => stopMusic(), (seconds + 2.6) * 1000) };
     return true;
   } catch (e) { out.disconnect(); return false; }
