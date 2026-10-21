@@ -7,6 +7,8 @@ export const TYPES6 = ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighti
 export const hasType = (ctx, e, type) => (ctx.g.rules.energyTextAnyType ? true : energyTypesOf(ctx.db, e).includes(type));
 export const typeFilter = (ctx, type) => (e) => hasType(ctx, e, type);
 export const countType = (ctx, m, type) => m.en.reduce((k, e) => k + energyTypesOf(ctx.db, e).filter((t) => t === type).length, 0);
+/** Water Energy for "extra Water" attacks; under the house rule a Double Colorless counts as 2 Water. */
+export const countWater = (ctx, m) => m.en.reduce((k, e) => k + (ctx.g.rules && ctx.g.rules.dceCountsAsWater !== false && ctx.db[e.c] && ctx.db[e.c].name === 'Double Colorless Energy' ? 2 : energyTypesOf(ctx.db, e).filter((t) => t === 'Water').length), 0);
 export const countersOn = (m) => m.dmg / 10;
 export const ownPokemon = (ctx) => mons(ctx.me);
 export const typeOptions = () => TYPES6.map((t) => ({ key: t, label: t }));
@@ -25,7 +27,7 @@ export const discardTypeThen = (type, n, damage) => ({
   canUse: ({ g, db, m }) => (g.rules.energyTextAnyType ? m.en.length >= n : m.en.filter((e) => energyTypesOf(db, e).includes(type)).length >= n) ? null : `Needs ${n} ${type} Energy to discard`,
   effect: (ctx, m) => { ctx.requireDiscardEnergy(m, n, typeFilter(ctx, type)); ctx.damage(damage); },
 });
-export const extraWater = (base, cost, cap) => ({ effect: (ctx, m) => { const extra = Math.min(cap, Math.max(0, countType(ctx, m, 'Water') - cost)); ctx.damage(base + 10 * extra); } });
+export const extraWater = (base, cost, cap) => ({ effect: (ctx, m) => { const extra = Math.min(cap, Math.max(0, countWater(ctx, m) - cost)); ctx.damage(base + 10 * extra); } });
 export const oppSwitches = (n, label) => ({ effect: (ctx) => { ctx.damage(n); const op = ctx.opp; if (op.bench.length && op.active) { const k = ctx.chooseMon('Choose the Pokémon to switch in', op.bench, { seat: ctx.oppSeat, id: 'oppswitch' }); ctx.switchActive(ctx.oppSeat, k[0], label || 'Whirlwind'); } } });
 export const selfDestruct = (n, bench) => ({ effect: (ctx, m) => { ctx.damage(n); ctx.benchDamage(ctx.oppSeat, bench); ctx.benchDamage(ctx.seat, bench); ctx.selfDamage(n); } });
 export const recover = (type) => ({ canUse: ({ g, db, m }) => (g.rules.energyTextAnyType ? m.en.length : m.en.filter((e) => energyTypesOf(db, e).includes(type)).length) ? null : `Needs a ${type} Energy to discard`, effect: (ctx, m) => { ctx.requireDiscardEnergy(m, 1, typeFilter(ctx, type)); ctx.heal(m); } });

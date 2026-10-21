@@ -2,6 +2,7 @@
 // ctx API: see engine.js makeCtx. `m` is the attacking Pokémon, `T` the current turn number.
 import { energyTypesOf, nameOf, monHP, hasFx, runAttack, evolutionNameMatches } from '../engine.js';
 import { findMon, mons, pullCard, removeMon, monCards, P, other, toMon } from '../state.js';
+import { countWater } from './helpers.js';
 
 const T = (ctx) => ctx.g.turnNo;
 const hasType = (ctx, e, type) => (ctx.g.rules.energyTextAnyType ? true : energyTypesOf(ctx.db, e).includes(type));
@@ -16,7 +17,7 @@ const discardTypeThen = (type, n, damage) => ({
   canUse: ({ g, db, m }) => (g.rules.energyTextAnyType ? m.en.length >= n : m.en.filter((e) => energyTypesOf(db, e).includes(type)).length >= n) ? null : `Needs ${n} ${type} Energy to discard`,
   effect: (ctx, m) => { ctx.requireDiscardEnergy(m, n, typeFilter(ctx, type)); ctx.damage(damage); },
 });
-const extraWater = (base, cost, cap) => ({ effect: (ctx, m) => { const w = m.en.reduce((k, e) => k + energyTypesOf(ctx.db, e).filter((t) => t === 'Water').length, 0); const extra = Math.min(cap, Math.max(0, w - cost)); ctx.damage(base + 10 * extra); } });
+const extraWater = (base, cost, cap) => ({ effect: (ctx, m) => { const extra = Math.min(cap, Math.max(0, countWater(ctx, m) - cost)); ctx.damage(base + 10 * extra); } });
 const oppSwitches = (n) => ({ effect: (ctx) => { ctx.damage(n); const op = ctx.opp; if (op.bench.length) { const k = ctx.chooseMon('Choose the Pokémon to switch in', op.bench, { seat: ctx.oppSeat, id: 'whirlwind' }); ctx.switchActive(ctx.oppSeat, k[0], 'Whirlwind'); } } });
 const selfDestruct = (n, bench) => ({ effect: (ctx, m) => { ctx.damage(n); ctx.benchDamage(ctx.oppSeat, bench); ctx.benchDamage(ctx.seat, bench); ctx.selfDamage(n); } });
 const recover = (type) => ({ canUse: ({ g, db, m }) => (g.rules.energyTextAnyType ? m.en.length : m.en.filter((e) => energyTypesOf(db, e).includes(type)).length) ? null : `Needs a ${type} Energy to discard`, effect: (ctx, m) => { ctx.requireDiscardEnergy(m, 1, typeFilter(ctx, type)); ctx.heal(m); } });

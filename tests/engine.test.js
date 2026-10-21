@@ -467,3 +467,12 @@ test('Rain Dance attaches several Water Energy in one use', () => {
   assert.ok(has(legalActions(g, 'a', DB), 'usePower', { power: 'Rain Dance' }), 'and Rain Dance can be used again');
 });
 
+test('house rule: Double Colorless counts as 2 Water for Hydro Pump', () => {
+  const W = N['Water Energy'], dce = 'base1-96';
+  const mk = (rules) => setup({ a: { active: { c: N['Blastoise'], en: [dce, W, W, W] }, deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] }, rules });
+  let g = act(mk({}), { type: 'attack', index: 0 });
+  assert.equal(g.p.b.active.dmg, 60, '3 Water + DCE (2 Water) = 5: two over the cost, +20');
+  g = act(mk({ dceCountsAsWater: false }), { type: 'attack', index: 0 });
+  assert.equal(g.p.b.active.dmg, 40, 'without the rule the DCE adds nothing');
+});
+
