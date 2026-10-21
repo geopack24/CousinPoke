@@ -6,6 +6,8 @@ Per-Pokémon music. Drop MP3 files here named after the card, lowercase, with sp
   nidoran-f.mp3            Nidoran (female)
   farfetchd.mp3            Farfetch'd
 
+Versions share the plain species' file unless they have their own: Blaine's Charmander, Dark Charmeleon and so on fall back to charmander.mp3 / charmeleon.mp3.
+
 When that Pokémon becomes a player's Active Pokémon, its track plays for about 10 seconds and fades out, on both players' screens.
 The animation lab (fx-lab.html) shows the exact file name for whichever attacker you pick.
 

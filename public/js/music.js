@@ -145,7 +145,13 @@ export function musicFileFor(cardName) {
   return `music/${slug}.mp3`;
 }
 /** Play music/<pokemon>.mp3 if the player dropped one in; 10 s then a fade. Resolves false when there is no file. */
-export async function playPokemonMusic(cardName, seconds = 10) { return playTrack(musicFileFor(cardName).replace(/\.mp3$/, ''), seconds); }
+export async function playPokemonMusic(cardName, seconds = 10) {
+  const exact = musicFileFor(cardName).replace(/\.mp3$/, '');
+  // every version shares the plain species' track unless it has its own: Blaine's Charmander -> charmander.mp3
+  const species = musicFileFor(cardName.replace(/^(?:[A-Z][A-Za-z.]*(?: [A-Z][A-Za-z.]*)?'s |Dark )/, '')).replace(/\.mp3$/, '');
+  if (await playTrack(exact, seconds)) return true;
+  return species !== exact ? playTrack(species, seconds) : false;
+}
 /** Game-event music: music/confusion.mp3 when a Pokémon becomes Confused, and so on. Resolves false when there is no file. */
 export async function playEventMusic(name, seconds = 10) { return playTrack(`music/${name}`, seconds); }
 async function playTrack(base, seconds) {
