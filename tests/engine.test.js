@@ -457,3 +457,13 @@ test('house mulligan: opponent may mulligan too; a second miss draws one at a ti
   assert.ok(has(legalActions(g, 'a', DB), 'placeActive'));
 });
 
+test('Rain Dance attaches several Water Energy in one use', () => {
+  const W = N['Water Energy'];
+  let g = setup({ a: { hand: [W, W, W], active: N['Blastoise'], bench: [N['Squirtle']], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  const blast = g.p.a.active.id; const [w1, w2] = g.p.a.hand.map((c) => c.id);
+  g = actWith(g, { type: 'usePower', pokemon: blast, power: 'Rain Dance' }, [[w1, w2], [blast]]).state;
+  assert.equal(g.p.a.active.en.length, 2, 'two Water on Blastoise from one Rain Dance'); assert.equal(g.p.a.hand.length, 1);
+  assert.ok(has(legalActions(g, 'a', DB), 'attach'), 'the normal attachment is still unused');
+  assert.ok(has(legalActions(g, 'a', DB), 'usePower', { power: 'Rain Dance' }), 'and Rain Dance can be used again');
+});
+

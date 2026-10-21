@@ -42,9 +42,12 @@ export const base1 = {
       canUse: ({ g, db, seat }) => { const p = P(g, seat); const w = p.hand.some((c) => db[c.c].st === 'Energy' && energyTypesOf(db, c).includes('Water')); const t = mons(p).some((m) => (db[m.c].types || []).includes('Water')); return w && t ? true : 'Needs a Water Energy in hand and a Water Pokémon'; },
       use: (ctx) => {
         const ws = ctx.me.hand.filter((c) => ctx.db[c.c].st === 'Energy' && energyTypesOf(ctx.db, c).includes('Water'));
-        const card = ctx.chooseCards('Attach which Water Energy?', ws, { id: 'rainCard' })[0];
+        // pick as many Water Energy as you like in one go; they all go to the same Water Pokémon (use the power again for another)
+        const cards = ctx.chooseCards('Rain Dance: attach which Water Energy? (pick as many as you like)', ws, { id: 'rainCard', min: 1, max: ws.length });
         const tgt = ctx.chooseMon('To which Water Pokémon?', ownPokemon(ctx).filter((m) => (ctx.db[m.c].types || []).includes('Water')), { id: 'rainTo' })[0];
-        const c = pullCard(ctx.g, card); const m = findMon(ctx.g, tgt).m; m.en.push(c); ctx.log(`Rain Dance: attached Water Energy to ${nameOf(ctx.db, m.c)}`); ctx.event({ t: 'attach', card: c, target: m.id });
+        const m = findMon(ctx.g, tgt).m;
+        for (const card of cards) { const c = pullCard(ctx.g, card); m.en.push(c); ctx.event({ t: 'attach', card: c, target: m.id }); }
+        ctx.log(`Rain Dance: attached ${cards.length} Water Energy to ${nameOf(ctx.db, m.c)}`);
       } } },
     attacks: { 'Hydro Pump': extraWater(40, 3, 2) },
   },
