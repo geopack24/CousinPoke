@@ -95,23 +95,45 @@ async function fileExists(url) {
 }
 /** Optional music/start-times.json: { "battle": 42, "charizard": "1:05" } — where each track starts (seconds or m:ss).
  *  Keys are the file name without its extension. A missing or broken file just means "start at the beginning". */
-let startTimes = null;
+let startTimes = null, startTimesP = null;
 export function parseTime(v) {
   if (typeof v === 'number') return v > 0 ? v : 0;
   const m = String(v || '').trim().match(/^(?:(\d+):)?(\d+(?:\.\d+)?)$/); if (!m) return 0;
   return (m[1] ? +m[1] * 60 : 0) + +m[2];
 }
+async function prefetchStartTracks() {
+  for (const key of Object.keys(startTimes || {})) {
+    if (!parseTime(startTimes[key])) continue;
+    const url = key === 'battle' ? 'battle.mp3' : `music/${key}.mp3`;
+    if (await fileExists(url)) seekableUrl(url).catch(() => {});
+  }
+}
+/** Read the start-time list early (the page calls this once audio is unlocked) so tracks are ready when needed. */
+export function warmMusic() { startTimeFor('battle.mp3').catch(() => {}); }
 async function startTimeFor(url) {
-  if (!startTimes) { try { const r = await fetch('music/start-times.json', { cache: 'no-store' }); startTimes = /json/.test(r.headers.get('content-type') || '') ? await r.json() : {}; } catch (e) { startTimes = {}; } }
+  if (!startTimesP) startTimesP = (async () => { try { const r = await fetch('music/start-times.json', { cache: 'no-store' }); startTimes = /json/.test(r.headers.get('content-type') || '') ? await r.json() : {}; } catch (e) { startTimes = {}; } prefetchStartTracks(); })();
+  await startTimesP;
   const key = url.split('/').pop().replace(/\.[a-z0-9]+$/i, '');
   return parseTime(startTimes[key]);
+}
+// The host doesn't answer partial-file (Range) requests, so a streamed track can't jump ahead.
+// Tracks with a start time are downloaded whole once and played from an in-memory copy, which always seeks.
+const blobUrls = {};
+async function seekableUrl(url) {
+  if (!blobUrls[url]) blobUrls[url] = fetch(url).then((r) => (r.ok ? r.blob() : Promise.reject(new Error('fetch ' + r.status)))).then((b) => URL.createObjectURL(b)).catch((e) => { delete blobUrls[url]; throw e; });
+  return blobUrls[url];
 }
 async function playFile(url, out, ctx, seconds) {
   if (!(await fileExists(url))) return false;
   try {
     const at = await startTimeFor(url);
-    const el = new Audio(at ? `${url}#t=${at}` : url); el.volume = 1; const src = ctx.createMediaElementSource(el); src.connect(out);
+    let playUrl = url; if (at) { try { playUrl = await seekableUrl(url); } catch (e) { /* fall back to streaming from the top */ } }
+    const el = new Audio(at ? `${playUrl}#t=${at}` : playUrl); el.volume = 1; const src = ctx.createMediaElementSource(el); src.connect(out);
     if (at) await new Promise((res) => { const go = () => { try { if (Math.abs(el.currentTime - at) > 0.5) el.currentTime = at; } catch (e) { /* */ } res(); }; if (el.readyState >= 1) go(); else { el.addEventListener('loadedmetadata', go, { once: true }); setTimeout(res, 3000); } });
+    if (at) { // starting mid-song: fade in, then the usual hold and fade out, timed from when it actually starts
+      const now = ctx.currentTime; const g = out.gain; g.cancelScheduledValues(now); g.setValueAtTime(0.0001, now); g.linearRampToValueAtTime(0.55, now + 0.8);
+      g.setValueAtTime(0.55, now + seconds); g.linearRampToValueAtTime(0.0001, now + seconds + 2.5);
+    }
     await el.play();
     current = { stop: () => { try { el.pause(); } catch (e) { /* */ } out.disconnect(); }, timer: setTimeout(() => stopMusic(), (seconds + 2.6) * 1000) };
     return true;
@@ -123,8 +145,11 @@ export function musicFileFor(cardName) {
   return `music/${slug}.mp3`;
 }
 /** Play music/<pokemon>.mp3 if the player dropped one in; 10 s then a fade. Resolves false when there is no file. */
-export async function playPokemonMusic(cardName, seconds = 10) {
-  const base = musicFileFor(cardName).replace(/\.mp3$/, ''); let url = null;
+export async function playPokemonMusic(cardName, seconds = 10) { return playTrack(musicFileFor(cardName).replace(/\.mp3$/, ''), seconds); }
+/** Game-event music: music/confusion.mp3 when a Pokémon becomes Confused, and so on. Resolves false when there is no file. */
+export async function playEventMusic(name, seconds = 10) { return playTrack(`music/${name}`, seconds); }
+async function playTrack(base, seconds) {
+  let url = null;
   for (const ext of ['mp3', 'ogg', 'wav', 'm4a']) { if (await fileExists(`${base}.${ext}`)) { url = `${base}.${ext}`; break; } }
   if (!url) return false;
   stopMusic(); const a = audio(); if (!a) return false; const { ctx, master } = a;

@@ -9,6 +9,8 @@ Per-Pokémon music. Drop MP3 files here named after the card, lowercase, with sp
 When that Pokémon becomes a player's Active Pokémon, its track plays for about 10 seconds and fades out, on both players' screens.
 The animation lab (fx-lab.html) shows the exact file name for whichever attacker you pick.
 
+Event music: confusion.mp3 plays when a Pokémon becomes Confused (about 10 seconds, then a fade).
+
 Starting a track partway in: add a file named start-times.json in this folder, listing where each track should start.
 Use seconds or minutes:seconds, keyed by the file name without .mp3 ("battle" is the match-start battle.mp3):
 
@@ -18,5 +20,5 @@ Use seconds or minutes:seconds, keyed by the file name without .mp3 ("battle" is
     "blaines-charizard": 30.5
   }
 
-Tracks that aren't listed start from the beginning.
+Tracks that aren't listed start from the beginning. A track that starts partway in fades in over about a second.
 

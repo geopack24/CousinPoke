@@ -6,7 +6,7 @@ import { randomSeed } from './engine/rng.js';
 import { R } from './engine/rules.js';
 import { automationReport } from './engine/cards/index.js';
 import { playAttack, playKO, playHeal, playSelfHit, playCoins, playWin, playTurnChime, attachLayer, isEnabled as fxEnabled, setEnabled as setFxEnabled, soundOn, setSoundVolume } from './fx.js';
-import { playBattleIntro, playPokemonMusic } from './music.js';
+import { playBattleIntro, playPokemonMusic, playEventMusic, warmMusic } from './music.js';
 import { BOT_UID, BOT_DECKS, botDeckCards, botAction, botAnswer, key as botKey } from './bot.js';
 
 let PT = null;           // bridge from index.html
@@ -153,6 +153,7 @@ function playEvents(events, doc, scene) {
         if (e.t === 'heal') { const el = document.querySelector(`[data-mon="${e.target}"]`); if (el) { const f = document.createElement('div'); f.className = 'float-dmg heal'; f.textContent = '+' + e.amount; el.appendChild(f); setTimeout(() => f.remove(), 900); } playHeal(board, rect(e.target)); }
         if (e.t === 'ko') setTimeout(() => playKO(board, rect(e.id)), 250);
       }
+      if (events.some((e) => e.t === 'status' && e.code === 'CNF')) playEventMusic('confusion');
     }, impact);
   }, delay);
 }
@@ -162,6 +163,7 @@ export function render(main, doc) {
   const g = doc.state; const me = mySeat(doc); const bottom = me || 'a'; const top = other(bottom); const r = R(g.rules);
   const compact = isCompact(); wasCompact = compact;
   const SC = compact ? { active: .3, bench: .22, hand: .36, pile: .22, opp: .26 } : { active: .42, bench: .34, hand: .42, pile: .34, opp: .34 };
+  warmMusic(); // cheap after the first call: reads the start-time list once and pre-loads those tracks
   const battleStart = phaseSeen[doc.id] === 'setup' && g.phase === 'main';
   if (battleStart) { playBattleIntro(10); if (fxEnabled()) PT.toast('Battle start!'); }
   phaseSeen[doc.id] = g.phase;
