@@ -216,6 +216,7 @@ export function render(main, doc) {
     ${doc.prev && doc.prev.seat === me && !g.winner ? '<button type="button" data-act="undo" title="Undo your last move (only moves that revealed nothing)">Undo</button>' : ''}
     ${legal.some((a) => a.type === 'useStadium') ? `<button type="button" data-act="useStadium">Use ${esc(C(g.stadium.c).name)}</button>` : ''}
     ${myTurn ? '<button type="button" class="pri" data-act="end">End turn</button>' : ''}
+    ${g.winner && (me || doc.host === PT.uid()) ? '<button type="button" class="dng" data-act="closeTable" title="Remove this finished table for everyone">Close table</button>' : ''}
     ${inflightMine ? '<button type="button" class="pri" data-act="answer">Answer the prompt</button>' : ''}
     <button type="button" data-act="sound" class="icon" title="${soundOn() ? 'Sound is on (click to mute)' : 'Sound is off (click to unmute)'}">${soundOn() ? '🔊' : '🔇'}</button>
     <button type="button" data-act="more">${compact ? '⋯' : 'More…'}</button>` : '<span class="small">Watching</span>';
@@ -403,6 +404,7 @@ function setupDrag(main, doc, legal, me) {
 function onButton(act, btn, doc, legal, me) {
   const g = doc.state;
   if (act === 'end') return submit({ type: 'endTurn' });
+  if (act === 'closeTable') return PT.confirmDeleteGame(doc.id);
   if (act === 'undo') return undo(doc);
   if (act === 'setupDone') return submit({ type: 'setupDone' });
   if (act === 'mulligan') return submit({ type: 'mulligan' });

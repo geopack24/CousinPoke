@@ -539,7 +539,7 @@ function renderLobby(main){
         ${games.length?`<div class="list">${games.map(g=>{const a=g.seats?.a||{},b=g.seats?.b||{};const mine=a.uid===uid||b.uid===uid;const open=(!a.uid||!b.uid)&&g.status==='lobby';
           return `<div class="item"><div class="grow"><div class="t">${esc(g.name)}</div><div class="small muted">${g.status==='lobby'?'Setting up':g.status==='playing'?`In play · turn ${g.state?.turnNo||1}`:'Finished'} · ${g.mode==='auto'?'auto rules':'tabletop'} · host ${esc(nameOf(g.host))}</div>
             <div class="row" style="margin-top:6px"><span class="seat ${a.uid?'full':''}">${esc(nameOf(a.uid))}</span><span class="muted small">vs</span><span class="seat ${b.uid?'full':''}">${esc(nameOf(b.uid))}</span></div></div>
-            <div class="row">${mine?`<button class="sec" data-open="${g.id}" type="button">Open</button>`:open?`<button class="pri" data-join="${g.id}" type="button">Take a seat</button>`:`<button data-open="${g.id}" type="button">Watch</button>`}${g.host===uid?`<button class="sm dng ghost" data-del="${g.id}" type="button" title="Close table">✕</button>`:''}</div></div>`}).join('')}</div>`
+            <div class="row">${mine?`<button class="sec" data-open="${g.id}" type="button">Open</button>`:open?`<button class="pri" data-join="${g.id}" type="button">Take a seat</button>`:`<button data-open="${g.id}" type="button">Watch</button>`}${g.host===uid||(g.status==='done'&&mine)?`<button class="sm dng ghost" data-del="${g.id}" type="button" title="Close table">✕</button>`:''}</div></div>`}).join('')}</div>`
           :`<p class="muted">No tables yet. ${online?'Start one and your cousins can take the other seat from their own device.':''}</p>`}
       </div>
     </div>
@@ -582,7 +582,7 @@ async function joinGame(id){
     const ver=g.version;delete g.id;delete g.version;g.seats[seat]={uid,deckId:null,deckName:null};g.updatedAt=Date.now();pushLog(g,`${S.name||'A player'} sat down`);
     const r=await api('PUT','games/'+id,{data:g,ifVersion:ver});if(r&&r.conflict){toast('Someone else just took that seat. Try again.');return}
     openGame(id)}catch(e){toast('Could not join ('+(e.code||'error')+')')}}
-function confirmDeleteGame(id){showModal('Close this table?',`<p>The table and its log are removed for everyone.</p>`,`<button class="dng" id="dok" type="button">Close table</button>`,m=>{m.querySelector('#dok').onclick=async()=>{closeModal();try{await api('DELETE','games/'+id);if(S.gameId===id){S.gameId=null}syncSoon(100)}catch(e){toast('Could not close ('+(e.code||'error')+')')}}})}
+function confirmDeleteGame(id){showModal('Close this table?',`<p>The table and its log are removed for everyone.</p>`,`<button class="dng" id="dok" type="button">Close table</button>`,m=>{m.querySelector('#dok').onclick=async()=>{closeModal();try{await api('DELETE','games/'+id);if(S.gameId===id){S.gameId=null;S.game=null;if(S.screen==='game')go('lobby')}syncSoon(100)}catch(e){toast('Could not close ('+(e.code||'error')+')')}}})}
 
 /* ---------- deck builder ---------- */
 const B={deckId:null,deck:null,q:'',sets:new Set(['base1','base2','base3','base5','gym1','gym2']),st:'',type:'',stage:'',dirty:false};
@@ -901,6 +901,7 @@ function moreMenu(anchor){
     {label:'I concede',danger:true,fn:()=>commit(g=>{g.state.winner=other(my);g.status='done';pushLog(g,`${who(g,my)} conceded. ${who(g,other(my))} wins.`)})},
     {sep:true},
     {label:'Back to lobby (table stays open)',fn:()=>go('lobby')}];
+  if(g.status==='done')items.push({label:'Close table',danger:true,fn:()=>confirmDeleteGame(S.gameId)});
   if(host||g.status==='done')items.push({label:g.status==='done'?'Play again (back to setup)':'Reset table to setup',danger:g.status!=='done',fn:()=>showModal('Reset this table?',`<p>The current game is thrown away. Seats and decks are kept.</p>`,`<button class="dng" id="rok" type="button">Reset</button>`,m=>{m.querySelector('#rok').onclick=()=>{closeModal();commit(g=>{g.state=null;g.status='lobby';pushLog(g,`${whoDo()} reset the table`)})}})});
   showMenu(items,anchor,'More');
 }
@@ -921,7 +922,7 @@ async function saveGame(doc){
     if(r&&r.version!=null&&S.game&&S.game.id===id){S.game.version=r.version}return true}
   catch(e){toast('Could not save ('+(e.code||'error')+')');return false}
 }
-window.PT={esc,get CARDS(){return CARDS},cardHTML,backHTML,cardStyle,showModal,closeModal,showMenu,toast,nameOf,uid:()=>uid,S,saveGame,render,go,viewCard,rulesSummary};
+window.PT={esc,confirmDeleteGame,get CARDS(){return CARDS},cardHTML,backHTML,cardStyle,showModal,closeModal,showMenu,toast,nameOf,uid:()=>uid,S,saveGame,render,go,viewCard,rulesSummary};
 start();
 })();
 </script>
