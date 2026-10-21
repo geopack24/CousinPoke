@@ -286,6 +286,23 @@ export function playTurnChime() { sfx.play('turn'); }
 export function playKO(boardEl, rect) { sfx.play('ko'); if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); fx.burst(rect.cx, rect.cy, { n: 30, colors: ['#222', '#555', '#999', '#fff'], speed: 7, size: 6, life: 700, g: 0.1 }); fx.ring(rect.cx, rect.cy, { r0: 10, r1: 90, color: '#fff', width: 4, life: 400 }); fx.text(rect.cx, rect.cy - 20, 'KO', { color: '#ff5a5a', size: 40, life: 1100 }); }
 export function playHeal(boardEl, rect) { sfx.play('heal'); if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); for (let i = 0; i < 16; i++) fx.particle({ x: rect.cx + rnd(-rect.w / 2, rect.w / 2), y: rect.cy + rnd(-rect.h / 3, rect.h / 3), vy: rnd(-1.6, -0.6), size: rnd(2, 5), color: pick(['#c6ffd0', '#7ae58a', '#fff']), shape: 'star', life: rnd(500, 900), glow: 8, vr: 0.1 }); }
 export function playSelfHit(boardEl, rect) { sfx.play('self'); if (!isEnabled() || !boardEl || !rect) return; const fx = layerFor(boardEl); fx.burst(rect.cx, rect.cy, { n: 16, colors: ['#ff5a5a', '#ffb0b0', '#fff'], speed: 5, size: 5, life: 500 }); }
+/** A Confused attack that failed: ??? swirl around the attacker, then the "huh?" sound. Returns ms until the self-hit lands. */
+export function playConfused(boardEl, rect) {
+  if (!boardEl || !rect) { sfx.play('confused'); return 0; }
+  if (!isEnabled()) { sfx.play('confused'); return 300; }
+  const n = 6;
+  for (let i = 0; i < n; i++) {
+    const q = document.createElement('div'); q.className = 'confq'; q.textContent = '?';
+    const a = (i / n) * Math.PI * 2, r = Math.max(rect.w, rect.h) * 0.55;
+    q.style.left = `${rect.cx + Math.cos(a) * r * 0.6}px`; q.style.top = `${rect.cy + Math.sin(a) * r * 0.6}px`;
+    q.style.setProperty('--dx', `${Math.cos(a + 1.4) * r * 0.5}px`); q.style.setProperty('--dy', `${Math.sin(a + 1.4) * r * 0.5 - 12}px`);
+    q.style.setProperty('--rot', `${(i % 2 ? 1 : -1) * 35}deg`); q.style.animationDelay = `${i * 70}ms`;
+    q.style.fontSize = `${Math.max(16, Math.round(rect.w * 0.28))}px`;
+    boardEl.appendChild(q); setTimeout(() => q.remove(), 1400);
+  }
+  setTimeout(() => sfx.play('confused'), 450);
+  return 1000;
+}
 /** End of game: confetti over the whole board, a banner with the winner's name, and the fanfare. */
 export function playWin(boardEl, name, opts = {}) {
   if (!opts.quiet) sfx.play('win'); // quiet when a victory track is playing instead if (!isEnabled() || !boardEl) return;

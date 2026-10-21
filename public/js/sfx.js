@@ -57,6 +57,7 @@ const FX = {
   coin: (t, heads) => { for (let i = 0; i < 6; i++) tone(t + i * 0.08, { type: 'triangle', f: 2200 + (i % 2) * 400, dur: 0.06, g: 0.08 }); tone(t + 0.55, { type: 'square', f: heads ? 1319 : 440, dur: 0.25, g: 0.15 }); if (heads) tone(t + 0.62, { type: 'square', f: 1760, dur: 0.25, g: 0.12 }); },
   ko: (t) => { arp(t, [660, 550, 440, 330, 220], 0.1, { type: 'square', g: 0.14 }); noise(t, { dur: 0.5, type: 'lowpass', f: 1500, to: 200, g: 0.3 }); },
   heal: (t) => arp(t, [523, 659, 784, 1047, 1319], 0.07, { type: 'sine', g: 0.14 }),
+  confused: (t) => { [520, 390, 560, 360, 600, 340].forEach((f, i) => tone(t + i * 0.075, { type: 'triangle', f, dur: 0.07, g: 0.09 })); tone(t + 0.48, { type: 'sine', f: 420, to: 140, dur: 0.32, g: 0.13 }); },
   self: (t) => { noise(t, { dur: 0.15, type: 'lowpass', f: 400, g: 0.3 }); tone(t, { type: 'square', f: 200, to: 80, dur: 0.2, g: 0.1 }); },
   turn: (t) => arp(t, [784, 1047, 1319], 0.09, { type: 'triangle', g: 0.14 }),
   win: (t) => arp(t, [523, 659, 784, 1047, 784, 1047, 1319], 0.11, { type: 'square', g: 0.14 }),

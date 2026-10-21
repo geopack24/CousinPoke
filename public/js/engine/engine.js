@@ -467,7 +467,7 @@ function runAction(ctx, a) {
       ctx.log(`${ctx.name(seat)}'s ${nameOf(db, m.c)} used ${atk.n}`); ctx.event({ t: 'attack', attacker: m.id, name: atk.n, type: typeOf(g, db, m) });
       g.attacked = true; g.lastAttack = { seat, attacker: m.id, name: atk.n, turn: g.turnNo };
       let proceed = true;
-      if (m.st.includes('CNF')) { if (!ctx.flip('confusion')) { ctx.log(`${nameOf(db, m.c)} is Confused and hurt itself`); dealDamage(ctx, m, R(g.rules).confusionSelfDamage, { noWR: true, self: true }); proceed = false; } }
+      if (m.st.includes('CNF')) { if (!ctx.flip('confusion')) { ctx.event({ t: 'confused', attacker: m.id }); ctx.log(`${nameOf(db, m.c)} is Confused and hurt itself`); dealDamage(ctx, m, R(g.rules).confusionSelfDamage, { noWR: true, self: true }); proceed = false; } }
       if (proceed && ctx.defender && db[ctx.defender.c] && db[ctx.defender.c].sub === 'Baby' && !ctx.copying) { if (!ctx.flip('Baby Rule')) { ctx.log(`Baby Rule: tails, the attack on ${nameOf(db, ctx.defender.c)} does nothing`); proceed = false; } }
       if (proceed && hasFx(m, 'sandAttack')) { if (!ctx.flip('Sand-attack')) { ctx.log('The attack does nothing (Sand-attack)'); proceed = false; } }
       if (proceed) { const bs = scriptOf(m.c).passive; if (bs && bs.beforeAttack && powersActive(g, db) && bs.beforeAttack(ctx, m) === false) proceed = false; }

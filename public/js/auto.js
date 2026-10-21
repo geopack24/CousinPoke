@@ -5,7 +5,7 @@ import { newGame, other, mons, findMon } from './engine/state.js';
 import { randomSeed } from './engine/rng.js';
 import { R } from './engine/rules.js';
 import { automationReport } from './engine/cards/index.js';
-import { playAttack, playKO, playHeal, playSelfHit, playCoins, playWin, playTurnChime, attachLayer, isEnabled as fxEnabled, setEnabled as setFxEnabled, soundOn, setSoundVolume } from './fx.js';
+import { playAttack, playKO, playHeal, playSelfHit, playCoins, playWin, playTurnChime, playConfused, attachLayer, isEnabled as fxEnabled, setEnabled as setFxEnabled, soundOn, setSoundVolume } from './fx.js';
 import { playBattleIntro, playPokemonMusic, playEventMusic, warmMusic } from './music.js';
 import { BOT_UID, BOT_DECKS, botDeckCards, botAction, botAnswer, key as botKey } from './bot.js';
 
@@ -13,6 +13,12 @@ let PT = null;           // bridge from index.html
 let promptOpen = null;   // id of the prompt modal currently shown
 let seenFxId = null;     // id of the last doc.fx payload this client animated
 let pendingFx = null;
+let pendingScene = null; // scene captured from the board on screen before a remote update re-renders it
+/** Prefer positions from before the re-render (the knocked-out card was still there), fill gaps from after. */
+function mergeScene(before, after) {
+  if (!before) return after; if (!after) return before;
+  return { ...after, from: after.from || before.from, rects: { ...after.rects, ...before.rects }, targets: before.targets && before.targets.length ? before.targets : after.targets, ghosts: before.ghosts };
+}
 let pendingWin = null;
 let pendingTurn = false;
 let logOpen = false;      // compact mode: whether the log is expanded
@@ -87,7 +93,7 @@ function promptModal(prompt) {
 }
 
 /* ---------- events -> animations ---------- */
-const FX_EVENTS = ['attack', 'damage', 'heal', 'ko', 'flip', 'status', 'draw'];
+const FX_EVENTS = ['attack', 'damage', 'heal', 'ko', 'flip', 'status', 'draw', 'confused'];
 /** Store the interesting events on the doc so the other player's screen animates them too. */
 function publishFx(doc, events) {
   const ev = events.filter((e) => FX_EVENTS.includes(e.t)); if (!ev.length) { return; }
@@ -99,7 +105,9 @@ const rectOf = (id) => { const b = boardEl(); return rectIn(b, b && b.querySelec
 const slotRect = (seat) => { const b = boardEl(); return rectIn(b, b && b.querySelector(`[data-active-slot="${seat}"]`)); };
 /** Where things are on screen right now, for the attack in `events`. Call before re-rendering when you can. */
 function captureScene(events, g) {
-  const atk = events.find((e) => e.t === 'attack'); if (!atk) return null;
+  const b0 = boardEl(); const ghosts = [];
+  for (const e of events) if (e.t === 'ko') { const el = b0 && b0.querySelector(`[data-mon="${e.id}"] .poke`); const r = rectIn(b0, el); if (el && r) ghosts.push({ id: e.id, html: el.outerHTML, rect: r }); }
+  const atk = events.find((e) => e.t === 'attack'); if (!atk) return ghosts.length ? { ghosts, rects: Object.fromEntries(ghosts.map((x) => [x.id, x.rect])), targets: [] } : null;
   const f = findMon(g, atk.attacker); const seat = f ? f.seat : (g.lastAttack && g.lastAttack.attacker === atk.attacker ? g.lastAttack.seat : null);
   const from = rectOf(atk.attacker) || (seat && slotRect(seat));
   const ids = [...new Set(events.filter((e) => e.t === 'damage' && !e.self && e.target !== atk.attacker).map((e) => e.target))];
@@ -107,7 +115,8 @@ function captureScene(events, g) {
   const targets = ids.map((id) => rects[id] || (seat && slotRect(other(seat)))).filter(Boolean);
   if (!targets.length && seat) { const r = slotRect(other(seat)); if (r) targets.push(r); }
   rects[atk.attacker] = from;
-  return { type: atk.type, name: atk.name, cardId: f ? f.m.c : null, attacker: atk.attacker, from, targets, rects };
+  for (const x of ghosts) if (!rects[x.id]) rects[x.id] = x.rect;
+  return { type: atk.type, name: atk.name, cardId: f ? f.m.c : null, attacker: atk.attacker, from, targets, rects, ghosts };
 }
 /** Card backs fly from a seat's deck to its hand; the player's own new cards flip face up when they land. */
 function animateDraws(events, doc) {
@@ -135,8 +144,20 @@ function animateDraws(events, doc) {
     delay += n * 90 + 200;
   }
 }
+/** A knocked-out card stays where it was (as a stand-in) until the attack lands, then breaks apart. */
+function placeGhosts(scene) {
+  const b = boardEl(); const out = {}; if (!b || !scene || !scene.ghosts) return out;
+  for (const x of scene.ghosts) {
+    if (b.querySelector(`[data-mon="${x.id}"]`)) continue; // still on the board (it wasn't removed)
+    const el = document.createElement('div'); el.className = 'koghost'; el.innerHTML = x.html;
+    el.style.cssText = `left:${x.rect.x}px;top:${x.rect.y}px;width:${x.rect.w}px;height:${x.rect.h}px`;
+    b.appendChild(el); out[x.id] = el;
+  }
+  return out;
+}
 function playEvents(events, doc, scene) {
-  const b = boardEl();
+  const b = boardEl(); const ghosts = placeGhosts(scene);
+  setTimeout(() => { for (const el of Object.values(ghosts)) if (el.isConnected) el.remove(); }, 6000); // safety net
   const flips = events.filter((e) => e.t === 'flip');
   if (flips.length) PT.toast(flips.map((e) => (e.heads ? 'Heads' : 'Tails')).join(', '));
   let delay = 30; if (flips.length && b) delay += Math.round(playCoins(b, flips.map((e) => e.heads)) * 0.7);
@@ -144,14 +165,16 @@ function playEvents(events, doc, scene) {
   const atk = events.find((e) => e.t === 'attack');
   setTimeout(() => {
     let impact = 0; const board = boardEl();
-    if (atk && scene && board) { scene.fromEl = board.querySelector(`[data-mon="${atk.attacker}"]`); impact = playAttack(board, scene).impact; }
+    const conf = events.find((e) => e.t === 'confused');
+    if (conf && board) impact = playConfused(board, (scene && scene.rects && scene.rects[conf.attacker]) || rectOf(conf.attacker));
+    else if (atk && scene && board) { scene.fromEl = board.querySelector(`[data-mon="${atk.attacker}"]`); impact = playAttack(board, scene).impact; }
     else if (atk) { const el = board && board.querySelector(`[data-mon="${atk.attacker}"]`); if (el) { el.classList.add('lunge'); setTimeout(() => el.classList.remove('lunge'), 500); } }
     const rect = (id) => (scene && scene.rects && scene.rects[id]) || rectOf(id);
     setTimeout(() => {
       for (const e of events) {
-        if (e.t === 'damage') { const el = document.querySelector(`[data-mon="${e.target}"]`); if (el) { el.classList.add('hit'); const f = document.createElement('div'); f.className = 'float-dmg'; f.textContent = '-' + e.amount; el.appendChild(f); setTimeout(() => { el.classList.remove('hit'); f.remove(); }, 900); } if (e.self) playSelfHit(board, rect(e.target)); }
+        if (e.t === 'damage') { const el = document.querySelector(`[data-mon="${e.target}"]`) || ghosts[e.target]; if (el) { el.classList.add('hit'); const f = document.createElement('div'); f.className = 'float-dmg'; f.textContent = '-' + e.amount; el.appendChild(f); setTimeout(() => { el.classList.remove('hit'); f.remove(); }, 900); } if (e.self) playSelfHit(board, rect(e.target)); }
         if (e.t === 'heal') { const el = document.querySelector(`[data-mon="${e.target}"]`); if (el) { const f = document.createElement('div'); f.className = 'float-dmg heal'; f.textContent = '+' + e.amount; el.appendChild(f); setTimeout(() => f.remove(), 900); } playHeal(board, rect(e.target)); }
-        if (e.t === 'ko') setTimeout(() => playKO(board, rect(e.id)), 250);
+        if (e.t === 'ko') setTimeout(() => { playKO(board, rect(e.id)); const gh = ghosts[e.id]; if (gh) { gh.classList.add('gone'); setTimeout(() => gh.remove(), 650); } }, 250);
       }
       if (events.some((e) => e.t === 'status' && e.code === 'CNF')) playEventMusic('confusion');
     }, impact);
@@ -172,7 +195,7 @@ export function render(main, doc) {
   { const prev = activeSeen[doc.id]; const now = { a: g.p.a.active ? g.p.a.active.id : null, b: g.p.b.active ? g.p.b.active.id : null }; activeSeen[doc.id] = now;
     if (prev && !battleStart && g.phase === 'main') for (const s of [other(bottom), bottom]) { const m = g.p[s].active; if (m && now[s] !== prev[s]) playPokemonMusic(C(m.c).name); } }
   if (seenFxId === null) seenFxId = doc.fx ? doc.fx.id : '';
-  else if (doc.fx && doc.fx.id !== seenFxId) { seenFxId = doc.fx.id; pendingFx = doc.fx.events; }
+  else if (doc.fx && doc.fx.id !== seenFxId) { seenFxId = doc.fx.id; pendingFx = doc.fx.events; pendingScene = captureScene(pendingFx, g); }
   const legal = me ? legalActions(g, me, PT.CARDS) : [];
   const pending = g.pending[0];
   const myTurn = me && g.phase === 'main' && g.turn === me && !g.pending.length && !g.winner;
@@ -233,7 +256,7 @@ export function render(main, doc) {
   attachLayer(main.querySelector('.board.auto'));
   if (pendingWin) { const n = pendingWin; pendingWin = null; setTimeout(() => { const bd = main.querySelector('.board.auto'); playEventMusic('victory', 30).then((ok) => playWin(bd, n, { quiet: ok }), () => playWin(bd, n)); }, 400); }
   if (pendingTurn) { pendingTurn = false; const b = main.querySelector('.board.auto'); if (b) { const el = document.createElement('div'); el.className = 'turnbanner'; el.textContent = 'YOUR TURN'; b.appendChild(el); setTimeout(() => el.remove(), 1600); } playTurnChime(); }
-  if (pendingFx) { const ev = pendingFx; pendingFx = null; playEvents(ev, doc, captureScene(ev, g)); }
+  if (pendingFx) { const ev = pendingFx; pendingFx = null; const sc = pendingScene; pendingScene = null; playEvents(ev, doc, mergeScene(sc, captureScene(ev, g))); }
   maybeRunBot(doc);
   const chat = main.querySelector('#chat'); if (chat) chat.onsubmit = (e) => { e.preventDefault(); const i = chat.querySelector('#chatin'); const v = i.value.trim(); if (!v) return; i.value = ''; submit({ type: 'chat', text: v }); };
 

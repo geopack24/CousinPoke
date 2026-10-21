@@ -295,6 +295,8 @@ textarea{width:100%;min-height:60px;resize:vertical}
 .mon.lunge .poke{animation:lunge .45s}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
 @keyframes lunge{0%,100%{transform:translateY(0)}40%{transform:translateY(-14px) scale(1.06)}}
+.confq{position:absolute;z-index:9;pointer-events:none;font-family:var(--display);font-weight:800;color:#ffd84a;text-shadow:0 2px 5px rgba(0,0,0,.75);transform:translate(-50%,-50%);opacity:0;animation:confq .9s ease-in-out forwards}@keyframes confq{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}25%{opacity:1}100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1.25) rotate(var(--rot))}}
+.koghost{position:absolute;z-index:8;pointer-events:none;transition:opacity .6s ease,transform .6s ease,filter .6s ease}.koghost>.poke{width:100%;height:100%}.koghost.gone{opacity:0;transform:scale(.6) rotate(-8deg);filter:grayscale(1) brightness(.4)}
 .float-dmg{position:absolute;left:50%;top:10%;transform:translateX(-50%);font-family:var(--display);font-size:26px;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.7),0 0 2px var(--danger);animation:floatup .9s forwards;pointer-events:none;z-index:9}
 .float-dmg.heal{text-shadow:0 2px 6px rgba(0,0,0,.7),0 0 2px var(--ok)}
 @keyframes floatup{0%{opacity:0;transform:translate(-50%,10px)}20%{opacity:1}100%{opacity:0;transform:translate(-50%,-40px)}}
