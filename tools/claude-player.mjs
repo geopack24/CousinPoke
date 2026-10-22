@@ -75,7 +75,7 @@ async function main() {
       doc.inflight = { action, prompt: r.prompt }; console.log('prompt parked for', r.prompt.seat, ':', r.prompt.title); await save(doc); return;
     }
     if (existsSync(seedFile)) unlinkSync(seedFile);
-    doc.prev = null; doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner;
+    doc.prev = null; doc.undo = []; doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner;
     doc.fx = { id: Date.now().toString(36), events: r.events.filter((e) => ['attack', 'damage', 'heal', 'ko', 'flip', 'status', 'confused'].includes(e.t)) };
     console.log('events:', r.events.map((e) => e.t + (e.amount ? ':' + e.amount : '') + (e.heads != null ? ':' + (e.heads ? 'H' : 'T') : '')).join(' '));
     await save(doc); return view(doc);

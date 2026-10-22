@@ -62,7 +62,7 @@ export async function submit(action, answers = [], opts = {}) {
     doc.inflight = { action, prompt: r.prompt }; await PT.saveGame(doc); PT.render(); return;
   }
   const scene = captureScene(r.events, doc.state);
-  doc.prev = undoable(action, r.events) ? { state: doc.state, seat, label: action.type } : null;
+  recordUndo(doc, action, r.events, seat);
   doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner;
   publishFx(doc, r.events); PT.render(); playEvents(r.events, doc, scene); await PT.saveGame(doc);
 }
@@ -71,9 +71,27 @@ function undoable(action, events) {
   if (['chat', 'endTurn', 'attack', 'takePrize', 'mulligan', 'mulliganDraw', 'concede', 'override', 'setupDone'].includes(action.type)) return false;
   return !events.some((e) => ['flip', 'draw', 'shuffle', 'prize', 'turn', 'ko', 'win'].includes(e.t));
 }
+/* Undo history: every move that revealed nothing is snapshotted (state without its log, ~6 KB), so a player can step
+   back through several of them in a row. Anything that reveals information (or another player's move, or a new turn)
+   clears the history. */
+const UNDO_MAX = 20;
+function recordUndo(doc, action, events, seat) {
+  if (action.type === 'chat') return; // chatting doesn't touch the undo history
+  doc.prev = null; // the old single-step undo
+  if (!undoable(action, events)) { doc.undo = []; return; }
+  const st = doc.undo || [];
+  const keep = st.length && st[st.length - 1].seat === seat && st[st.length - 1].turnNo === doc.state.turnNo ? st : [];
+  const { log, ...rest } = doc.state;
+  keep.push({ state: rest, logLen: (log || []).length, seat, label: action.type, turnNo: doc.state.turnNo });
+  doc.undo = keep.slice(-UNDO_MAX);
+}
+function undoDepth(doc, me) { const st = doc.undo || []; if (st.length && st[st.length - 1].seat === me) return st.length; return doc.prev && doc.prev.seat === me ? 1 : 0; }
 async function undo(doc) {
-  if (!doc.prev || doc.prev.seat !== mySeat(doc)) { PT.toast('Nothing to undo'); return; }
-  const g = doc.prev.state; g.log.push({ t: Date.now(), turn: g.turnNo, m: `${g.seats[doc.prev.seat].name} undid their last move (${doc.prev.label})` });
+  const me = mySeat(doc); if (!undoDepth(doc, me)) { PT.toast('Nothing to undo'); return; }
+  // a move saved by the older single-step undo (doc.prev) still works
+  const snap = (doc.undo || []).length ? doc.undo.pop() : { state: doc.prev.state, logLen: doc.prev.state.log ? doc.prev.state.log.length : (doc.state.log || []).length, seat: doc.prev.seat, label: doc.prev.label };
+  const g = { ...snap.state, log: (doc.state.log || []).slice(0, snap.logLen) };
+  g.log.push({ t: Date.now(), turn: g.turnNo, m: `${g.seats[snap.seat].name} undid a move (${snap.label})` });
   doc.state = g; doc.prev = null; doc.inflight = null; await PT.saveGame(doc); PT.render();
 }
 
@@ -286,7 +304,7 @@ export function render(main, doc) {
     ${g.phase === 'setup' && legal.some((a) => a.type === 'mulligan') ? `<button type="button" data-act="mulligan">${legal.some((a) => a.type === 'placeActive') ? 'Mulligan too (optional)' : 'Mulligan (no Basic)'}</button>` : ''}
     ${g.phase === 'setup' && legal.some((a) => a.type === 'setupDone') ? '<button type="button" class="pri" data-act="setupDone">Ready</button>' : ''}
     ${pending && pending.t === 'mulliganDraw' && pending.seat === me ? `<button type="button" class="pri" data-act="mulliganDraw1">Draw ${pending.n} extra</button><button type="button" data-act="mulliganDraw0">Skip</button>` : ''}
-    ${doc.prev && doc.prev.seat === me && !g.winner ? '<button type="button" data-act="undo" title="Undo your last move (only moves that revealed nothing)">Undo</button>' : ''}
+    ${undoDepth(doc, me) && !g.winner ? `<button type="button" data-act="undo" title="Undo your last move. You can keep going back through moves that revealed nothing.">Undo${undoDepth(doc, me) > 1 ? ` (${undoDepth(doc, me)})` : ''}</button>` : ''}
     ${legal.some((a) => a.type === 'useStadium') ? `<button type="button" data-act="useStadium">Use ${esc(C(g.stadium.c).name)}</button>` : ''}
     ${myTurn ? '<button type="button" class="pri" data-act="end">End turn</button>' : ''}
     ${g.winner && (me || doc.host === PT.uid()) ? '<button type="button" class="dng" data-act="closeTable" title="Remove this finished table for everyone">Close table</button>' : ''}
@@ -408,7 +426,7 @@ async function botStep() {
       doc.inflight = { action, prompt: r.prompt }; await PT.saveGame(doc); PT.render(); return; // the human has to answer
     }
     const scene = captureScene(r.events, doc.state);
-    doc.prev = null; doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner;
+    doc.prev = null; doc.undo = []; doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner;
     publishFx(doc, r.events); PT.render(); playEvents(r.events, doc, scene); await PT.saveGame(doc); return;
   }
   console.warn('computer: gave up on a prompt loop', action); botSkip.add(botKey(action)); maybeRunBot(doc);
@@ -559,7 +577,7 @@ async function answerInflight(doc) {
   if (r.error) { PT.toast(r.error); return; }
   if (r.prompt) { if (r.prompt.seat === mySeat(doc)) { doc.inflight = { action, prompt: r.prompt }; return answerInflight(doc); } doc.inflight = { action, prompt: r.prompt }; await PT.saveGame(doc); PT.render(); return; }
   const scene = captureScene(r.events, doc.state);
-  doc.prev = null; doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner;
+  doc.prev = null; doc.undo = []; doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner;
   publishFx(doc, r.events); PT.render(); playEvents(r.events, doc, scene); await PT.saveGame(doc);
 }
 function handMenu(doc, legal, iid, anchor) {
