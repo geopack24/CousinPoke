@@ -48,14 +48,17 @@ export function startGame(doc, decks) {
 /* ---------- actions ---------- */
 function mySeat(doc) { const uid = PT.uid(); if (doc.seats.a.uid === uid) return 'a'; if (doc.seats.b.uid === uid) return 'b'; return null; }
 
-export async function submit(action, answers = []) {
+export async function submit(action, answers = [], opts = {}) {
   const doc = PT.S.game; if (!doc || !doc.state) return;
   const seat = action.seat || mySeat(doc); if (!seat) { PT.toast("You're watching this table"); return; }
   action = { ...action, seat, seed: action.seed || randomSeed(), answers };
   const r = apply(doc.state, action, PT.CARDS);
   if (r.error) { PT.toast(r.error); return; }
   if (r.prompt) {
-    if (r.prompt.seat === mySeat(doc)) { const ans = await promptModal(r.prompt); if (ans == null) return; return submit(action, [...answers, ans]); }
+    if (r.prompt.seat === mySeat(doc)) {
+      if (opts.autoAnswer) { const auto = opts.autoAnswer(r.prompt); if (auto !== undefined) return submit(action, [...answers, auto], opts); }
+      const ans = await promptModal(r.prompt); if (ans == null) return; return submit(action, [...answers, ans], opts);
+    }
     doc.inflight = { action, prompt: r.prompt }; await PT.saveGame(doc); PT.render(); return;
   }
   const scene = captureScene(r.events, doc.state);
@@ -307,6 +310,7 @@ export function render(main, doc) {
   const chat = main.querySelector('#chat'); if (chat) chat.onsubmit = (e) => { e.preventDefault(); const i = chat.querySelector('#chatin'); const v = i.value.trim(); if (!v) return; i.value = ''; submit({ type: 'chat', text: v }); };
 
   if (me) setupDrag(main, doc, legal, me);
+  if (me) setupArrange(main, doc, legal, me); else arrangeState = null;
   main.onclick = (e) => {
     if (suppressClick) { suppressClick = false; return; }
     const t = e.target; if (boardPickClick(t)) return; const btn = t.closest('button');
@@ -361,11 +365,11 @@ function describeFx(f, g) {
 function monHTML(m, seat, active, promoteClick, scale) {
   const c = C(m.c); const hp = c.hp; const sc = scale || (active ? .42 : .34); const compact = isCompact(); const step = Math.round(330 * sc * (compact ? 0.09 : 0.13));
   const att = [...m.en, ...m.tools]; const n = att.length;
-  const stack = att.map((x, i) => `<div class="attc" style="top:${i * step}px;z-index:${i + 1}">${PT.cardHTML(x.c, sc)}</div>`).join('');
+  const stack = att.map((x, i) => `<div class="attc" data-att="${x.id}" data-owner="${m.id}" style="top:${i * step}px;z-index:${i + 1}">${PT.cardHTML(x.c, sc)}</div>`).join('');
   const GL = { SLP: 'Zz', CNF: '?!', PAR: '⚡', PSN: '☠', BRN: '🔥' }; const stChips = m.st.map((s) => `<span class="${s}" title="${STATUS_NAMES[s]}">${GL[s]} ${active ? STATUS_NAMES[s] : s}</span>`).join('');
   const fxChips = m.fx.map((f) => { const d = describeFx(f, PT.S.game.state); return `<span class="FX" title="${esc(d.desc)}" data-desc="${esc(d.desc)}">${esc(d.label)}</span>`; }).join('');
   const left = hp ? (hp - m.dmg) / hp : 1; const hurt = left <= 0.25 ? 'critical' : left <= 0.5 ? 'hurt' : '';
-  return `<div class="mon ${active ? 'active' : ''} ${promoteClick ? 'glow' : ''} ${hurt}" data-mon="${m.id}" tabindex="0"><div class="cdwrap" style="padding-top:${n * step}px">${stack}<div class="poke" style="z-index:${n + 1}">${PT.cardHTML(m.c, sc)}${hp ? `<span class="hp">${Math.max(0, hp - m.dmg)}/${hp}</span>` : ''}${m.dmg ? `<span class="dmg">${m.dmg}</span>` : ''}${m.st.length || fxChips ? `<div class="sts">${stChips}${fxChips}</div>` : ''}${m.un.length ? `<span class="stk">+${m.un.length} under</span>` : ''}</div></div>${n && !compact ? `<div class="attn">${n} attached</div>` : ''}</div>`;
+  return `<div class="mon ${active ? 'active' : ''} ${promoteClick ? 'glow' : ''} ${hurt}" data-mon="${m.id}" tabindex="0"><div class="cdwrap" style="padding-top:${n * step}px">${stack}<div class="poke" style="z-index:${n + 1}">${PT.cardHTML(m.c, sc)}${hp ? `<span class="hp">${Math.max(0, hp - m.dmg)}/${hp}</span>` : ''}${m.dmg ? `<span class="dmg" data-dmg-of="${m.id}">${m.dmg}</span>` : ''}${m.st.length || fxChips ? `<div class="sts">${stChips}${fxChips}</div>` : ''}${m.un.length ? `<span class="stk">+${m.un.length} under</span>` : ''}</div></div>${n && !compact ? `<div class="attn">${n} attached</div>` : ''}</div>`;
 }
 
 /* ---------- the computer opponent ----------
@@ -413,6 +417,57 @@ async function botStep() {
 /* ---------- drag and drop ----------
    Drag a hand card onto one of your Pokémon (attach energy / evolve), a Basic onto your bench (play it), a Trainer onto the
    field of play (either side, or the middle bar) to play it, or a benched Pokémon onto your Active spot (retreat / promote). Taps still open the menus. */
+/* ---------- arrange mode: Energy Trans, Damage Swap ----------
+   Instead of answering "from which Pokémon / which card / to which Pokémon" every time, you drag: an attached Energy
+   (Energy Trans) or the damage badge (Damage Swap, one counter per drag) from one of your Pokémon onto another.
+   Each drop is one use of the power. A bar at the top of the board has Done. */
+const ARRANGE = {
+  'Energy Trans': { kind: 'energy', hint: 'drag an Energy from one of your Pokémon onto another' },
+  'Damage Swap': { kind: 'damage', hint: 'drag a damage counter (the red badge) from one of your Pokémon onto another' },
+};
+let arrangeState = null;
+function startArrange(pid, power) { arrangeState = { pid, power, ...ARRANGE[power] }; PT.render(); }
+function stopArrange() { arrangeState = null; PT.render(); }
+function arrangeMove(from, to, card) {
+  const st = arrangeState; if (!st) return;
+  const answers = st.kind === 'energy' ? { transFrom: from, transCard: card, transTo: to } : { swapFrom: from, swapTo: to };
+  return submit({ type: 'usePower', pokemon: st.pid, power: st.power }, [], { autoAnswer: (p) => (p.id in answers && p.options.some((o) => o.key === answers[p.id]) ? [answers[p.id]] : undefined) });
+}
+function setupArrange(main, doc, legal, me) {
+  const b = main.querySelector('.board.auto'); if (!b) return;
+  if (!arrangeState) return;
+  const g = doc.state; const mine = mons(g.p[me]); const still = legal.some((a) => a.type === 'usePower' && a.pokemon === arrangeState.pid && a.power === arrangeState.power);
+  if (!mine.some((m) => m.id === arrangeState.pid) || !still) { arrangeState = null; return; }
+  b.classList.add('arranging');
+  const bar = document.createElement('div'); bar.className = 'pickbar';
+  bar.innerHTML = `<span class="grow"><b>${esc(arrangeState.power)}</b><span class="small muted"> · ${esc(arrangeState.hint)}</span></span><button type="button" class="sm pri" data-arrange="done">Done</button>`;
+  b.appendChild(bar); bar.querySelector('[data-arrange="done"]').onclick = (e) => { e.stopPropagation(); stopArrange(); };
+  const ownIds = new Set(mine.map((m) => m.id));
+  const sources = arrangeState.kind === 'energy'
+    ? [...b.querySelectorAll('.attc[data-att]')].filter((el) => ownIds.has(el.dataset.owner) && (g.p[me].active && g.p[me].active.id === el.dataset.owner ? g.p[me].active : g.p[me].bench.find((m) => m.id === el.dataset.owner)).en.some((e) => e.id === el.dataset.att))
+    : [...b.querySelectorAll('.dmg[data-dmg-of]')].filter((el) => ownIds.has(el.dataset.dmgOf));
+  for (const el of sources) {
+    el.classList.add('arrange-src');
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const from = el.dataset.owner || el.dataset.dmgOf; const card = el.dataset.att || null;
+      const targets = [...b.querySelectorAll('.mon[data-mon]')].filter((t) => ownIds.has(t.dataset.mon) && t.dataset.mon !== from);
+      targets.forEach((t) => t.classList.add('drop-ok'));
+      const ghost = (el.querySelector('.cd') || el).cloneNode(true); ghost.classList.add('dragghost'); if (!card) ghost.textContent = '10';
+      ghost.style.left = e.clientX + 'px'; ghost.style.top = e.clientY + 'px'; document.body.appendChild(ghost);
+      let hover = null;
+      const move = (ev) => { ghost.style.left = ev.clientX + 'px'; ghost.style.top = ev.clientY + 'px'; const u = document.elementFromPoint(ev.clientX, ev.clientY); const hit = u && targets.find((t) => t.contains(u)); if (hover && hover !== hit) hover.classList.remove('drop-hover'); hover = hit || null; if (hover) hover.classList.add('drop-hover'); };
+      const up = (ev) => {
+        document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
+        ghost.remove(); targets.forEach((t) => t.classList.remove('drop-ok', 'drop-hover'));
+        const u = document.elementFromPoint(ev.clientX, ev.clientY); const hit = u && targets.find((t) => t.contains(u));
+        suppressClick = true; setTimeout(() => { suppressClick = false; }, 300);
+        if (hit) arrangeMove(from, hit.dataset.mon, card);
+      };
+      document.addEventListener('pointermove', move); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
+    });
+  }
+}
 function setupDrag(main, doc, legal, me) {
   const g = doc.state; const board = main.querySelector('.board.auto'); if (!board) return;
   const myActiveSlot = board.querySelector(`[data-active-slot="${me}"]`); const myBench = board.querySelector('.side.mine .benchz');
@@ -527,7 +582,7 @@ function monMenu(doc, legal, pid, anchor, me) {
   if (own && me) {
     const atks = (c.atk || []).map((a, i) => ({ a, i, chk: canAttack(g, me, i, PT.CARDS) }));
     if (f.p.active && f.p.active.id === pid && atks.length) { items.push({ sep: true }); for (const { a, i, chk } of atks) items.push({ label: `${a.n} ${a.d || ''} (${a.c.length} energy)${chk.ok ? '' : ' — ' + chk.why}`, disabled: !chk.ok, fn: () => chk.ok && submit({ type: 'attack', index: i }) }); }
-    const pws = legal.filter((a) => a.type === 'usePower' && a.pokemon === pid); for (const a of pws) items.push({ label: `Use ${a.power}`, fn: () => submit({ type: 'usePower', pokemon: pid, power: a.power }) });
+    const pws = legal.filter((a) => a.type === 'usePower' && a.pokemon === pid); for (const a of pws) items.push({ label: `Use ${a.power}${ARRANGE[a.power] ? ' (drag to move)' : ''}`, fn: () => (ARRANGE[a.power] ? startArrange(pid, a.power) : submit({ type: 'usePower', pokemon: pid, power: a.power })) });
     const rts = legal.filter((a) => a.type === 'retreat'); if (f.p.active && f.p.active.id === pid && rts.length) items.push({ label: 'Retreat…', fn: () => boardPick('Retreat: which Pokémon comes in?', rts.map((a) => a.target)).then((k) => { if (k && k !== 'none') submit({ type: 'retreat', target: k }); }) });
     const pks = legal.filter((a) => a.type === 'pickupEnergy' && a.target === pid); if (pks.length) items.push({ label: 'Pick up an Energy… (instead of attaching)', fn: () => PT.showMenu(pks.map((a) => ({ label: `Take ${nm(m.en.find((e) => e.id === a.card))} to hand`, fn: () => submit({ type: 'pickupEnergy', target: pid, card: a.card }) })), anchor, 'Pick up') });
     if (legal.some((a) => a.type === 'promote' && a.target === pid)) items.push({ label: 'Promote to Active', fn: () => submit({ type: 'promote', target: pid }) });
