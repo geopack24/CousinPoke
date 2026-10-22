@@ -7,6 +7,7 @@ import { R } from './engine/rules.js';
 import { automationReport } from './engine/cards/index.js';
 import { playAttack, playKO, playHeal, playSelfHit, playCoins, playWin, playTurnChime, playConfused, attachLayer, isEnabled as fxEnabled, setEnabled as setFxEnabled, soundOn, setSoundVolume } from './fx.js';
 import { playBattleIntro, playPokemonMusic, playEventMusic, warmMusic } from './music.js';
+import * as sfx from './sfx.js';
 import { BOT_UID, BOT_DECKS, botDeckCards, botAction, botAnswer, key as botKey } from './bot.js';
 
 let PT = null;           // bridge from index.html
@@ -62,9 +63,50 @@ export async function submit(action, answers = [], opts = {}) {
     doc.inflight = { action, prompt: r.prompt }; await PT.saveGame(doc); PT.render(); return;
   }
   const scene = captureScene(r.events, doc.state);
+  const flips = r.events.filter((e) => e.t === 'flip');
+  const clicked = flips.length > 0 && fxEnabled();
+  if (clicked) await clickCoins(flips);
   recordUndo(doc, action, r.events, seat);
   doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner;
-  publishFx(doc, r.events); PT.render(); playEvents(r.events, doc, scene); await PT.saveGame(doc);
+  publishFx(doc, r.events); PT.render(); playEvents(r.events, doc, scene, { coinsDone: clicked }); await PT.saveGame(doc);
+}
+
+/* ---------- click-to-flip coins ----------
+   Your own coin flips show a big coin you click to flip (one click per coin; "Flip the rest" for long runs).
+   The result is already decided by the move's random seed; clicking just reveals it. The board only shows the
+   outcome after the last coin lands. The other player's flips still animate on their own. */
+const FLIP_LABELS = { confusion: 'Confusion check', sleep: 'Asleep: wake-up check', burn: 'Burn check', 'Sand-attack': 'Sand-attack', 'Baby Rule': 'Baby Rule', 'confused retreat': 'Confused retreat' };
+function clickCoins(flips) {
+  return new Promise((resolve) => {
+    const wrap = document.createElement('div'); wrap.className = 'coinflip';
+    let i = 0, heads = 0; const results = [];
+    const render = () => {
+      const f = flips[i]; const label = f && f.label ? (FLIP_LABELS[f.label] || f.label) : 'Coin flip';
+      wrap.innerHTML = `<div class="cf-box"><div class="cf-title">${esc(label)}${flips.length > 1 ? ` · coin ${Math.min(i + 1, flips.length)} of ${flips.length}` : ''}</div>
+        <button type="button" class="cf-coin" aria-label="Flip the coin"><span class="cf-face">?</span></button>
+        <div class="cf-hint">Click the coin to flip</div>
+        <div class="cf-results">${results.map((h) => `<span class="${h ? 'h' : 't'}">${h ? 'H' : 'T'}</span>`).join('')}</div>
+        ${flips.length - i > 2 ? '<button type="button" class="sm cf-all">Flip the rest</button>' : ''}</div>`;
+      wrap.querySelector('.cf-coin').onclick = flipOne;
+      const all = wrap.querySelector('.cf-all'); if (all) all.onclick = (e) => { e.stopPropagation(); flipAll(); };
+    };
+    let busy = false;
+    const land = (h) => { results.push(h); if (h) heads++; i++; };
+    const finish = () => { const sum = wrap.querySelector('.cf-hint'); if (sum) sum.textContent = flips.length > 1 ? `${heads} heads, ${flips.length - heads} tails` : (results[0] ? 'Heads!' : 'Tails'); setTimeout(() => { wrap.remove(); resolve(); }, 900); };
+    const flipOne = () => {
+      if (busy || i >= flips.length) return; busy = true;
+      const h = !!flips[i].heads; const coin = wrap.querySelector('.cf-coin'); const face = coin.querySelector('.cf-face');
+      sfx.play('coin', 0, h); coin.classList.add('spin'); face.textContent = '';
+      setTimeout(() => {
+        coin.classList.remove('spin'); coin.classList.add(h ? 'heads' : 'tails'); face.textContent = h ? 'HEADS' : 'TAILS'; land(h);
+        const res = wrap.querySelector('.cf-results'); if (res) res.innerHTML = results.map((x) => `<span class="${x ? 'h' : 't'}">${x ? 'H' : 'T'}</span>`).join('');
+        busy = false;
+        if (i >= flips.length) finish(); else setTimeout(render, 650);
+      }, 700);
+    };
+    const flipAll = () => { if (busy) return; while (i < flips.length) land(!!flips[i].heads); sfx.play('coin', 0, results[results.length - 1]); const res = wrap.querySelector('.cf-results'); if (res) res.innerHTML = results.map((x) => `<span class="${x ? 'h' : 't'}">${x ? 'H' : 'T'}</span>`).join(''); const all = wrap.querySelector('.cf-all'); if (all) all.remove(); finish(); };
+    document.body.appendChild(wrap); render();
+  });
 }
 /** A move can be undone only if it revealed nothing: no flip, draw, search, prize, and it didn't hand the turn over. */
 function undoable(action, events) {
@@ -248,7 +290,7 @@ async function revealPlayed(items, doc) {
 }
 
 /** Animate one move's events. A Confused attacker goes: ??? swirl, its confusion coin, then the attack (heads) or the self-hit (tails). */
-async function playEvents(events, doc, scene) {
+async function playEvents(events, doc, scene, opts = {}) {
   const b = boardEl(); const ghosts = placeGhosts(scene);
   setTimeout(() => { for (const el of Object.values(ghosts)) if (el.isConnected) el.remove(); }, 8000); // safety net
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -271,11 +313,10 @@ async function playEvents(events, doc, scene) {
   if (confFlip) {
     // 1. the ??? around the Confused Pokémon  2. its coin  3. tails: the self-hit and nothing else
     if (b) await wait(playConfused(boardEl() || b, rect(atk.attacker)));
-    PT.toast(`Confusion: ${confFlip.heads ? 'Heads' : 'Tails'}`);
-    const cb = boardEl(); if (cb) await wait(Math.round(playCoins(cb, [confFlip.heads]) * 0.8));
+    if (!opts.coinsDone) { PT.toast(`Confusion: ${confFlip.heads ? 'Heads' : 'Tails'}`); const cb = boardEl(); if (cb) await wait(Math.round(playCoins(cb, [confFlip.heads]) * 0.8)); }
     if (!confFlip.heads) { landHits(); return; }
   }
-  if (flips.length) { PT.toast(flips.map((e) => (e.heads ? 'Heads' : 'Tails')).join(', ')); const fb = boardEl(); if (fb) await wait(Math.round(playCoins(fb, flips.map((e) => e.heads)) * 0.7)); }
+  if (flips.length && !opts.coinsDone) { PT.toast(flips.map((e) => (e.heads ? 'Heads' : 'Tails')).join(', ')); const fb = boardEl(); if (fb) await wait(Math.round(playCoins(fb, flips.map((e) => e.heads)) * 0.7)); }
   let impact = 0; const board = boardEl();
   if (atk && scene && board) { scene.fromEl = board.querySelector(`[data-mon="${atk.attacker}"]`); impact = playAttack(board, scene).impact; }
   else if (atk) { const el = board && board.querySelector(`[data-mon="${atk.attacker}"]`); if (el) { el.classList.add('lunge'); setTimeout(() => el.classList.remove('lunge'), 500); } }
