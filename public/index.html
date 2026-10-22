@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Poké Table</title>
+<title>Cousin Pokémon League</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Titan+One&family=Nunito+Sans:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap">
 <style>
 html{color-scheme:light}img{max-width:100%}[hidden]{display:none!important}
@@ -378,8 +378,12 @@ button.sec:hover:not(:disabled){filter:brightness(1.07)}
 
 /* lobby hero */
 .hero{position:relative;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);align-items:center;gap:12px;padding:22px 26px;margin-bottom:16px;border-radius:18px;overflow:hidden;color:#fff;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.14' stroke-width='3'%3E%3Ccircle cx='50' cy='50' r='46'/%3E%3Cpath d='M4 50h32m28 0h32'/%3E%3Ccircle cx='50' cy='50' r='14'/%3E%3Ccircle cx='50' cy='50' r='7'/%3E%3C/g%3E%3C/svg%3E") right -60px center/340px no-repeat,radial-gradient(circle at 78% 50%,rgba(255,203,5,.38),transparent 55%),radial-gradient(circle at 0% 0%,rgba(109,157,240,.5),transparent 60%),linear-gradient(135deg,#17346a,#2a5db0 48%,#7a1f3d);box-shadow:var(--shadow),inset 0 0 0 1px rgba(255,255,255,.12)}
-.hero .wordmark{font-size:clamp(38px,6vw,66px);line-height:1;color:#ffcb05;display:inline-block;transform:rotate(-2deg);text-shadow:-3px -3px 0 #2a5db0,3px -3px 0 #2a5db0,-3px 3px 0 #2a5db0,3px 3px 0 #2a5db0,0px -3px 0 #2a5db0,0px 3px 0 #2a5db0,-3px 0px 0 #2a5db0,3px 0px 0 #2a5db0,0 7px 0 #102a55,0 14px 26px rgba(0,0,0,.35)}
+.hero .wordmark{font-size:clamp(34px,5vw,60px);line-height:1;color:#ffcb05;display:inline-block;transform:rotate(-2deg);text-shadow:-3px -3px 0 #2a5db0,3px -3px 0 #2a5db0,-3px 3px 0 #2a5db0,3px 3px 0 #2a5db0,0px -3px 0 #2a5db0,0px 3px 0 #2a5db0,-3px 0px 0 #2a5db0,3px 0px 0 #2a5db0,0 7px 0 #102a55,0 14px 26px rgba(0,0,0,.35)}
 .hero p{margin:12px 0 0;font-size:16px;opacity:.92;max-width:36ch}
+.hero .wordmark small{display:block;font-size:.5em;letter-spacing:.08em;margin-bottom:2px}
+.hero .slogan{font-family:var(--display);font-size:clamp(17px,2.2vw,22px);font-style:italic;opacity:1;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.25)}
+#hdr .logo .lg-short{display:none}
+@media (max-width:480px){#hdr .logo .lg-full{display:none}#hdr .logo .lg-short{display:inline}}
 .hero .hstats{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .hero .hstats span{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:4px 12px;font-size:13px;font-weight:800}
 .hero .hstats span b{color:#ffcb05}
@@ -405,7 +409,7 @@ button.sec:hover:not(:disabled){filter:brightness(1.07)}
 </head>
 <body>
 <header id="hdr">
-  <a class="logo" href="#lobby" id="logo"><i></i>Poké Table</a>
+  <a class="logo" href="#lobby" id="logo" title="Cousin Pokémon League"><i></i><span class="lg-full">Cousin Pokémon League</span><span class="lg-short">CPL</span></a>
   <nav>
     <button data-nav="lobby" id="nav-lobby">Lobby</button>
     <button data-nav="builder" id="nav-builder">Deck builder</button>
@@ -641,7 +645,7 @@ function heroHTML(games){
   const live=games.filter(g=>g.status==='playing').length;const n=heroCards().length;const t=(Date.now()%5000)/1000;
   const fan=heroCards().map((id,i)=>{const k=i-(n-1)/2;return `<div class="fan" style="--dx0:${k*62}px;--dx:${k*62}px;--dy:${Math.abs(k)*10}px;--r:${k*9}deg;--d:${-(t+i*.6).toFixed(2)}s;z-index:${5-Math.abs(Math.round(k))}">${cardHTML(id,.5,'','click')}</div>`}).join('');
   const sparks=[[8,20,0],[42,12,1.1],[30,80,2.2],[88,18,.6],[70,86,1.7],[56,40,2.8]].map(([x,y,d])=>`<i class="spark" style="left:${x}%;top:${y}%;animation-delay:${d}s"></i>`).join('');
-  return `<section class="hero">${sparks}<div><h1 class="wordmark">Poké Table</h1><p>Base Set through Gym Challenge, with the cousins, from any device.</p>
+  return `<section class="hero">${sparks}<div><h1 class="wordmark"><small>Cousin</small>Pokémon League</h1><p class="slogan">There's only one right way to play</p>
     <div class="hstats"><span><b>${live}</b> ${live===1?'table':'tables'} in play</span><span><b>${S.decks.length}</b> ${S.decks.length===1?'deck':'decks'}</span>${S.name?`<span>Hi, ${esc(S.name)}</span>`:''}</div></div>
     <div class="hero-fan" aria-hidden="true">${fan}</div></section>`}
 function renderLobby(main){

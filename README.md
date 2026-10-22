@@ -1,4 +1,4 @@
-# Poké Table
+# Cousin Pokémon League
 
 A tabletop-style site for playing the original Pokémon TCG sets (Base Set, Jungle, Fossil, Team Rocket, Gym Heroes, Gym Challenge, and the Wizards Black Star Promos) with family on separate devices. Deck builder, house rules per table, shared game board with a move log.
 
