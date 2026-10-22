@@ -446,7 +446,7 @@ function runAction(ctx, a) {
       pullCard(g, c.id); ctx.log(`${ctx.name(seat)} played ${card.name}`); ctx.event({ t: 'trainer', card: c, seat });
       if (card.sub === 'Stadium') { const old = g.stadium; if (old) { P(g, old.owner).discard.push({ id: old.id, c: old.c }); ctx.log(`${nameOf(db, old.c)} leaves play`); } g.stadium = { id: c.id, c: c.c, owner: seat }; ctx.card = c; if (s.trainer) s.trainer(ctx); checkKOs(ctx); return; }
       { const st = stadiumScript(g); if (st.chaos && !ctx.flip('Chaos Gym')) { p.discard.push(c); ctx.log(`Chaos Gym: ${card.name} fizzles`); return; } if (st.removalTax && /Energy Removal/.test(card.name)) { const others = p.hand.filter((x) => x.id !== c.id); must(others.length >= 2, 'No Removal Gym: needs 2 other cards to discard'); const k = ctx.chooseCards('No Removal Gym: discard 2 cards', others, { min: 2, max: 2, id: 'noRemoval' }); for (const id of k) ctx.discardFromHand(seat, id); } }
-      ctx.card = c; const keep = s.trainer(ctx); if (!keep) p.discard.push(c); checkKOs(ctx); if (ctx.endTurnNow) { ctx.log('The turn ends immediately'); g.attacked = true; finishTurnIfClear(ctx); } return;
+      ctx.card = c; const keep = s.trainer(ctx); if (keep !== true) p.discard.push(c); checkKOs(ctx); if (ctx.endTurnNow) { ctx.log('The turn ends immediately'); g.attacked = true; finishTurnIfClear(ctx); } return;
     }
     case 'usePower': {
       must(powersActive(g, db), 'Pokémon Powers are switched off'); const f = findMon(g, a.pokemon); must(f && f.seat === seat, 'Not your Pokémon');

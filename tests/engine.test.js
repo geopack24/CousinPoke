@@ -565,3 +565,10 @@ test('house rule: any basic Energy counts as Lightning for Electroburn recoil to
   g = act(mk({ basicEnergyAnyType: false }), { type: 'attack', index: 1 });
   assert.equal(g.p.a.active.dmg, 0, 'with the rule off Grass is not Lightning');
 });
+
+test('played Trainers go to the discard pile (Bill used to vanish)', () => {
+  let g = setup({ a: { hand: [N['Bill']], active: N['Chansey'], deck: [N['Bill'], N['Bill'], N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  g = act(g, { type: 'playTrainer', card: g.p.a.hand[0].id });
+  assert.equal(g.p.a.discard.filter((c) => c.c === N['Bill']).length, 1, 'Bill is in the discard pile');
+  assert.equal(g.p.a.hand.length, 2);
+});
