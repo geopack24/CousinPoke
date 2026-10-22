@@ -232,7 +232,7 @@ textarea{width:100%;min-height:60px;resize:vertical}
 .side.mine .hand .cd:active,.dragghost{cursor:grabbing}
 .side.mine .benchz .mon{cursor:grab}
 .side.mine .benchz .mon{touch-action:none}
-.dragghost{position:fixed;z-index:1000;pointer-events:none;opacity:.92;transform:translate(-50%,-50%) scale(1.08);box-shadow:0 10px 24px rgba(0,0,0,.55)}
+.dragghost{position:fixed;left:0;top:0;z-index:1000;pointer-events:none;opacity:.92;will-change:transform;transform:translate(-50%,-50%) scale(1.08);box-shadow:0 10px 24px rgba(0,0,0,.55)}
 .dragging{opacity:.4}
 .drop-ok{outline:3px dashed var(--accent);outline-offset:3px;border-radius:10px}
 .drop-hover{outline:4px solid var(--accent);outline-offset:3px;box-shadow:0 0 0 6px rgba(255,203,5,.25);border-radius:10px}
@@ -283,9 +283,10 @@ textarea{width:100%;min-height:60px;resize:vertical}
 @keyframes flipin{0%{transform:rotateY(90deg) scale(.9);opacity:.2}60%{transform:rotateY(-12deg) scale(1.03);opacity:1}100%{transform:rotateY(0) scale(1)}}
 /* whose turn it is */
 .board .side{border-radius:12px;transition:box-shadow .3s,opacity .3s;padding:4px}
-.board .side.live{box-shadow:0 0 0 3px var(--accent),0 0 22px rgba(255,203,5,.45);animation:livepulse 2s ease-in-out infinite}
+.board .side.live{box-shadow:0 0 0 3px var(--accent),0 0 16px rgba(255,203,5,.35);position:relative}
+.board .side.live::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:0 0 30px rgba(255,203,5,.6);opacity:0;animation:livepulse 2s ease-in-out infinite}
 .board .side.idle{opacity:.82}
-@keyframes livepulse{0%,100%{box-shadow:0 0 0 3px var(--accent),0 0 16px rgba(255,203,5,.35)}50%{box-shadow:0 0 0 3px var(--accent),0 0 30px rgba(255,203,5,.7)}}
+@keyframes livepulse{0%,100%{opacity:0}50%{opacity:1}}
 .midbar.mine{background:rgba(255,203,5,.14);border-radius:8px}
 .midbar .turn.mine{color:var(--accent);font-size:22px;letter-spacing:.02em}
 .turnbanner{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:var(--display);font-size:clamp(34px,7vw,72px);color:var(--accent);text-shadow:0 4px 0 #7a4b00,0 10px 24px rgba(0,0,0,.6);pointer-events:none;z-index:46;animation:turnpop 1.6s ease-out forwards}
@@ -309,13 +310,12 @@ textarea{width:100%;min-height:60px;resize:vertical}
 :root{--glow-1:rgba(242,183,5,.20);--glow-2:rgba(42,93,176,.16);--glow-3:rgba(211,55,44,.10);--pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cg fill='none' stroke='%23000' stroke-opacity='.045' stroke-width='2'%3E%3Ccircle cx='30' cy='30' r='20'/%3E%3Cpath d='M10 30h13m14 0h13'/%3E%3Ccircle cx='30' cy='30' r='6'/%3E%3Ccircle cx='90' cy='90' r='20'/%3E%3Cpath d='M70 90h13m14 0h13'/%3E%3Ccircle cx='90' cy='90' r='6'/%3E%3C/g%3E%3C/svg%3E");--rainbow:linear-gradient(90deg,#d3372c,#f2b705 35%,#2a5db0 70%,#d3372c)}
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){--glow-1:rgba(242,183,5,.10);--glow-2:rgba(109,157,240,.16);--glow-3:rgba(229,87,76,.10);--pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.035' stroke-width='2'%3E%3Ccircle cx='30' cy='30' r='20'/%3E%3Cpath d='M10 30h13m14 0h13'/%3E%3Ccircle cx='30' cy='30' r='6'/%3E%3Ccircle cx='90' cy='90' r='20'/%3E%3Cpath d='M70 90h13m14 0h13'/%3E%3Ccircle cx='90' cy='90' r='6'/%3E%3C/g%3E%3C/svg%3E")} }
 :root[data-theme="dark"]{--glow-1:rgba(242,183,5,.10);--glow-2:rgba(109,157,240,.16);--glow-3:rgba(229,87,76,.10);--pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.035' stroke-width='2'%3E%3Ccircle cx='30' cy='30' r='20'/%3E%3Cpath d='M10 30h13m14 0h13'/%3E%3Ccircle cx='30' cy='30' r='6'/%3E%3Ccircle cx='90' cy='90' r='20'/%3E%3Cpath d='M70 90h13m14 0h13'/%3E%3Ccircle cx='90' cy='90' r='6'/%3E%3C/g%3E%3C/svg%3E")}
-body{background:radial-gradient(1100px 600px at 8% -10%,var(--glow-1),transparent 60%),radial-gradient(900px 520px at 105% 0%,var(--glow-2),transparent 60%),radial-gradient(900px 600px at 50% 115%,var(--glow-3),transparent 60%),var(--pattern),var(--bg);background-attachment:fixed}
+body{background:radial-gradient(1100px 600px at 8% -10%,var(--glow-1),transparent 60%),radial-gradient(900px 520px at 105% 0%,var(--glow-2),transparent 60%),radial-gradient(900px 600px at 50% 115%,var(--glow-3),transparent 60%),var(--pattern),var(--bg)}
 ::selection{background:var(--accent);color:#1f1b16}
 *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 55%,transparent) transparent}
 
 #hdr{background:color-mix(in srgb,var(--panel) 80%,transparent);-webkit-backdrop-filter:saturate(1.4) blur(10px);backdrop-filter:saturate(1.4) blur(10px);border-bottom:none}
-#hdr::after{content:"";position:absolute;left:0;right:0;bottom:-3px;height:3px;background:var(--rainbow);background-size:200% 100%;animation:stripe 14s linear infinite}
-@keyframes stripe{to{background-position:-200% 0}}
+#hdr::after{content:"";position:absolute;left:0;right:0;bottom:-3px;height:3px;background:var(--rainbow)}
 #hdr .logo{color:#ffcb05;letter-spacing:.02em;white-space:nowrap;text-shadow:-2px -2px 0 #2a5db0,2px -2px 0 #2a5db0,-2px 2px 0 #2a5db0,2px 2px 0 #2a5db0,0px -2px 0 #2a5db0,0px 2px 0 #2a5db0,-2px 0px 0 #2a5db0,2px 0px 0 #2a5db0,0 4px 0 #1b3f7a}
 #hdr .logo i{box-shadow:0 0 0 2px rgba(255,255,255,.15),0 0 12px rgba(242,183,5,.45);transition:transform .2s}
 #hdr .logo:hover i{animation:ballspin .8s cubic-bezier(.3,1.4,.5,1)}
@@ -351,8 +351,7 @@ button.sec:hover:not(:disabled){filter:brightness(1.07)}
 .slot{background:rgba(0,0,0,.12);box-shadow:inset 0 2px 8px rgba(0,0,0,.25)}
 .midbar{background:linear-gradient(180deg,rgba(0,0,0,.22),rgba(0,0,0,.12));border:1px solid var(--felt-line);border-radius:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
 .midbar.mine{background:linear-gradient(180deg,rgba(255,203,5,.22),rgba(255,203,5,.08))}
-.midbar .turn.mine{background:linear-gradient(90deg,#ffcb05,#fff3b0 25%,#ffcb05 50%,#fff3b0 75%,#ffcb05);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 0 #7a4b00);animation:shimmer 3s linear infinite}
-@keyframes shimmer{to{background-position:-200% 0}}
+.midbar .turn.mine{background:linear-gradient(90deg,#ffcb05,#fff3b0 25%,#ffcb05 50%,#fff3b0 75%,#ffcb05);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 0 #7a4b00)}
 .pile .cd.back{box-shadow:1px 1px 0 #0e2f66,2px 2px 0 #163f85,3px 3px 0 #0e2f66,4px 4px 0 #163f85,5px 6px 12px rgba(0,0,0,.45)}
 .mon .cdwrap{z-index:1}
 .mon.active::before{content:"";position:absolute;left:50%;bottom:4px;width:170%;height:46px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(ellipse at center,rgba(255,236,150,.38),rgba(255,203,5,.14) 45%,transparent 70%);pointer-events:none;z-index:0}
@@ -362,12 +361,13 @@ button.sec:hover:not(:disabled){filter:brightness(1.07)}
 
 /* holo foil: holo rares shimmer on the table and when you hover them anywhere */
 .cd.holo::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(115deg,transparent 25%,rgba(255,60,170,.55) 35%,rgba(60,240,255,.55) 43%,rgba(255,240,80,.55) 51%,transparent 61%);background-size:300% 300%;mix-blend-mode:color-dodge;opacity:0;transition:opacity .3s}
-.board .cd.holo::before{opacity:.32;animation:foil 7s linear infinite}
+.board .cd.holo::before{opacity:.3;background-position:30% 30%}
 .cd.holo:hover::before{opacity:.6;animation:foil 2.4s linear infinite}
 @keyframes foil{0%{background-position:100% 100%}100%{background-position:0% 0%}}
 @media (hover:hover){
   .side.mine .hand .cd{transition:transform .16s cubic-bezier(.2,1.4,.4,1),box-shadow .16s}
-  .side.mine .hand .cd:hover{transform:translateY(-12px) scale(1.07);box-shadow:0 14px 24px rgba(0,0,0,.5);z-index:3}
+  .side.mine .hand .cd:hover:not(.dragging){transform:translateY(-12px) scale(1.07);box-shadow:0 14px 24px rgba(0,0,0,.5);z-index:3}
+  .side.mine .hand .cd.dragging{transition:none}
   .cdgrid .tile .cd{transition:transform .16s cubic-bezier(.2,1.4,.4,1),box-shadow .16s}
   .cdgrid .tile .cd:hover{transform:translateY(-5px) rotate(-1.5deg);box-shadow:0 12px 22px rgba(0,0,0,.4)}
 }

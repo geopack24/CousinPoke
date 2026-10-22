@@ -549,9 +549,9 @@ function setupArrange(main, doc, legal, me) {
       const targets = [...b.querySelectorAll('.mon[data-mon]')].filter((t) => ownIds.has(t.dataset.mon) && t.dataset.mon !== from);
       targets.forEach((t) => t.classList.add('drop-ok'));
       const ghost = (el.querySelector('.cd') || el).cloneNode(true); ghost.classList.add('dragghost'); if (!card) ghost.textContent = '10';
-      ghost.style.left = e.clientX + 'px'; ghost.style.top = e.clientY + 'px'; document.body.appendChild(ghost);
+      moveGhost(ghost, e.clientX, e.clientY); document.body.appendChild(ghost);
       let hover = null;
-      const move = (ev) => { ghost.style.left = ev.clientX + 'px'; ghost.style.top = ev.clientY + 'px'; const u = document.elementFromPoint(ev.clientX, ev.clientY); const hit = u && targets.find((t) => t.contains(u)); if (hover && hover !== hit) hover.classList.remove('drop-hover'); hover = hit || null; if (hover) hover.classList.add('drop-hover'); };
+      const move = (ev) => { moveGhost(ghost, ev.clientX, ev.clientY); const u = document.elementFromPoint(ev.clientX, ev.clientY); const hit = u && targets.find((t) => t.contains(u)); if (hover && hover !== hit) hover.classList.remove('drop-hover'); hover = hit || null; if (hover) hover.classList.add('drop-hover'); };
       const up = (ev) => {
         document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
         ghost.remove(); targets.forEach((t) => t.classList.remove('drop-ok', 'drop-hover'));
@@ -563,6 +563,8 @@ function setupArrange(main, doc, legal, me) {
     });
   }
 }
+/** Drag ghosts move by transform, so following the pointer doesn't repaint the table under them. */
+function moveGhost(ghost, x, y) { ghost.style.transform = `translate3d(${x}px,${y}px,0) translate(-50%,-50%) scale(1.08)`; }
 function setupDrag(main, doc, legal, me) {
   const g = doc.state; const board = main.querySelector('.board.auto'); if (!board) return;
   const myActiveSlot = board.querySelector(`[data-active-slot="${me}"]`); const myBench = board.querySelector('.side.mine .benchz');
@@ -602,7 +604,7 @@ function setupDrag(main, doc, legal, me) {
           ghost = cd.cloneNode(true); ghost.className = 'cd dragghost'; ghost.style.cssText += `;--s:${getComputedStyle(cd).getPropertyValue('--s') || .4}`; document.body.appendChild(ghost);
           for (const t of targets) t.el.classList.add('drop-ok'); el.classList.add('dragging');
         }
-        ghost.style.left = ev.clientX + 'px'; ghost.style.top = ev.clientY + 'px';
+        moveGhost(ghost, ev.clientX, ev.clientY);
         const under = document.elementFromPoint(ev.clientX, ev.clientY); const hit = under && targets.find((t) => t.el === under || t.el.contains(under));
         if (hover && hover !== (hit && hit.el)) hover.classList.remove('drop-hover'); hover = hit ? hit.el : null; if (hover) hover.classList.add('drop-hover');
         ev.preventDefault();
