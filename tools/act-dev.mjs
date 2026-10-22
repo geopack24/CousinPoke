@@ -16,7 +16,7 @@ if (r.error) { console.log('error:', r.error); process.exit(1); }
 if (r.prompt) { console.log('prompt:', r.prompt.title, r.prompt.options.map((o) => o.key)); process.exit(1); }
 const { id, version, ...data } = doc;
 data.prev = null; data.state = r.state; data.inflight = null; data.status = r.state.status; if (r.state.winner) data.winner = r.state.winner;
-data.fx = { id: Date.now().toString(36), events: r.events.filter((e) => ['attack', 'damage', 'heal', 'ko', 'flip', 'status', 'confused'].includes(e.t)) };
+data.fx = { id: Date.now().toString(36), events: r.events.filter((e) => ['attack', 'damage', 'heal', 'ko', 'flip', 'status', 'confused', 'trainer', 'play', 'evolve', 'attach', 'draw'].includes(e.t)) };
 data.updatedAt = Date.now(); data.v = (data.v || 0) + 1;
 const res = await fetch(`${API}/games/${gid}`, { method: 'PUT', headers: H, body: JSON.stringify({ data, ifVersion: version }) }).then((x) => x.json());
 console.log('events:', r.events.map((e) => e.t + (e.amount ? ':' + e.amount : '')).join(' '), '| saved', JSON.stringify(res));

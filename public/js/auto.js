@@ -150,7 +150,7 @@ function promptModal(prompt) {
 }
 
 /* ---------- events -> animations ---------- */
-const FX_EVENTS = ['attack', 'damage', 'heal', 'ko', 'flip', 'status', 'draw', 'confused'];
+const FX_EVENTS = ['attack', 'damage', 'heal', 'ko', 'flip', 'status', 'draw', 'confused', 'trainer', 'play', 'evolve', 'attach'];
 /** Store the interesting events on the doc so the other player's screen animates them too. */
 function publishFx(doc, events) {
   const ev = events.filter((e) => FX_EVENTS.includes(e.t)); if (!ev.length) { return; }
@@ -212,6 +212,41 @@ function placeGhosts(scene) {
   }
   return out;
 }
+/* ---------- played cards ----------
+   Every card that's played (Trainer, Stadium, Basic to the bench, evolution, attached Energy) is shown big in the
+   middle of the screen for a moment, then flies to where it went. The opponent's plays hold a bit longer. */
+function playedCards(events, doc) {
+  const g = doc.state; const items = [];
+  for (const e of events) {
+    let it = null;
+    if (e.t === 'trainer' && e.card) it = { cid: e.card.c, seat: e.seat, dest: () => (g.stadium && g.stadium.id === e.card.id ? document.querySelector('.board.auto .midbar') : document.querySelector(`.board.auto [data-pile="discard"][data-seat="${e.seat}"]`)) };
+    else if (e.t === 'attach' && e.card) { const f = findMon(g, e.target); it = { cid: e.card.c, seat: f ? f.seat : null, key: `a:${e.card.c}:${e.target}`, dest: () => document.querySelector(`.board.auto [data-mon="${e.target}"]`) }; }
+    else if ((e.t === 'evolve' || e.t === 'play') && e.id) { const f = findMon(g, e.id); if (f) it = { cid: f.m.c, seat: f.seat, dest: () => document.querySelector(`.board.auto [data-mon="${e.id}"]`) }; }
+    if (!it) continue;
+    const last = items[items.length - 1];
+    if (it.key && last && last.key === it.key) last.n++; else items.push({ ...it, n: 1 });
+  }
+  return items.slice(0, 6);
+}
+async function revealPlayed(items, doc) {
+  if (!items.length || !fxEnabled()) return;
+  const me = mySeat(doc); const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const vw = window.innerWidth, vh = window.innerHeight; const sc = Math.max(0.42, Math.min(0.9, (Math.min(vw, vh) * 0.62) / 330));
+  for (const it of items) {
+    const own = it.seat && it.seat === me; const hold = own ? 380 : 850;
+    const el = document.createElement('div'); el.className = 'playcard'; el.innerHTML = PT.cardHTML(it.cid, sc) + (it.n > 1 ? `<span class="pc-n">×${it.n}</span>` : '');
+    const w = 240 * sc, h = 330 * sc; const fromY = own ? vh + 20 : -h - 20;
+    el.style.cssText = `left:${vw / 2 - w / 2}px;top:${vh / 2 - h / 2}px;width:${w}px;height:${h}px;transform:translateY(${fromY - (vh / 2 - h / 2)}px) scale(.7);opacity:0`;
+    document.body.appendChild(el);
+    await wait(20); el.style.transform = 'translateY(0) scale(1)'; el.style.opacity = '1';
+    await wait(320 + hold);
+    const d = it.dest && it.dest(); const r = d && d.getBoundingClientRect();
+    if (r && r.width) { const dx = r.left + r.width / 2 - vw / 2, dy = r.top + r.height / 2 - vh / 2; el.style.transform = `translate(${dx}px,${dy}px) scale(.25)`; }
+    el.style.opacity = '0';
+    await wait(380); el.remove();
+  }
+}
+
 /** Animate one move's events. A Confused attacker goes: ??? swirl, its confusion coin, then the attack (heads) or the self-hit (tails). */
 async function playEvents(events, doc, scene) {
   const b = boardEl(); const ghosts = placeGhosts(scene);
@@ -232,6 +267,7 @@ async function playEvents(events, doc, scene) {
     if (events.some((e) => e.t === 'status' && e.code === 'CNF')) playEventMusic('confusion');
   };
   await wait(30);
+  await revealPlayed(playedCards(events, doc), doc);
   if (confFlip) {
     // 1. the ??? around the Confused Pokémon  2. its coin  3. tails: the self-hit and nothing else
     if (b) await wait(playConfused(boardEl() || b, rect(atk.attacker)));

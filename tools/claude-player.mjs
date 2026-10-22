@@ -76,7 +76,7 @@ async function main() {
     }
     if (existsSync(seedFile)) unlinkSync(seedFile);
     doc.prev = null; doc.undo = []; doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner;
-    doc.fx = { id: Date.now().toString(36), events: r.events.filter((e) => ['attack', 'damage', 'heal', 'ko', 'flip', 'status', 'confused'].includes(e.t)) };
+    doc.fx = { id: Date.now().toString(36), events: r.events.filter((e) => ['attack', 'damage', 'heal', 'ko', 'flip', 'status', 'confused', 'trainer', 'play', 'evolve', 'attach', 'draw'].includes(e.t)) };
     console.log('events:', r.events.map((e) => e.t + (e.amount ? ':' + e.amount : '') + (e.heads != null ? ':' + (e.heads ? 'H' : 'T') : '')).join(' '));
     await save(doc); return view(doc);
   }
