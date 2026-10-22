@@ -766,7 +766,7 @@ function renderSetup(main,g){
     <div class="row"><h2 class="grow">${esc(g.name)}</h2><span class="muted small">host ${esc(nameOf(g.host))}</span></div>
     <div class="grid2">${seatHTML('a')}${seatHTML('b')}</div>
     <div class="panel"><div class="row"><h3 class="grow">Rules</h3>${host?`<button class="sm" type="button" id="editrules">Edit</button>`:''}</div><p class="small">${esc(rulesSummary(g.rules))}</p>${g.rules.notes?`<div class="notice info small" style="white-space:pre-wrap">${esc(g.rules.notes)}</div>`:''}</div>
-    <div class="row">${host?`<button class="pri" type="button" id="start" ${ready?'':'disabled'}>Start game</button><span class="small muted">${ready?'Shuffles both decks, deals hands and prizes, flips for who goes first.':both?'Waiting for both decks.':'Waiting for a second player.'}</span>`:`<span class="muted small">${ready?'Waiting for the host to start.':'Waiting for everyone to pick a deck.'}</span>`}<span class="grow"></span><button type="button" id="back">Back to lobby</button></div>
+    <div class="row">${host||my?`<button class="pri" type="button" id="start" ${ready?'':'disabled'}>Start game</button><span class="small muted">${ready?'Shuffles both decks, deals hands and prizes, flips for who goes first.':both?'Waiting for both decks.':'Waiting for a second player.'}</span>`:`<span class="muted small">${ready?'Waiting for the host to start.':'Waiting for everyone to pick a deck.'}</span>`}<span class="grow"></span><button type="button" id="back">Back to lobby</button></div>
   </div>`;
   main.onclick=async e=>{const b=e.target.closest('button');if(!b)return;
     if(b.id==='back')go('lobby');
