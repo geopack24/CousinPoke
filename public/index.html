@@ -305,6 +305,101 @@ textarea{width:100%;min-height:60px;resize:vertical}
 .float-dmg.heal{text-shadow:0 2px 6px rgba(0,0,0,.7),0 0 2px var(--ok)}
 @keyframes floatup{0%{opacity:0;transform:translate(-50%,10px)}20%{opacity:1}100%{opacity:0;transform:translate(-50%,-40px)}}
 .mon .sts span.FX{background:#1f2a44;color:#cfe3ff}
+/* ---------- look & feel: backdrop, glossy controls, felt mat, holo foil, lobby hero ---------- */
+:root{--glow-1:rgba(242,183,5,.20);--glow-2:rgba(42,93,176,.16);--glow-3:rgba(211,55,44,.10);--pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cg fill='none' stroke='%23000' stroke-opacity='.045' stroke-width='2'%3E%3Ccircle cx='30' cy='30' r='20'/%3E%3Cpath d='M10 30h13m14 0h13'/%3E%3Ccircle cx='30' cy='30' r='6'/%3E%3Ccircle cx='90' cy='90' r='20'/%3E%3Cpath d='M70 90h13m14 0h13'/%3E%3Ccircle cx='90' cy='90' r='6'/%3E%3C/g%3E%3C/svg%3E");--rainbow:linear-gradient(90deg,#d3372c,#f2b705 35%,#2a5db0 70%,#d3372c)}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){--glow-1:rgba(242,183,5,.10);--glow-2:rgba(109,157,240,.16);--glow-3:rgba(229,87,76,.10);--pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.035' stroke-width='2'%3E%3Ccircle cx='30' cy='30' r='20'/%3E%3Cpath d='M10 30h13m14 0h13'/%3E%3Ccircle cx='30' cy='30' r='6'/%3E%3Ccircle cx='90' cy='90' r='20'/%3E%3Cpath d='M70 90h13m14 0h13'/%3E%3Ccircle cx='90' cy='90' r='6'/%3E%3C/g%3E%3C/svg%3E")} }
+:root[data-theme="dark"]{--glow-1:rgba(242,183,5,.10);--glow-2:rgba(109,157,240,.16);--glow-3:rgba(229,87,76,.10);--pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.035' stroke-width='2'%3E%3Ccircle cx='30' cy='30' r='20'/%3E%3Cpath d='M10 30h13m14 0h13'/%3E%3Ccircle cx='30' cy='30' r='6'/%3E%3Ccircle cx='90' cy='90' r='20'/%3E%3Cpath d='M70 90h13m14 0h13'/%3E%3Ccircle cx='90' cy='90' r='6'/%3E%3C/g%3E%3C/svg%3E")}
+body{background:radial-gradient(1100px 600px at 8% -10%,var(--glow-1),transparent 60%),radial-gradient(900px 520px at 105% 0%,var(--glow-2),transparent 60%),radial-gradient(900px 600px at 50% 115%,var(--glow-3),transparent 60%),var(--pattern),var(--bg);background-attachment:fixed}
+::selection{background:var(--accent);color:#1f1b16}
+*{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 55%,transparent) transparent}
+
+#hdr{background:color-mix(in srgb,var(--panel) 80%,transparent);-webkit-backdrop-filter:saturate(1.4) blur(10px);backdrop-filter:saturate(1.4) blur(10px);border-bottom:none}
+#hdr::after{content:"";position:absolute;left:0;right:0;bottom:-3px;height:3px;background:var(--rainbow);background-size:200% 100%;animation:stripe 14s linear infinite}
+@keyframes stripe{to{background-position:-200% 0}}
+#hdr .logo{color:#ffcb05;letter-spacing:.02em;white-space:nowrap;text-shadow:-2px -2px 0 #2a5db0,2px -2px 0 #2a5db0,-2px 2px 0 #2a5db0,2px 2px 0 #2a5db0,0px -2px 0 #2a5db0,0px 2px 0 #2a5db0,-2px 0px 0 #2a5db0,2px 0px 0 #2a5db0,0 4px 0 #1b3f7a}
+#hdr .logo i{box-shadow:0 0 0 2px rgba(255,255,255,.15),0 0 12px rgba(242,183,5,.45);transition:transform .2s}
+#hdr .logo:hover i{animation:ballspin .8s cubic-bezier(.3,1.4,.5,1)}
+@keyframes ballspin{0%{transform:rotate(0)}70%{transform:rotate(380deg) scale(1.15)}100%{transform:rotate(360deg)}}
+#hdr nav button{border-radius:999px;transition:background-color .15s,color .15s}
+#hdr nav button:hover{color:var(--fg)}
+#hdr nav button.on{background:var(--fg);color:var(--bg)}
+
+button{transition:transform .08s,box-shadow .15s,background-color .15s,border-color .15s,filter .15s}
+button:active:not(:disabled){transform:translateY(1px) scale(.98)}
+button.pri,.board button.pri{background:linear-gradient(180deg,#ffdc5e,#f2b705 55%,#d99c00);border-color:#b98500;color:#1f1b16;box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 2px 0 #9c7000,0 4px 12px rgba(242,183,5,.3);text-shadow:0 1px 0 rgba(255,255,255,.35)}
+button.pri:hover:not(:disabled),.board button.pri:hover:not(:disabled){filter:brightness(1.06);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 2px 0 #9c7000,0 6px 18px rgba(242,183,5,.5)}
+button.sec{background:linear-gradient(180deg,color-mix(in srgb,var(--accent-2) 78%,#fff),var(--accent-2));box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 2px 0 color-mix(in srgb,var(--accent-2) 65%,#000),0 4px 12px color-mix(in srgb,var(--accent-2) 30%,transparent)}
+button.sec:hover:not(:disabled){filter:brightness(1.07)}
+
+.panel{background:var(--rainbow) top/100% 3px no-repeat,linear-gradient(180deg,color-mix(in srgb,var(--panel) 100%,#fff 6%),var(--panel));box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.05)}
+.panel h2{display:flex;align-items:center;gap:8px}
+.item{transition:transform .15s,box-shadow .15s,border-color .15s}
+.item:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:color-mix(in srgb,var(--accent) 60%,var(--line))}
+.toast{background:linear-gradient(180deg,#2a3550,#1b2338);color:#fff;border:1px solid rgba(255,255,255,.14);box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.toast:not([hidden]){animation:toastin .32s cubic-bezier(.2,1.5,.4,1)}
+@keyframes toastin{0%{transform:translate(-50%,20px) scale(.9);opacity:0}100%{transform:translate(-50%,0) scale(1);opacity:1}}
+#modal-bg{-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+#modal-bg:not([hidden]) #modal{animation:modalin .26s cubic-bezier(.2,1.3,.4,1)}
+#modal{background:var(--rainbow) top/100% 4px no-repeat,var(--panel);border:1px solid var(--line)}
+@keyframes modalin{0%{transform:translateY(14px) scale(.96);opacity:0}100%{transform:none;opacity:1}}
+#menu{animation:menuin .14s ease-out;transform-origin:top left}
+@keyframes menuin{0%{transform:scale(.95);opacity:0}100%{transform:none;opacity:1}}
+
+/* the play mat: lit center, dark edges, felt grain, a faint Poké Ball, stitched border */
+.board{background:radial-gradient(ellipse 70% 55% at 50% 50%,rgba(255,255,255,.10),transparent 70%),radial-gradient(ellipse 90% 45% at 50% 0%,rgba(0,0,0,.30),transparent 70%),radial-gradient(ellipse 90% 45% at 50% 100%,rgba(0,0,0,.30),transparent 70%),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.07' stroke-width='3'%3E%3Ccircle cx='50' cy='50' r='46'/%3E%3Cpath d='M4 50h32m28 0h32'/%3E%3Ccircle cx='50' cy='50' r='14'/%3E%3Ccircle cx='50' cy='50' r='7'/%3E%3C/g%3E%3C/svg%3E") center/min(70%,460px) no-repeat,url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),linear-gradient(180deg,var(--felt-2),var(--felt) 50%,var(--felt-2));box-shadow:inset 0 0 0 2px var(--felt-line),inset 0 0 0 7px rgba(0,0,0,.14),inset 0 0 0 8px rgba(255,255,255,.07),inset 0 0 90px rgba(0,0,0,.35),var(--shadow)}
+.board .zlbl{text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.slot{background:rgba(0,0,0,.12);box-shadow:inset 0 2px 8px rgba(0,0,0,.25)}
+.midbar{background:linear-gradient(180deg,rgba(0,0,0,.22),rgba(0,0,0,.12));border:1px solid var(--felt-line);border-radius:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.midbar.mine{background:linear-gradient(180deg,rgba(255,203,5,.22),rgba(255,203,5,.08))}
+.midbar .turn.mine{background:linear-gradient(90deg,#ffcb05,#fff3b0 25%,#ffcb05 50%,#fff3b0 75%,#ffcb05);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 0 #7a4b00);animation:shimmer 3s linear infinite}
+@keyframes shimmer{to{background-position:-200% 0}}
+.pile .cd.back{box-shadow:1px 1px 0 #0e2f66,2px 2px 0 #163f85,3px 3px 0 #0e2f66,4px 4px 0 #163f85,5px 6px 12px rgba(0,0,0,.45)}
+.mon .cdwrap{z-index:1}
+.mon.active::before{content:"";position:absolute;left:50%;bottom:4px;width:170%;height:46px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(ellipse at center,rgba(255,236,150,.38),rgba(255,203,5,.14) 45%,transparent 70%);pointer-events:none;z-index:0}
+.mon.active .poke .cd{box-shadow:0 0 0 2px rgba(255,255,255,.22),0 10px 22px rgba(0,0,0,.45)}
+.mon .dmg{background:radial-gradient(circle at 35% 30%,#ff8a7e,#d3372c 60%,#9e1f16)}
+.mon .hp[style]::after{content:"";display:block;height:3px;margin:1px 0 1px;border-radius:2px;background:linear-gradient(90deg,var(--hpc) calc(var(--hpf) * 100%),rgba(255,255,255,.22) 0)}
+
+/* holo foil: holo rares shimmer on the table and when you hover them anywhere */
+.cd.holo::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(115deg,transparent 25%,rgba(255,60,170,.55) 35%,rgba(60,240,255,.55) 43%,rgba(255,240,80,.55) 51%,transparent 61%);background-size:300% 300%;mix-blend-mode:color-dodge;opacity:0;transition:opacity .3s}
+.board .cd.holo::before{opacity:.32;animation:foil 7s linear infinite}
+.cd.holo:hover::before{opacity:.6;animation:foil 2.4s linear infinite}
+@keyframes foil{0%{background-position:100% 100%}100%{background-position:0% 0%}}
+@media (hover:hover){
+  .side.mine .hand .cd{transition:transform .16s cubic-bezier(.2,1.4,.4,1),box-shadow .16s}
+  .side.mine .hand .cd:hover{transform:translateY(-12px) scale(1.07);box-shadow:0 14px 24px rgba(0,0,0,.5);z-index:3}
+  .cdgrid .tile .cd{transition:transform .16s cubic-bezier(.2,1.4,.4,1),box-shadow .16s}
+  .cdgrid .tile .cd:hover{transform:translateY(-5px) rotate(-1.5deg);box-shadow:0 12px 22px rgba(0,0,0,.4)}
+}
+/* the big hover preview tilts toward the pointer with a moving glare */
+#hover .cd{transform:perspective(900px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transition:transform .12s ease-out;box-shadow:0 14px 40px rgba(0,0,0,.55)}
+#hover .cd::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:radial-gradient(circle at var(--mx,50%) var(--my,30%),rgba(255,255,255,.45),transparent 48%);mix-blend-mode:overlay}
+#hover .cd.holo::before{opacity:.65;animation:none;background-position:var(--mx,50%) var(--my,50%)}
+
+/* lobby hero */
+.hero{position:relative;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);align-items:center;gap:12px;padding:22px 26px;margin-bottom:16px;border-radius:18px;overflow:hidden;color:#fff;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.14' stroke-width='3'%3E%3Ccircle cx='50' cy='50' r='46'/%3E%3Cpath d='M4 50h32m28 0h32'/%3E%3Ccircle cx='50' cy='50' r='14'/%3E%3Ccircle cx='50' cy='50' r='7'/%3E%3C/g%3E%3C/svg%3E") right -60px center/340px no-repeat,radial-gradient(circle at 78% 50%,rgba(255,203,5,.38),transparent 55%),radial-gradient(circle at 0% 0%,rgba(109,157,240,.5),transparent 60%),linear-gradient(135deg,#17346a,#2a5db0 48%,#7a1f3d);box-shadow:var(--shadow),inset 0 0 0 1px rgba(255,255,255,.12)}
+.hero .wordmark{font-size:clamp(38px,6vw,66px);line-height:1;color:#ffcb05;display:inline-block;transform:rotate(-2deg);text-shadow:-3px -3px 0 #2a5db0,3px -3px 0 #2a5db0,-3px 3px 0 #2a5db0,3px 3px 0 #2a5db0,0px -3px 0 #2a5db0,0px 3px 0 #2a5db0,-3px 0px 0 #2a5db0,3px 0px 0 #2a5db0,0 7px 0 #102a55,0 14px 26px rgba(0,0,0,.35)}
+.hero p{margin:12px 0 0;font-size:16px;opacity:.92;max-width:36ch}
+.hero .hstats{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.hero .hstats span{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:4px 12px;font-size:13px;font-weight:800}
+.hero .hstats span b{color:#ffcb05}
+.hero-fan{position:relative;height:210px}
+.hero-fan .fan{position:absolute;left:50%;top:50%;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) rotate(var(--r));transition:transform .25s cubic-bezier(.2,1.4,.4,1)}
+.hero-fan .fan .cd{animation:bob 5s ease-in-out infinite;animation-delay:var(--d);box-shadow:0 10px 24px rgba(0,0,0,.45)}
+.hero-fan .fan:hover{z-index:6;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy) - 14px)) rotate(0) scale(1.14)}
+.hero-fan .fan:hover .cd{animation-play-state:paused}
+.hero-fan .fan .cd.holo::before{opacity:.4;animation:foil 5s linear infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.hero .spark{position:absolute;width:6px;height:6px;border-radius:50%;background:#fff;box-shadow:0 0 10px 3px rgba(255,240,170,.8);opacity:0;animation:twinkle 3.2s ease-in-out infinite;pointer-events:none}
+@keyframes twinkle{0%,100%{opacity:0;transform:scale(.4)}50%{opacity:.9;transform:scale(1)}}
+@media (max-width:760px){
+  .hero{grid-template-columns:1fr;padding:18px 16px 8px;text-align:center}
+  .hero p{margin-inline:auto}
+  .hero .hstats{justify-content:center}
+  .hero-fan{height:150px}
+  .hero-fan .fan{--dx:calc(var(--dx0) * .62)!important}
+  .hero-fan .fan .cd{--s:.34!important}
+}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -350,7 +445,7 @@ async function loadData(){
 }
 const C=id=>CARDS[id]||{name:'Unknown card',st:'',sub:'',set:'base1',i:0};
 function cardStyle(cid){const c=C(cid);const s=SETIDX[c.set]||{cols:12,rows:1};return `background-image:url(${c.set}.webp);--x:${c.i%s.cols};--y:${Math.floor(c.i/s.cols)};--rows1:${Math.max(1,s.rows-1)}`}
-function cardHTML(cid,scale,attrs='',cls=''){return `<div class="cd ${cls}" style="--s:${scale};${cardStyle(cid)}" data-cid="${esc(cid)}" ${attrs} role="img" aria-label="${esc(C(cid).name)}"></div>`}
+function cardHTML(cid,scale,attrs='',cls=''){return `<div class="cd ${cls}${/Holo/.test(C(cid).rar||'')?' holo':''}" style="--s:${scale};${cardStyle(cid)}" data-cid="${esc(cid)}" ${attrs} role="img" aria-label="${esc(C(cid).name)}"></div>`}
 function backHTML(scale,attrs=''){return `<div class="cd back" style="--s:${scale}" ${attrs}></div>`}
 function energyType(c){if(c.st!=='Energy')return null;if(c.types&&c.types[0])return c.types[0];const t=TYPES.find(t=>c.name.startsWith(t));if(t)return t;if(/Colorless/.test(c.name))return 'Colorless';return 'Colorless'}
 function isBasicLike(c){return (c.st==='Pokémon'&&c.sub==='Basic')||(c.st==='Trainer'&&/as if it were a Basic/i.test(c.txt||''))}
@@ -393,11 +488,13 @@ function viewCard(cid){
   showModal(c.name,`<div class="detail">${cardHTML(cid,1.25)}<div><div class="lbl">${esc(setName(c.set))} · ${esc(c.n)}/${SETIDX[c.set]?SETIDX[c.set].count:''} · ${esc(c.rar||'')}</div><div class="muted small">${esc(meta.join(' · '))}</div>${pw}${atk}${c.txt?`<div class="atk">${esc(c.txt)}</div>`:''}<div class="muted small" style="margin-top:8px">${esc(foot.join(' · '))}</div></div></div>`);
 }
 /* hover preview (desktop) */
-const hov=$('#hover');let hovT=null;
+const hov=$('#hover');let hovT=null,hovSrc=null;
 document.addEventListener('mouseover',e=>{const el=e.target.closest&&e.target.closest('.cd[data-cid]');if(!el){return}
-  clearTimeout(hovT);hovT=setTimeout(()=>{hov.innerHTML=cardHTML(el.dataset.cid,1);hov.style.display='block';const r=el.getBoundingClientRect();let x=r.right+10,y=r.top;if(x+250>innerWidth)x=r.left-250;if(x<0)x=8;if(y+340>innerHeight)y=Math.max(8,innerHeight-340);hov.style.left=x+'px';hov.style.top=y+'px'},450)});
+  clearTimeout(hovT);hovSrc=el;hovT=setTimeout(()=>{hov.innerHTML=cardHTML(el.dataset.cid,1);hov.style.display='block';const r=el.getBoundingClientRect();let x=r.right+10,y=r.top;if(x+250>innerWidth)x=r.left-250;if(x<0)x=8;if(y+340>innerHeight)y=Math.max(8,innerHeight-340);hov.style.left=x+'px';hov.style.top=y+'px'},450)});
 document.addEventListener('mouseout',e=>{if(e.target.closest&&e.target.closest('.cd[data-cid]')){clearTimeout(hovT);hov.style.display='none'}});
 document.addEventListener('mousedown',()=>{clearTimeout(hovT);hov.style.display='none'});
+document.addEventListener('mousemove',e=>{if(hov.style.display!=='block'||!hovSrc||!hovSrc.contains(e.target))return;const cd=hov.firstElementChild;if(!cd)return;const r=hovSrc.getBoundingClientRect();const px=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)),py=Math.min(1,Math.max(0,(e.clientY-r.top)/r.height));
+  cd.style.setProperty('--ry',((px-.5)*18).toFixed(1)+'deg');cd.style.setProperty('--rx',((.5-py)*18).toFixed(1)+'deg');cd.style.setProperty('--mx',(px*100).toFixed(0)+'%');cd.style.setProperty('--my',(py*100).toFixed(0)+'%')},{passive:true});
 
 /* ---------- identity / server ---------- */
 const API='api/';
@@ -535,10 +632,22 @@ function rulesSummary(r){r=R(r);const bits=[`${r.deckSize}-card decks`,`${r.priz
   if(r.colorlessCosts)bits.push('energy types ignored (all costs colorless)');if(r.noAttackAfterRetreat)bits.push('no attack after retreating');if(r.unlimitedTrainers)bits.push('unlimited Trainers per turn');if(r.conditionsPersist)bits.push('conditions stay when benched');if(r.deckOutDamage)bits.push('deck-out deals 10 to your Active instead of losing');if(r.multiEvolve)bits.push('multiple evolutions per turn allowed');if(r.conditionsStack)bits.push('conditions stack');if(r.evolveSameTurn!==false)bits.push('evolve the turn a Pokémon is played');if(r.basicEnergyAnyType!==false)bits.push('any basic Energy counts as any type in card text');if(r.mulliganRescue!==false)bits.push('house mulligan (opponent may mulligan too; second miss draws up to 5)');if(r.benchRescue!==false)bits.push('no Pokémon left: draw up to 7 for a Basic');if(r.anyVersionEvolves!==false)bits.push('evolutions fit any version of the Pokémon');if(r.energyPickup!==false)bits.push('pick up an Energy instead of attaching');if(r.dceCountsAsWater!==false)bits.push('Double Colorless counts as 2 Water for Hydro Pump / Water Gun');if(r.dceNoReturn!==false)bits.push('attached Double Colorless never returns to hand');if(r.charizardDoubleDiscard!==false)bits.push('Charizard may burn a Double Colorless for Fire Spin');bits.push(`confusion self-damage ${r.confusionSelfDamage==null?20:r.confusionSelfDamage}`);bits.push(r.weaknessBonus?`weakness +${r.weaknessBonus}`:'weakness ×2');bits.push(`resistance −${r.resistanceAmount==null?20:r.resistanceAmount}`);
   const lim=Object.entries(r.limits||{});if(lim.length)bits.push('limits: '+lim.map(([k,v])=>`${k} ×${v}`).join(', '));if((r.banned||[]).length)bits.push('banned: '+r.banned.join(', '));return bits.join(' · ')}
 
+let HERO=null;
+function heroCards(){
+  if(!HERO){const pool=Object.keys(CARDS).filter(id=>{const c=CARDS[id];return c.st==='Pokémon'&&/Holo/.test(c.rar||'')&&c.set!=='basep'});
+    HERO=[];while(HERO.length<5&&pool.length)HERO.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0])}
+  return HERO}
+function heroHTML(games){
+  const live=games.filter(g=>g.status==='playing').length;const n=heroCards().length;const t=(Date.now()%5000)/1000;
+  const fan=heroCards().map((id,i)=>{const k=i-(n-1)/2;return `<div class="fan" style="--dx0:${k*62}px;--dx:${k*62}px;--dy:${Math.abs(k)*10}px;--r:${k*9}deg;--d:${-(t+i*.6).toFixed(2)}s;z-index:${5-Math.abs(Math.round(k))}">${cardHTML(id,.5,'','click')}</div>`}).join('');
+  const sparks=[[8,20,0],[42,12,1.1],[30,80,2.2],[88,18,.6],[70,86,1.7],[56,40,2.8]].map(([x,y,d])=>`<i class="spark" style="left:${x}%;top:${y}%;animation-delay:${d}s"></i>`).join('');
+  return `<section class="hero">${sparks}<div><h1 class="wordmark">Poké Table</h1><p>Base Set through Gym Challenge, with the cousins, from any device.</p>
+    <div class="hstats"><span><b>${live}</b> ${live===1?'table':'tables'} in play</span><span><b>${S.decks.length}</b> ${S.decks.length===1?'deck':'decks'}</span>${S.name?`<span>Hi, ${esc(S.name)}</span>`:''}</div></div>
+    <div class="hero-fan" aria-hidden="true">${fan}</div></section>`}
 function renderLobby(main){
   const online=S.online;
   const games=S.games.filter(g=>g.status!=='done'||g.host===uid||(g.seats&&((g.seats.a||{}).uid===uid||(g.seats.b||{}).uid===uid)));
-  main.innerHTML=`
+  main.innerHTML=`${heroHTML(games)}
   ${!online?`<div class="notice" style="margin-bottom:16px"><b>Can't reach the game server.</b> Check your connection; the page reconnects on its own. Saving decks and playing need the server.</div>`:''}
   <div class="grid2">
     <div class="stack">
@@ -559,7 +668,7 @@ function renderLobby(main){
       <div class="panel small muted">Tabletop style: the table shuffles, deals, tracks damage, status, energy, prizes and the log. You read the cards and apply their effects, like at a real table. Every action is logged so your opponent can follow along.</div>
     </div>
   </div>`;
-  main.onclick=e=>{const b=e.target.closest('button');if(!b)return;
+  main.onclick=e=>{const hc=e.target.closest('.hero .cd[data-cid]');if(hc){viewCard(hc.dataset.cid);return}const b=e.target.closest('button');if(!b)return;
     if(b.id==='todeck')go('builder');
     else if(b.dataset.edit){B.deckId=b.dataset.edit;B.deck=null;go('builder')}
     else if(b.id==='newgame')newGameModal();
