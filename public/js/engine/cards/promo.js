@@ -236,7 +236,7 @@ const S = {
   'basep-52': { attacks: { 'Sacred Wing': { effect: (ctx) => ctx.damage(ctx.flip() ? 60 : 20) } } },
   // 53 Suicune: Pure Body (Poké-Body) — attaching a Water Energy from hand makes you discard an Energy from it
   'basep-53': {
-    passive: { onEnergyAttached: (ctx, m, c) => { if (!/Water/.test(nameOf(ctx.db, c.c)) || !m.en.length) return; const k = ctx.chooseCards('Pure Body: discard an Energy from Suicune', m.en, { id: 'pureBody' })[0]; const e = m.en.find((x) => x.id === k); if (e) ctx.discardEnergy(m, [e]); } },
+    passive: { onEnergyAttached: (ctx, m, c) => { if (!energyIs(ctx.db, c, 'Water', ctx.g.rules) || !m.en.length) return; const k = ctx.chooseCards('Pure Body: discard an Energy from Suicune', m.en, { id: 'pureBody' })[0]; const e = m.en.find((x) => x.id === k); if (e) ctx.discardEnergy(m, [e]); } },
     attacks: { 'Hypno Wave': { effect: (ctx) => { if (ctx.flip()) ctx.damage(50); else { ctx.damage(30); ctx.status('SLP'); } } } } },
 };
 

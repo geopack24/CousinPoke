@@ -556,3 +556,12 @@ test('house rule: any basic Energy counts as any type for card text, Colorless d
   r = act(r, { type: 'usePower', pokemon: r.p.a.active.id, power: 'Rain Dance' });
   assert.equal(r.p.a.active.en.length, 1); assert.equal(DB[r.p.a.hand[0].c].name, 'Double Colorless Energy', 'the Double Colorless stays in hand');
 });
+
+test('house rule: any basic Energy counts as Lightning for Electroburn recoil too', () => {
+  const G = N['Grass Energy'];
+  const mk = (rules) => setup({ a: { active: { c: 'gym2-15', en: [G, G, G, G] }, deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] }, rules });
+  let g = act(mk({}), { type: 'attack', index: 1 });
+  assert.equal(g.p.a.active.dmg, 40, '4 Grass count as 4 Lightning: 40 to itself');
+  g = act(mk({ basicEnergyAnyType: false }), { type: 'attack', index: 1 });
+  assert.equal(g.p.a.active.dmg, 0, 'with the rule off Grass is not Lightning');
+});
