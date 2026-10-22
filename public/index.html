@@ -760,7 +760,7 @@ function monHTML(m,seat,active,canTouch){const c=C(m.c);const hp=c.hp;const sc=a
 function renderSetup(main,g){
   const my=mySeat(g);const host=g.host===uid;const both=g.seats.a.uid&&g.seats.b.uid;const ready=both&&g.seats.a.deckId&&g.seats.b.deckId;
   const seatHTML=s=>{const st=g.seats[s];const mine=st.uid===uid;return `<div class="panel"><div class="lbl">Seat ${s.toUpperCase()}</div><h3>${esc(nameOf(st.uid))}${mine?' (you)':''}</h3>
-    ${st.uid?`<p class="small">Deck: <b>${st.deckName?esc(st.deckName):'not chosen'}</b></p>`:`<p class="small muted">Open seat</p>`}
+    ${st.uid?`<p class="small">Deck: <b>${!st.deckName?'not chosen':(mine||g.status==='done')?esc(st.deckName):'chosen (name hidden until the game ends)'}</b></p>`:`<p class="small muted">Open seat</p>`}
     ${mine?`<div class="row"><select id="deck-${s}"><option value="">Choose a deck…</option>${S.decks.map(d=>{const bad=validateDeck(d,g.rules).filter(x=>x.bad);return `<option value="${d.id}" ${d.id===st.deckId?'selected':''}>${esc(d.name)} (${deckCount(d)})${bad.length?' · '+esc(bad[0].m):''}</option>`}).join('')}</select><button class="sm" type="button" data-leave="${s}">Leave seat</button></div>`:(!st.uid&&uid&&!my?`<button class="pri" type="button" data-sit="${s}">Take this seat</button>`:'')}
   </div>`};
   main.innerHTML=`<div style="max-width:900px;margin:0 auto" class="stack">
@@ -776,7 +776,7 @@ function renderSetup(main,g){
     else if(b.dataset.leave)commit(g=>{g.seats[b.dataset.leave]={uid:null,deckId:null,deckName:null};pushLog(g,`${whoDo()} left the seat`)});
     else if(b.id==='editrules')showModal('Edit rules',rulesForm(g.rules),`<button class="pri" id="rok" type="button">Save rules</button>`,m=>{m.querySelector('#rok').onclick=()=>{const r=readRulesForm(m);closeModal();commit(g=>{g.rules=r;pushLog(g,`${whoDo()} changed the rules: ${rulesSummary(r)}`)})}});
   };
-  main.querySelectorAll('select[id^=deck-]').forEach(sel=>sel.onchange=()=>{const s=sel.id.slice(5);const d=S.decks.find(x=>x.id===sel.value);commit(g=>{g.seats[s].deckId=d?d.id:null;g.seats[s].deckName=d?d.name:null;if(d)pushLog(g,`${whoDo()} chose the deck "${d.name}"`)})});
+  main.querySelectorAll('select[id^=deck-]').forEach(sel=>sel.onchange=()=>{const s=sel.id.slice(5);const d=S.decks.find(x=>x.id===sel.value);commit(g=>{g.seats[s].deckId=d?d.id:null;g.seats[s].deckName=d?d.name:null;if(d)pushLog(g,`${whoDo()} chose a deck`)})});
 }
 
 /* ---------- game: menus ---------- */

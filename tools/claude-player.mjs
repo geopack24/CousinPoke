@@ -36,7 +36,7 @@ async function save(doc) {
 function monStr(m) { const c = DB[m.c]; return `${nm(m)}#${m.id} ${c.hp - m.dmg}/${c.hp}hp st=${m.st.join(',') || '-'} en=[${[...m.en, ...m.tools].map(nm).join(', ')}]${m.un.length ? ' under=' + m.un.map(nm).join('>') : ''}${m.fx.length ? ' fx=' + m.fx.map((f) => f.k).join(',') : ''}`; }
 function view(doc) {
   const g = doc.state; const me = seatOf(doc); const op = other(me);
-  if (!g) { console.log(`== ${doc.name} | not started. seats:`, JSON.stringify(doc.seats)); return; }
+  if (!g) { const me = seatOf(doc); const shown = Object.fromEntries(Object.entries(doc.seats).map(([k, v]) => [k, k === me || doc.status === 'done' ? v : { ...v, deckId: v.deckId ? '(chosen)' : null, deckName: v.deckName ? '(hidden)' : null }])); console.log(`== ${doc.name} | not started. seats:`, JSON.stringify(shown)); return; }
   console.log(`== ${doc.name} | phase=${g.phase} turn ${g.turnNo} (${g.turn === me ? 'ME' : 'GEORGE'}) winner=${g.winner || '-'} pending=${JSON.stringify(g.pending)} inflight=${doc.inflight ? doc.inflight.prompt.seat + ':' + doc.inflight.prompt.title : '-'}`);
   for (const s of [op, me]) {
     const p = g.p[s]; console.log(`-- ${g.seats[s].name}${s === me ? ' (me)' : ''}: hand ${p.hand.length} deck ${p.deck.length} prizes ${p.prizes.length} discard[${p.discard.slice(-5).map(nm).join(', ')}]`);
