@@ -23,6 +23,8 @@ function mergeScene(before, after) {
 let pendingWin = null;
 let pendingTurn = false;
 let logOpen = false;      // compact mode: whether the log is expanded
+const chatSeen = {};       // doc id -> how many chat messages this client has seen (new ones from others get a toast)
+let chatUnread = 0;        // compact mode: chat messages that arrived while the log was closed
 let suppressClick = false; // a drag just finished: swallow the click that follows
 const isCompact = () => window.innerWidth < 700;
 let wasCompact = null;
@@ -369,7 +371,9 @@ export function render(main, doc) {
     // bench sits along the player's edge, the Active Pokémon in front of it toward the middle of the table
     const field = `<div class="field">${isTop ? benchZ + activeZ : activeZ + benchZ}</div>`;
     const name = `<div class="pname"><span>${esc(g.seats[seat].name)}${own ? ' (you)' : ''}</span>${g.phase === 'main' && g.turn === seat && !g.winner ? `<span class="chip">${own ? 'Your turn' : 'Their turn'}</span>` : ''}${g.phase === 'setup' ? `<span class="chip">${p.setupDone ? 'Ready' : 'Setting up'}</span>` : ''}${g.winner === seat ? '<span class="chip">Winner</span>' : ''}</div>`;
-    const hand = own ? `<div class="z" style="align-items:stretch"><span class="zlbl">${compact ? `Hand · ${p.hand.length} · drag to play` : `Your hand · ${p.hand.length} · drag a card onto a Pokémon or the bench, or tap it for options`}</span><div class="hand ${compact ? 'strip' : ''}" data-handzone="${seat}">${p.hand.map((c) => PT.cardHTML(c.c, SC.hand, `data-hand="${c.id}"`, legal.some((a) => a.card === c.id) ? 'click can' : 'click')).join('') || '<span class="small muted">empty</span>'}</div></div>` : '';
+    const HORD = { 'Pokémon': 0, 'Trainer': 1, 'Energy': 2 };
+    const handCards = own ? p.hand.slice().sort((x, y) => (HORD[C(x.c).st] ?? 1) - (HORD[C(y.c).st] ?? 1) || C(x.c).name.localeCompare(C(y.c).name)) : p.hand;
+    const hand = own ? `<div class="z" style="align-items:stretch"><span class="zlbl">${compact ? `Hand · ${p.hand.length} · drag to play` : `Your hand · ${p.hand.length} · drag a card onto a Pokémon or the bench, or tap it for options`}</span><div class="hand ${compact ? 'strip' : ''}" data-handzone="${seat}">${handCards.map((c) => PT.cardHTML(c.c, SC.hand, `data-hand="${c.id}"`, legal.some((a) => a.card === c.id) ? 'click can' : 'click')).join('') || '<span class="small muted">empty</span>'}</div></div>` : '';
     const live = g.phase === 'main' && !g.winner && ((pending && pending.seat === seat) || (!pending && g.turn === seat));
     const cls = `side ${own ? 'mine' : ''} ${live ? 'live' : (g.phase === 'main' && !g.winner ? 'idle' : '')}`;
     return isTop ? `<div class="${cls}">${name}${rail}${field}</div>` : `<div class="${cls}">${name}${field}${rail}${hand}</div>`;
@@ -388,11 +392,19 @@ export function render(main, doc) {
     ${inflightMine ? '<button type="button" class="pri" data-act="answer">Answer the prompt</button>' : ''}
     <button type="button" data-act="sound" class="icon" title="${soundOn() ? 'Sound is on (click to mute)' : 'Sound is off (click to unmute)'}">${soundOn() ? '🔊' : '🔇'}</button>
     <button type="button" data-act="more">${compact ? '⋯' : 'More…'}</button>` : '<span class="small">Watching</span>';
+  { // surface chat: a message from the other player pops up as a toast, and counts as unread while the compact log is closed
+    const chats = (g.log || []).filter((e) => e.k === 'chat');
+    if (!(doc.id in chatSeen)) chatSeen[doc.id] = chats.length;
+    const fresh = chats.slice(chatSeen[doc.id]); chatSeen[doc.id] = chats.length;
+    const myName = me && g.seats[me] ? g.seats[me].name : null;
+    for (const e of fresh) if (e.n !== myName) { PT.toast(`💬 ${e.n}: ${e.m}`); if (compact && !logOpen) chatUnread++; }
+    if (!compact || logOpen) chatUnread = 0;
+  }
   main.innerHTML = `<div class="tablewrap"><div class="board auto">${sideHTML(top, true)}
     <div class="midbar ${waitingOnMe ? 'mine' : ''}"><span class="turn ${waitingOnMe ? 'mine' : ''}">${statusLine}</span>${g.stadium ? `<span class="chip click" data-stadium="${g.stadium.c}" title="Stadium in play (click to read)">Stadium: ${esc(C(g.stadium.c).name)}</span>` : ''}${doc.inflight && !inflightMine ? `<span class="chip">Waiting for ${esc(g.seats[doc.inflight.prompt.seat].name)}…</span>` : ''}<span class="grow"></span>${buttons}</div>
     ${sideHTML(bottom, false)}
     ${compact ? '' : `<div class="legend small"><span class="SLP">Zz Asleep</span><span class="CNF">?! Confused</span><span class="PAR">⚡ Paralyzed</span><span class="PSN">☠ Poisoned</span><span class="BRN">🔥 Burned</span><span class="FX">Effect tags</span><span class="muted">An effect tag names the attack or Trainer affecting that Pokémon. Hover or tap it to see what it does.</span></div>`}</div>
-    <aside class="logpane panel ${compact ? 'compact' : ''} ${logOpen ? 'open' : ''}"><div class="row"><h3 class="grow">${esc(doc.name)}</h3>${compact ? `<button class="sm" type="button" data-act="toggleLog">${logOpen ? 'Hide log' : 'Log'}</button>` : '<span class="chip">Auto rules</span>'}<button class="sm" type="button" data-act="rules">Rules</button></div>
+    <aside class="logpane panel ${compact ? 'compact' : ''} ${logOpen ? 'open' : ''}"><div class="row"><h3 class="grow">${esc(doc.name)}</h3>${compact ? `<button class="sm" type="button" data-act="toggleLog">${logOpen ? 'Hide log' : `Log${chatUnread ? ' · ' + chatUnread + ' 💬' : ''}`}</button>` : '<span class="chip">Auto rules</span>'}<button class="sm" type="button" data-act="rules">Rules</button></div>
     <div class="entries" id="logentries">${g.log.slice().reverse().map((e) => `<div class="e ${e.k === 'chat' ? 'chat' : ''}">${e.k === 'chat' ? `<b>${esc(e.n)}:</b> ${esc(e.m)}` : esc(e.m)}<span class="t">${e.turn != null ? 'T' + e.turn : ''}</span></div>`).join('')}</div>
     ${me ? `<form id="chat"><input type="text" id="chatin" placeholder="Say something" maxlength="200" class="grow" autocomplete="off"><button class="sm" type="submit">Send</button></form>` : ''}</aside></div>`;
   const chatNew = main.querySelector('#chatin'); if (chatNew && chatPrev) { chatNew.value = chatPrev; if (chatFocus) chatNew.focus(); }
@@ -402,7 +414,7 @@ export function render(main, doc) {
   if (pendingTurn) { pendingTurn = false; const b = main.querySelector('.board.auto'); if (b) { const el = document.createElement('div'); el.className = 'turnbanner'; el.textContent = 'YOUR TURN'; b.appendChild(el); setTimeout(() => el.remove(), 1600); } playTurnChime(); }
   if (pendingFx) { const ev = pendingFx; pendingFx = null; const sc = pendingScene; pendingScene = null; playEvents(ev, doc, mergeScene(sc, captureScene(ev, g))); }
   maybeRunBot(doc);
-  const chat = main.querySelector('#chat'); if (chat) chat.onsubmit = (e) => { e.preventDefault(); const i = chat.querySelector('#chatin'); const v = i.value.trim(); if (!v) return; i.value = ''; submit({ type: 'chat', text: v }); };
+  const chat = main.querySelector('#chat'); if (chat) chat.onsubmit = (e) => { e.preventDefault(); const i = chat.querySelector('#chatin'); const v = i.value.trim(); if (!v) return; i.value = ''; if (isCompact() && !logOpen) { logOpen = true; chatUnread = 0; } submit({ type: 'chat', text: v }); };
 
   if (me) setupDrag(main, doc, legal, me);
   if (me) setupArrange(main, doc, legal, me); else arrangeState = null;
@@ -668,7 +680,7 @@ function onButton(act, btn, doc, legal, me) {
   if (act === 'mulliganDraw0') return submit({ type: 'mulliganDraw', n: 0 });
   if (act === 'answer') return answerInflight(doc);
   if (act === 'useStadium') return submit({ type: 'useStadium' });
-  if (act === 'toggleLog') { logOpen = !logOpen; return PT.render(); }
+  if (act === 'toggleLog') { logOpen = !logOpen; if (logOpen) chatUnread = 0; return PT.render(); }
   if (act === 'sound') { setSoundVolume(soundOn() ? 0 : 0.6); PT.toast(soundOn() ? 'Sound on' : 'Sound off'); return PT.render(); }
   if (act === 'rules') return PT.showModal('Rules at this table', `<p>${esc(PT.rulesSummary(g.rules))}</p>${g.rules.notes ? `<div class="notice info" style="white-space:pre-wrap">${esc(g.rules.notes)}</div>` : ''}<p class="small muted">Automated rules: the table enforces costs, timing, damage, conditions and prizes. Use "Fix" on a Pokémon or the More menu if a card isn't automated yet.</p>`);
   if (act === 'more') {
