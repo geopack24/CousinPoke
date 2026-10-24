@@ -734,7 +734,7 @@ const B={deckId:null,deck:null,q:'',sets:new Set(['base1','base2','base3','base5
 function currentDeck(){
   if(B.deck)return B.deck;
   if(B.deckId){const d=S.decks.find(x=>x.id===B.deckId);if(d){B.deck=clone(d);return B.deck}}
-  B.deck={id:rid(),name:'New deck',cards:{}};B.deckId=B.deck.id;return B.deck;
+  B.deck={id:rid(),name:'New deck',cards:{'base1-96':4}};B.deckId=B.deck.id;return B.deck; // house rule: every new deck starts with 4 Double Colorless
 }
 function filteredCards(){
   const q=B.q.trim().toLowerCase();
