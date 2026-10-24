@@ -472,13 +472,13 @@ function describeFx(f, g) {
 }
 
 function monHTML(m, seat, active, promoteClick, scale) {
-  const c = C(m.c); const hp = c.hp; const sc = scale || (active ? .42 : .34); const compact = isCompact(); const step = Math.round(330 * sc * (compact ? 0.09 : 0.13));
+  const c = C(m.c); const hp = c.hp; const sc = scale || (active ? .42 : .34); const compact = isCompact(); const step = Math.round(330 * sc * (compact ? 0.12 : 0.13));
   const att = [...m.en, ...m.tools]; const n = att.length;
   const stack = att.map((x, i) => `<div class="attc" data-att="${x.id}" data-owner="${m.id}" style="top:${i * step}px;z-index:${i + 1}">${PT.cardHTML(x.c, sc)}</div>`).join('');
   const GL = { SLP: 'Zz', CNF: '?!', PAR: '⚡', PSN: '☠', BRN: '🔥' }; const stChips = m.st.map((s) => `<span class="${s}" title="${STATUS_NAMES[s]}">${GL[s]} ${active ? STATUS_NAMES[s] : s}</span>`).join('');
   const fxChips = m.fx.map((f) => { const d = describeFx(f, PT.S.game.state); return `<span class="FX" title="${esc(d.desc)}" data-desc="${esc(d.desc)}">${esc(d.label)}</span>`; }).join('');
   const left = hp ? (hp - m.dmg) / hp : 1; const hurt = left <= 0.25 ? 'critical' : left <= 0.5 ? 'hurt' : '';
-  return `<div class="mon ${active ? 'active' : ''} ${promoteClick ? 'glow' : ''} ${hurt}" data-mon="${m.id}" tabindex="0"><div class="cdwrap" style="padding-top:${n * step}px">${stack}<div class="poke" style="z-index:${n + 1}">${PT.cardHTML(m.c, sc)}${hp ? `<span class="hp" style="--hpf:${Math.max(0, left).toFixed(2)};--hpc:${left > 0.5 ? '#4cd07d' : left > 0.25 ? '#ffcb05' : '#ff5a4e'}">${Math.max(0, hp - m.dmg)}/${hp}</span>` : ''}${m.dmg ? `<span class="dmg" data-dmg-of="${m.id}">${m.dmg}</span>` : ''}${m.st.length || fxChips ? `<div class="sts">${stChips}${fxChips}</div>` : ''}${m.un.length ? `<span class="stk">+${m.un.length} under</span>` : ''}</div></div>${n && !compact ? `<div class="attn">${n} attached</div>` : ''}</div>`;
+  return `<div class="mon ${active ? 'active' : ''} ${promoteClick ? 'glow' : ''} ${hurt}" data-mon="${m.id}" tabindex="0"><div class="cdwrap" style="padding-top:${n * step}px">${stack}<div class="poke" style="z-index:${n + 1}">${PT.cardHTML(m.c, sc)}${hp ? `<span class="hp" style="--hpf:${Math.max(0, left).toFixed(2)};--hpc:${left > 0.5 ? '#4cd07d' : left > 0.25 ? '#ffcb05' : '#ff5a4e'}">${Math.max(0, hp - m.dmg)}/${hp}</span>` : ''}${m.dmg ? `<span class="dmg" data-dmg-of="${m.id}">${m.dmg}</span>` : ''}${m.st.length || fxChips ? `<div class="sts">${stChips}${fxChips}</div>` : ''}${m.un.length ? `<span class="stk">+${m.un.length} under</span>` : ''}</div></div>${n ? `<div class="attn">${n} attached</div>` : ''}</div>`;
 }
 
 /* ---------- the computer opponent ----------
