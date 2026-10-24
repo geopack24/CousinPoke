@@ -40,12 +40,13 @@ export const base1 = {
   },
   'base1-2': { // Blastoise
     powers: { 'Rain Dance': {
-      canUse: ({ g, db, seat }) => { const p = P(g, seat); const w = p.hand.some((c) => db[c.c].st === 'Energy' && energyIs(db, c, 'Water')); const t = mons(p).some((m) => (db[m.c].types || []).includes('Water')); return w && t ? true : 'Needs a Water Energy in hand and a Water Pokémon'; },
+      // house rule: Rain Dance may attach to ANY of your Pokémon, not only Water Pokémon
+      canUse: ({ g, db, seat }) => { const p = P(g, seat); const w = p.hand.some((c) => db[c.c].st === 'Energy' && energyIs(db, c, 'Water')); const t = mons(p).length > 0; return w && t ? true : 'Needs a Water Energy in hand'; },
       use: (ctx) => {
         const ws = ctx.me.hand.filter((c) => ctx.db[c.c].st === 'Energy' && energyIs(ctx.db, c, 'Water'));
         // pick as many Water Energy as you like in one go; they all go to the same Water Pokémon (use the power again for another)
         const cards = ctx.chooseCards('Rain Dance: attach which Water Energy? (pick as many as you like)', ws, { id: 'rainCard', min: 1, max: ws.length });
-        const tgt = ctx.chooseMon('To which Water Pokémon?', ownPokemon(ctx).filter((m) => (ctx.db[m.c].types || []).includes('Water')), { id: 'rainTo' })[0];
+        const tgt = ctx.chooseMon('To which Pokémon?', ownPokemon(ctx), { id: 'rainTo' })[0];
         const m = findMon(ctx.g, tgt).m;
         for (const card of cards) { const c = pullCard(ctx.g, card); m.en.push(c); ctx.event({ t: 'attach', card: c, target: m.id }); }
         ctx.log(`Rain Dance: attached ${cards.length} Water Energy to ${nameOf(ctx.db, m.c)}`);

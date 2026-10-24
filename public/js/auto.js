@@ -413,7 +413,9 @@ export function render(main, doc) {
     const stEl = t.closest('[data-stadium]'); if (stEl) return PT.viewCard(stEl.dataset.stadium);
     const chip = t.closest('.FX[data-desc]'); if (chip) return PT.toast(chip.dataset.desc);
     const hand = t.closest('[data-hand]'); if (hand && me) return handMenu(doc, legal, hand.dataset.hand, hand);
-    const mon = t.closest('[data-mon]'); if (mon) return monMenu(doc, legal, mon.dataset.mon, mon, me);
+    const mon = t.closest('[data-mon]');
+    if (mon && arrangeState && arrangeTapSel && mon.classList.contains('drop-ok')) { const sel = arrangeTapSel; arrangeTapSel = null; clearTapClasses(main.querySelector('.board.auto')); arrangeMove(sel.from, mon.dataset.mon, sel.card); return; }
+    if (mon) return monMenu(doc, legal, mon.dataset.mon, mon, me);
     const prize = t.closest('[data-prize]'); if (prize && me && prize.dataset.seat === me && pending && pending.t === 'prize' && pending.seat === me) return submit({ type: 'takePrize', index: +prize.dataset.prize });
     const pile = t.closest('[data-pile]'); if (pile) { if (pile.dataset.pile === 'discard') return viewPile(doc, pile.dataset.seat, 'discard'); if (pile.dataset.pile === 'deck' && me === pile.dataset.seat) return deckMenu(doc, pile); }
   };
@@ -517,12 +519,14 @@ async function botStep() {
    (Energy Trans) or the damage badge (Damage Swap, one counter per drag) from one of your Pokémon onto another.
    Each drop is one use of the power. A bar at the top of the board has Done. */
 const ARRANGE = {
-  'Energy Trans': { kind: 'energy', hint: 'drag an Energy from one of your Pokémon onto another' },
-  'Damage Swap': { kind: 'damage', hint: 'drag a damage counter (the red badge) from one of your Pokémon onto another' },
+  'Energy Trans': { kind: 'energy', hint: 'drag an Energy from one of your Pokémon onto another — or tap it, then tap the target' },
+  'Damage Swap': { kind: 'damage', hint: 'drag a damage counter (the red badge) onto another of your Pokémon — or tap it, then tap the target' },
 };
 let arrangeState = null;
-function startArrange(pid, power) { arrangeState = { pid, power, ...ARRANGE[power] }; PT.render(); }
-function stopArrange() { arrangeState = null; PT.render(); }
+let arrangeTapSel = null; // tap-to-move (phones): a picked-up Energy / damage counter waiting for a target tap
+function clearTapClasses(b) { if (!b) return; b.querySelectorAll('.arrange-src.picked').forEach((el) => el.classList.remove('picked')); b.querySelectorAll('.mon.drop-ok').forEach((el) => el.classList.remove('drop-ok', 'drop-hover')); }
+function startArrange(pid, power) { arrangeState = { pid, power, ...ARRANGE[power] }; arrangeTapSel = null; PT.render(); }
+function stopArrange() { arrangeState = null; arrangeTapSel = null; PT.render(); }
 function arrangeMove(from, to, card) {
   const st = arrangeState; if (!st) return;
   const answers = st.kind === 'energy' ? { transFrom: from, transCard: card, transTo: to } : { swapFrom: from, swapTo: to };
@@ -541,27 +545,56 @@ function setupArrange(main, doc, legal, me) {
   const sources = arrangeState.kind === 'energy'
     ? [...b.querySelectorAll('.attc[data-att]')].filter((el) => ownIds.has(el.dataset.owner) && (g.p[me].active && g.p[me].active.id === el.dataset.owner ? g.p[me].active : g.p[me].bench.find((m) => m.id === el.dataset.owner)).en.some((e) => e.id === el.dataset.att))
     : [...b.querySelectorAll('.dmg[data-dmg-of]')].filter((el) => ownIds.has(el.dataset.dmgOf));
+  const applyTapSel = () => {
+    if (!arrangeTapSel) return;
+    const src = sources.find((s) => (s.dataset.att || s.dataset.dmgOf) === arrangeTapSel.key);
+    if (!src) { arrangeTapSel = null; return; }
+    src.classList.add('picked');
+    [...b.querySelectorAll('.mon[data-mon]')].filter((t) => ownIds.has(t.dataset.mon) && t.dataset.mon !== arrangeTapSel.from).forEach((t) => t.classList.add('drop-ok'));
+  };
   for (const el of sources) {
     el.classList.add('arrange-src');
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault(); e.stopPropagation();
       const from = el.dataset.owner || el.dataset.dmgOf; const card = el.dataset.att || null;
       const targets = [...b.querySelectorAll('.mon[data-mon]')].filter((t) => ownIds.has(t.dataset.mon) && t.dataset.mon !== from);
-      targets.forEach((t) => t.classList.add('drop-ok'));
-      const ghost = (el.querySelector('.cd') || el).cloneNode(true); ghost.classList.add('dragghost'); if (!card) ghost.textContent = '10';
-      moveGhost(ghost, e.clientX, e.clientY); document.body.appendChild(ghost);
-      let hover = null;
-      const move = (ev) => { moveGhost(ghost, ev.clientX, ev.clientY); const u = document.elementFromPoint(ev.clientX, ev.clientY); const hit = u && targets.find((t) => t.contains(u)); if (hover && hover !== hit) hover.classList.remove('drop-hover'); hover = hit || null; if (hover) hover.classList.add('drop-hover'); };
+      const sx = e.clientX, sy = e.clientY; let ghost = null, hover = null;
+      const move = (ev) => {
+        if (!ghost) {
+          if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8) return; // not a drag yet — a plain tap picks the chip up instead
+          targets.forEach((t) => t.classList.add('drop-ok'));
+          ghost = (el.querySelector('.cd') || el).cloneNode(true); ghost.classList.add('dragghost'); if (!card) ghost.textContent = '10';
+          document.body.appendChild(ghost);
+        }
+        moveGhost(ghost, ev.clientX, ev.clientY);
+        const u = document.elementFromPoint(ev.clientX, ev.clientY); const hit = u && targets.find((t) => t.contains(u));
+        if (hover && hover !== hit) hover.classList.remove('drop-hover'); hover = hit || null; if (hover) hover.classList.add('drop-hover');
+      };
       const up = (ev) => {
         document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
-        ghost.remove(); targets.forEach((t) => t.classList.remove('drop-ok', 'drop-hover'));
-        const u = document.elementFromPoint(ev.clientX, ev.clientY); const hit = u && targets.find((t) => t.contains(u));
         suppressClick = true; setTimeout(() => { suppressClick = false; }, 300);
-        if (hit) arrangeMove(from, hit.dataset.mon, card);
+        if (ghost) { // a real drag ended
+          ghost.remove(); targets.forEach((t) => t.classList.remove('drop-ok', 'drop-hover'));
+          arrangeTapSel = null; clearTapClasses(b);
+          if (ev.type === 'pointercancel') return;
+          const u = document.elementFromPoint(ev.clientX, ev.clientY); const hit = u && targets.find((t) => t.contains(u));
+          if (hit) arrangeMove(from, hit.dataset.mon, card);
+          return;
+        }
+        if (ev.type === 'pointercancel') return;
+        // a plain tap: pick the chip up, drop onto a tapped target's chip, or tap again to put it back down
+        if (arrangeTapSel) {
+          const sel = arrangeTapSel;
+          if (sel.key === (card || from)) { arrangeTapSel = null; clearTapClasses(b); return; }
+          if (from !== sel.from) { arrangeTapSel = null; clearTapClasses(b); arrangeMove(sel.from, from, sel.card); return; }
+        }
+        arrangeTapSel = { from, card, key: card || from };
+        clearTapClasses(b); applyTapSel();
       };
       document.addEventListener('pointermove', move); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
     });
   }
+  applyTapSel(); // a tap selection survives re-renders
 }
 /** Drag ghosts move by transform, so following the pointer doesn't repaint the table under them. */
 function moveGhost(ghost, x, y) { ghost.style.transform = `translate3d(${x}px,${y}px,0) translate(-50%,-50%) scale(1.08)`; }

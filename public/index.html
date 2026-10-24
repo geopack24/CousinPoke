@@ -102,15 +102,36 @@ textarea{width:100%;min-height:60px;resize:vertical}
 
 /* deck builder */
 .builder{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
-@media (max-width:900px){.builder{grid-template-columns:1fr}.builder .deckpane{order:-1}}
 .filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
-.filters .chips{display:flex;flex-wrap:wrap;gap:4px}
+.filters .chips{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
 .tag{border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;border:1px solid var(--line);background:var(--panel);cursor:pointer}
 .tag.on{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
 .tag.ty{padding-left:6px}
 .tag.ty i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
 .deckpane{position:sticky;top:calc(58px + env(safe-area-inset-top,0px))}
+.deckpane .dp-bar{display:none}
 .deckpane .dl{max-height:52vh;overflow:auto;display:flex;flex-direction:column;gap:2px;margin-top:8px}
+@media (pointer:coarse){
+  .cdgrid .tile .ct{gap:8px}
+  .cdgrid .tile .ct button,.dl .r button{min-width:42px;min-height:34px;font-size:16px}
+  .tag{padding:6px 12px}
+}
+@media (max-width:900px){
+  .builder{grid-template-columns:1fr}
+  .cardpane{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+  .cdgrid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
+  .filters .chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+  .filters .chips::-webkit-scrollbar{display:none}
+  .filters .chips .tag{flex:none;white-space:nowrap}
+  .builder .deckpane{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:30;border-radius:14px 14px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.28);padding:0 0 env(safe-area-inset-bottom,0px);display:flex;flex-direction:column;overflow:hidden;max-height:72vh;max-height:72dvh}
+  .deckpane .dp-bar{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:12px 16px;text-align:left;font-weight:800;border-radius:14px 14px 0 0}
+  .deckpane .dp-bar .dp-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .deckpane .dp-bar .ok{color:var(--ok)}
+  .deckpane .dp-bar .no{color:var(--danger)}
+  .deckpane .dp-body{display:none;overflow:auto;padding:0 14px 14px;overscroll-behavior:contain;flex:1 1 auto;min-height:0;-webkit-overflow-scrolling:touch}
+  .deckpane.open .dp-body{display:block}
+  .deckpane .dl{max-height:none;overflow:visible}
+}
 .dl .sec{margin-top:8px}
 .dl .r{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:6px}
 .dl .r:hover{background:var(--panel-2)}
@@ -298,7 +319,10 @@ textarea{width:100%;min-height:60px;resize:vertical}
 @keyframes lunge{0%,100%{transform:translateY(0)}40%{transform:translateY(-14px) scale(1.06)}}
 .confq{position:absolute;z-index:9;pointer-events:none;font-family:var(--display);font-weight:800;color:#ffd84a;text-shadow:0 2px 5px rgba(0,0,0,.75);transform:translate(-50%,-50%);opacity:0;animation:confq .9s ease-in-out forwards}@keyframes confq{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}25%{opacity:1}100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1.25) rotate(var(--rot))}}
 .board.auto.picking .mon:not(.pickable){opacity:.55}.mon.pickable{outline:3px solid var(--accent);outline-offset:3px;border-radius:10px;cursor:pointer;animation:pickpulse 1.2s ease-in-out infinite}@keyframes pickpulse{0%,100%{box-shadow:0 0 0 0 rgba(255,203,5,.0)}50%{box-shadow:0 0 0 6px rgba(255,203,5,.35)}}.pickbar{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:60;display:flex;gap:8px;align-items:center;max-width:calc(100% - 16px);background:#1f2a44;color:#fff;padding:6px 10px;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.45);font-size:14px}
-.board.auto.arranging .arrange-src{cursor:grab;outline:2px dashed var(--accent);outline-offset:1px;border-radius:6px}.board.auto.arranging .dmg.arrange-src{animation:pickpulse 1.2s ease-in-out infinite}.dragghost.dmg{font-weight:800}
+.board.auto.arranging .arrange-src{cursor:grab;outline:2px dashed var(--accent);outline-offset:1px;border-radius:6px;touch-action:none}.board.auto.arranging .dmg.arrange-src{animation:pickpulse 1.2s ease-in-out infinite}.dragghost.dmg{font-weight:800}
+.board.auto.arranging .arrange-src::after{content:'';position:absolute;inset:-8px}
+@media (pointer:coarse){.board.auto.arranging .arrange-src::after{inset:-12px}}
+.arrange-src.picked{outline:3px solid var(--accent);animation:pickpulse 1.2s ease-in-out infinite}
 .playcard{position:fixed;z-index:1200;pointer-events:none;transition:transform .32s cubic-bezier(.2,.8,.3,1),opacity .32s ease;filter:drop-shadow(0 12px 28px rgba(0,0,0,.6))}.playcard>.cd{width:100%;height:100%}.playcard .pc-n{position:absolute;right:-10px;top:-10px;background:var(--accent);color:#111;font-family:var(--display);font-weight:800;font-size:22px;border-radius:999px;padding:2px 10px;box-shadow:0 2px 8px rgba(0,0,0,.5)}
 .coinflip{position:fixed;inset:0;z-index:1300;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)}.cf-box{background:#1f2a44;color:#fff;border-radius:16px;padding:18px 22px 16px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.6);min-width:240px}.cf-title{font-family:var(--display);font-size:18px;margin-bottom:12px}.cf-coin{width:130px;height:130px;border-radius:50%;border:6px solid #b8860b;background:radial-gradient(circle at 35% 30%,#fff3a0,#ffcb05 45%,#c79100);color:#5a3d00;font-family:var(--display);font-weight:800;font-size:22px;cursor:pointer;box-shadow:0 6px 0 #8a6200,0 10px 20px rgba(0,0,0,.4);display:inline-flex;align-items:center;justify-content:center}.cf-coin:hover{filter:brightness(1.08)}.cf-coin .cf-face{font-size:40px}.cf-coin.heads .cf-face,.cf-coin.tails .cf-face{font-size:22px}.cf-coin.tails{background:radial-gradient(circle at 35% 30%,#eee,#b9c0c9 45%,#7d8590);border-color:#5d636b;color:#222;box-shadow:0 6px 0 #4a4f55,0 10px 20px rgba(0,0,0,.4)}.cf-coin.spin{animation:cfspin .7s ease-in-out}@keyframes cfspin{0%{transform:translateY(0) rotateX(0)}50%{transform:translateY(-70px) rotateX(900deg)}100%{transform:translateY(0) rotateX(1800deg)}}.cf-hint{margin-top:12px;font-size:14px;opacity:.85}.cf-results{margin-top:8px;display:flex;gap:4px;justify-content:center;min-height:22px}.cf-results span{display:inline-block;width:22px;height:22px;border-radius:50%;font-size:12px;font-weight:800;line-height:22px}.cf-results .h{background:#ffcb05;color:#5a3d00}.cf-results .t{background:#b9c0c9;color:#222}.cf-all{margin-top:10px}
 .koghost{position:absolute;z-index:8;pointer-events:none;transition:opacity .6s ease,transform .6s ease,filter .6s ease}.koghost>.poke{width:100%;height:100%}.koghost.gone{opacity:0;transform:scale(.6) rotate(-8deg);filter:grayscale(1) brightness(.4)}
@@ -706,7 +730,7 @@ async function joinGame(id){
 function confirmDeleteGame(id){showModal('Close this table?',`<p>The table and its log are removed for everyone.</p>`,`<button class="dng" id="dok" type="button">Close table</button>`,m=>{m.querySelector('#dok').onclick=async()=>{closeModal();try{await api('DELETE','games/'+id);if(S.gameId===id){S.gameId=null;S.game=null;if(S.screen==='game')go('lobby')}syncSoon(100)}catch(e){toast('Could not close ('+(e.code||'error')+')')}}})}
 
 /* ---------- deck builder ---------- */
-const B={deckId:null,deck:null,q:'',sets:new Set(['base1','base2','base3','base5','gym1','gym2']),st:'',type:'',stage:'',dirty:false};
+const B={deckId:null,deck:null,q:'',sets:new Set(['base1','base2','base3','base5','gym1','gym2']),st:'',type:'',stage:'',dirty:false,paneOpen:false};
 function currentDeck(){
   if(B.deck)return B.deck;
   if(B.deckId){const d=S.decks.find(x=>x.id===B.deckId);if(d){B.deck=clone(d);return B.deck}}
@@ -723,9 +747,6 @@ function filteredCards(){
 function renderBuilder(main){
   const d=currentDeck();const list=filteredCards();const v=validateDeck(d);
   const ae=document.activeElement;const focusId=(ae&&(ae.id==='q'||ae.id==='dname'))?ae.id:null;const bannedSet=new Set(DEFAULT_RULES.banned);
-  const groups={'Pokémon':[],'Trainer':[],'Energy':[]};for(const [cid,k] of Object.entries(d.cards)){const c=C(cid);(groups[c.st]||groups.Trainer).push([cid,k,c])}
-  const gsum=Object.fromEntries(Object.entries(groups).map(([g,a])=>[g,a.reduce((s,x)=>s+x[1],0)]));
-  const sortMon=(a,b)=>{const sa=['Basic','Stage 1','Stage 2'].indexOf(a[2].sub),sb=['Basic','Stage 1','Stage 2'].indexOf(b[2].sub);return a[2].name.localeCompare(b[2].name)||sa-sb};
   main.innerHTML=`<div class="builder">
     <div class="cardpane">
       <div class="filters">
@@ -738,24 +759,19 @@ function renderBuilder(main){
       <div class="small muted" style="margin-bottom:8px">${list.length} cards</div>
       <div class="cdgrid">${list.map(c=>{const k=d.cards[c.id]||0;const isBan=bannedSet.has(c.name);const lim=DEFAULT_RULES.limits[c.name];return `<div class="tile"><div class="cd click" style="${cardStyle(c.id)}" data-cid="${c.id}" data-view="${c.id}" role="img" aria-label="${esc(c.name)}">${isBan?'<span class="ban">Banned</span>':lim!=null?`<span class="ban lim">Max ${lim}</span>`:''}</div><div class="nm" title="${esc(c.name)}">${esc(c.name)}</div><div class="ct"><button class="sm" type="button" data-dec="${c.id}" ${k?'':'disabled'}>−</button><b>${k}</b><button class="sm" type="button" data-inc="${c.id}">+</button></div></div>`}).join('')}</div>
     </div>
-    <div class="deckpane panel">
-      <div class="row"><input type="text" id="dname" value="${esc(d.name)}" maxlength="40" class="grow" aria-label="Deck name"><button class="pri" id="dsave" type="button">Save</button></div>
-      <div class="row small" style="margin-top:8px"><select id="dpick" aria-label="Switch deck"><option value="">Switch deck…</option>${S.decks.map(x=>`<option value="${x.id}" ${x.id===B.deckId?'selected':''}>${esc(x.name)} (${deckCount(x)})</option>`).join('')}</select><button class="sm" id="dnew" type="button">New</button><button class="sm" id="dcopy" type="button">Duplicate</button><button class="sm" id="dio" type="button">Import / export</button><button class="sm dng" id="ddel" type="button">Delete</button></div>
-      <div class="val">${v.map(x=>`<span class="${x.bad?'bad':x.good?'good':''}">${x.bad?'✕':'✓'} ${esc(x.m)}</span>`).join('')}</div>
-      <div class="dl">${['Pokémon','Trainer','Energy'].map(g=>groups[g].length?`<div class="sec lbl">${g} · ${gsum[g]}</div>${groups[g].sort(g==='Pokémon'?sortMon:(a,b)=>a[2].name.localeCompare(b[2].name)).map(([cid,k,c])=>`<div class="r"><span class="c">${k}</span><span class="n" data-view="${cid}">${c.st==='Energy'?`<i class="tydot" style="background:${TCOL[energyType(c)]||'#999'}"></i> `:''}${esc(c.name)} <span class="set">${esc(setName(c.set))} ${esc(c.n)}${c.sub&&c.st==='Pokémon'&&c.sub!=='Basic'?' · '+esc(c.sub):''}</span></span><button class="sm" type="button" data-dec="${cid}">−</button><button class="sm" type="button" data-inc="${cid}">+</button></div>`).join('')}`:'').join('')||'<p class="muted small">Tap + on a card to add it.</p>'}</div>
-    </div></div>`;
+    <div class="deckpane panel${B.paneOpen?' open':''}">${paneBarHTML(d,v)}${paneBodyHTML(d,v)}</div></div>`;
   if(focusId){const el=main.querySelector('#'+focusId);if(el){el.focus();try{el.setSelectionRange(el.value.length,el.value.length)}catch(e){}}}
   const rerender=()=>renderBuilder(main);
   main.querySelector('#q').oninput=e=>{B.q=e.target.value;debounce(rerender)};
   main.querySelector('#fst').onchange=e=>{B.st=e.target.value;rerender()};
   main.querySelector('#fstage').onchange=e=>{B.stage=e.target.value;rerender()};
-  main.querySelector('#dname').oninput=e=>{d.name=e.target.value;B.dirty=true};
-  main.querySelector('#dpick').onchange=e=>{if(!e.target.value)return;if(B.dirty&&!confirmDiscard())return;B.deckId=e.target.value;B.deck=null;B.dirty=false;rerender()};
+  bindPane(main,rerender);
   main.onclick=async e=>{const b=e.target.closest('[data-set],[data-type],[data-inc],[data-dec],[data-view],button');if(!b)return;
     if(b.dataset.set){if(B.sets.has(b.dataset.set))B.sets.delete(b.dataset.set);else B.sets.add(b.dataset.set);rerender()}
     else if(b.dataset.type){B.type=B.type===b.dataset.type?'':b.dataset.type;rerender()}
-    else if(b.dataset.inc){d.cards[b.dataset.inc]=(d.cards[b.dataset.inc]||0)+1;B.dirty=true;rerender()}
-    else if(b.dataset.dec){const k=(d.cards[b.dataset.dec]||0)-1;if(k<=0)delete d.cards[b.dataset.dec];else d.cards[b.dataset.dec]=k;B.dirty=true;rerender()}
+    else if(b.dataset.inc){const cid=b.dataset.inc;d.cards[cid]=(d.cards[cid]||0)+1;B.dirty=true;bumpTile(main,cid,d.cards[cid]);renderPane(main,rerender)}
+    else if(b.dataset.dec){const cid=b.dataset.dec;const k=(d.cards[cid]||0)-1;if(k<=0)delete d.cards[cid];else d.cards[cid]=k;B.dirty=true;bumpTile(main,cid,Math.max(0,k));renderPane(main,rerender)}
+    else if(b.id==='dpbar'){B.paneOpen=!B.paneOpen;renderPane(main,rerender)}
     else if(b.dataset.view){viewCard(b.dataset.view)}
     else if(b.id==='dsave'){d.name=(main.querySelector('#dname').value.trim()||'Untitled deck');try{await saveDeck(d);B.dirty=false;toast('Deck saved')}catch(err){toast('Save failed ('+(err.code||'error')+')')}rerender()}
     else if(b.id==='dnew'){if(B.dirty&&!confirmDiscard())return;B.deck=null;B.deckId=null;B.dirty=false;rerender()}
@@ -766,6 +782,39 @@ function renderBuilder(main){
 }
 let debT=null;function debounce(f){clearTimeout(debT);debT=setTimeout(f,180)}
 function confirmDiscard(){return true}
+/* The deck pane renders on its own so +/− taps don't rebuild the whole card grid (slow on phones).
+   On small screens it is a bottom sheet: the dp-bar summary is always visible; tapping it opens dp-body. */
+function paneBarHTML(d,v){const n=deckCount(d);const bad=v.some(x=>x.bad);
+  return `<button class="dp-bar" type="button" id="dpbar" aria-expanded="${!!B.paneOpen}"><span class="dp-n">${esc(d.name)}</span><span class="${bad?'no':'ok'}">${n}/${DEFAULT_RULES.deckSize} ${bad?'✕':'✓'}</span><span class="dp-ch">${B.paneOpen?'▾':'▴'}</span></button>`}
+function paneBodyHTML(d,v){
+  const groups={'Pokémon':[],'Trainer':[],'Energy':[]};for(const [cid,k] of Object.entries(d.cards)){const c=C(cid);(groups[c.st]||groups.Trainer).push([cid,k,c])}
+  const gsum=Object.fromEntries(Object.entries(groups).map(([g,a])=>[g,a.reduce((s,x)=>s+x[1],0)]));
+  const sortMon=(a,b)=>{const sa=['Basic','Stage 1','Stage 2'].indexOf(a[2].sub),sb=['Basic','Stage 1','Stage 2'].indexOf(b[2].sub);return a[2].name.localeCompare(b[2].name)||sa-sb};
+  return `<div class="dp-body">
+    <div class="row"><input type="text" id="dname" value="${esc(d.name)}" maxlength="40" class="grow" aria-label="Deck name"><button class="pri" id="dsave" type="button">Save</button></div>
+    <div class="row small" style="margin-top:8px"><select id="dpick" aria-label="Switch deck"><option value="">Switch deck…</option>${S.decks.map(x=>`<option value="${x.id}" ${x.id===B.deckId?'selected':''}>${esc(x.name)} (${deckCount(x)})</option>`).join('')}</select><button class="sm" id="dnew" type="button">New</button><button class="sm" id="dcopy" type="button">Duplicate</button><button class="sm" id="dio" type="button">Import / export</button><button class="sm dng" id="ddel" type="button">Delete</button></div>
+    <div class="val">${v.map(x=>`<span class="${x.bad?'bad':x.good?'good':''}">${x.bad?'✕':'✓'} ${esc(x.m)}</span>`).join('')}</div>
+    <div class="dl">${['Pokémon','Trainer','Energy'].map(g=>groups[g].length?`<div class="sec lbl">${g} · ${gsum[g]}</div>${groups[g].sort(g==='Pokémon'?sortMon:(a,b)=>a[2].name.localeCompare(b[2].name)).map(([cid,k,c])=>`<div class="r"><span class="c">${k}</span><span class="n" data-view="${cid}">${c.st==='Energy'?`<i class="tydot" style="background:${TCOL[energyType(c)]||'#999'}"></i> `:''}${esc(c.name)} <span class="set">${esc(setName(c.set))} ${esc(c.n)}${c.sub&&c.st==='Pokémon'&&c.sub!=='Basic'?' · '+esc(c.sub):''}</span></span><button class="sm" type="button" data-dec="${cid}">−</button><button class="sm" type="button" data-inc="${cid}">+</button></div>`).join('')}`:'').join('')||'<p class="muted small">Tap + on a card to add it.</p>'}</div>
+  </div>`}
+function bindPane(main,rerender){
+  const d=currentDeck();
+  const dn=main.querySelector('#dname');if(dn)dn.oninput=e=>{d.name=e.target.value;B.dirty=true};
+  const dp=main.querySelector('#dpick');if(dp)dp.onchange=e=>{if(!e.target.value)return;if(B.dirty&&!confirmDiscard())return;B.deckId=e.target.value;B.deck=null;B.dirty=false;B.paneOpen=false;rerender()};
+}
+function renderPane(main,rerender){
+  const pane=main.querySelector('.deckpane');if(!pane)return;
+  const d=currentDeck();const v=validateDeck(d);
+  const body=pane.querySelector('.dp-body');const st=body?body.scrollTop:0;const dl=pane.querySelector('.dl');const st2=dl?dl.scrollTop:0;
+  pane.classList.toggle('open',!!B.paneOpen);
+  pane.innerHTML=paneBarHTML(d,v)+paneBodyHTML(d,v);
+  const nb=pane.querySelector('.dp-body');if(nb)nb.scrollTop=st;const ndl=pane.querySelector('.dl');if(ndl)ndl.scrollTop=st2;
+  bindPane(main,rerender);
+}
+function bumpTile(main,cid,k){
+  const inc=main.querySelector(`.cdgrid [data-inc="${cid}"]`);if(!inc)return;
+  const ct=inc.parentElement;const b=ct.querySelector('b');if(b)b.textContent=k;
+  const dec=ct.querySelector('[data-dec]');if(dec)dec.disabled=!k;
+}
 
 /* ---------- game: state helpers ---------- */
 function pushLog(g,m,kind){g.log=g.log||[];g.log.push({t:Date.now(),n:S.name||'',m,k:kind||''});if(g.log.length>150)g.log=g.log.slice(-150)}
