@@ -96,6 +96,8 @@ textarea{width:100%;min-height:60px;resize:vertical}
 .cdgrid .tile .nm{font-size:12px;font-weight:700;text-align:center;line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cdgrid .tile .ct{display:flex;gap:4px;align-items:center}
 .cdgrid .tile .ct b{min-width:1.6em;text-align:center;font-variant-numeric:tabular-nums}
+.cdgrid .tile.have .cd{outline:3px solid var(--accent);outline-offset:-3px;border-radius:8px}
+.cdgrid .tile.have .ct b{background:var(--accent);color:var(--accent-fg);border-radius:6px;padding:0 6px}
 .cd .ban{position:absolute;left:4px;top:4px;background:var(--danger);color:var(--danger-fg);font-size:10px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;padding:1px 6px;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.4)}
 .cd .ban.lim{background:var(--warn);color:#1f1b16}
 .mon .sts span.RTR{background:#333;color:#fff}
@@ -730,7 +732,7 @@ async function joinGame(id){
 function confirmDeleteGame(id){showModal('Close this table?',`<p>The table and its log are removed for everyone.</p>`,`<button class="dng" id="dok" type="button">Close table</button>`,m=>{m.querySelector('#dok').onclick=async()=>{closeModal();try{await api('DELETE','games/'+id);if(S.gameId===id){S.gameId=null;S.game=null;if(S.screen==='game')go('lobby')}syncSoon(100)}catch(e){toast('Could not close ('+(e.code||'error')+')')}}})}
 
 /* ---------- deck builder ---------- */
-const B={deckId:null,deck:null,q:'',sets:new Set(['base1','base2','base3','base5','gym1','gym2']),st:'',type:'',stage:'',dirty:false,paneOpen:false};
+const B={deckId:null,deck:null,q:'',sets:new Set(['base1','base2','base3','base5','gym1','gym2']),st:'',type:'',stage:'',dirty:false,paneOpen:false,inDeck:false};
 function currentDeck(){
   if(B.deck)return B.deck;
   if(B.deckId){const d=S.decks.find(x=>x.id===B.deckId);if(d){B.deck=clone(d);return B.deck}}
@@ -745,11 +747,12 @@ function filteredCards(){
     return true});
 }
 function renderBuilder(main){
-  const d=currentDeck();const list=filteredCards();const v=validateDeck(d);
+  const d=currentDeck();let list=filteredCards();if(B.inDeck)list=list.filter(c=>d.cards[c.id]);const v=validateDeck(d);
   const ae=document.activeElement;const focusId=(ae&&(ae.id==='q'||ae.id==='dname'))?ae.id:null;const bannedSet=new Set(DEFAULT_RULES.banned);
   main.innerHTML=`<div class="builder">
     <div class="cardpane">
       <div class="filters">
+        <button class="tag ${B.inDeck?'on':''}" type="button" data-indeck="1">In deck · <b id="indeckct">${deckCount(d)}</b></button>
         <input type="text" id="q" placeholder="Search name or card text" value="${esc(B.q)}" style="flex:1;min-width:160px">
         <select id="fst"><option value="">All kinds</option><option ${B.st==='Pokémon'?'selected':''}>Pokémon</option><option ${B.st==='Trainer'?'selected':''}>Trainer</option><option ${B.st==='Energy'?'selected':''}>Energy</option></select>
         <select id="fstage"><option value="">Any stage</option>${['Basic','Stage 1','Stage 2'].map(s=>`<option ${B.stage===s?'selected':''}>${s}</option>`).join('')}</select>
@@ -757,7 +760,7 @@ function renderBuilder(main){
       <div class="filters"><div class="chips">${SETS.map(s=>`<button type="button" class="tag ${B.sets.has(s.id)?'on':''}" data-set="${s.id}">${esc(s.name)}</button>`).join('')}</div>
         <div class="chips">${TYPES.map(t=>`<button type="button" class="tag ty ${B.type===t?'on':''}" data-type="${t}"><i style="background:${TCOL[t]}"></i>${t}</button>`).join('')}</div></div>
       <div class="small muted" style="margin-bottom:8px">${list.length} cards</div>
-      <div class="cdgrid">${list.map(c=>{const k=d.cards[c.id]||0;const isBan=bannedSet.has(c.name);const lim=DEFAULT_RULES.limits[c.name];return `<div class="tile"><div class="cd click" style="${cardStyle(c.id)}" data-cid="${c.id}" data-view="${c.id}" role="img" aria-label="${esc(c.name)}">${isBan?'<span class="ban">Banned</span>':lim!=null?`<span class="ban lim">Max ${lim}</span>`:''}</div><div class="nm" title="${esc(c.name)}">${esc(c.name)}</div><div class="ct"><button class="sm" type="button" data-dec="${c.id}" ${k?'':'disabled'}>−</button><b>${k}</b><button class="sm" type="button" data-inc="${c.id}">+</button></div></div>`}).join('')}</div>
+      <div class="cdgrid">${list.map(c=>{const k=d.cards[c.id]||0;const isBan=bannedSet.has(c.name);const lim=DEFAULT_RULES.limits[c.name];return `<div class="tile${k?' have':''}"><div class="cd click" style="${cardStyle(c.id)}" data-cid="${c.id}" data-view="${c.id}" role="img" aria-label="${esc(c.name)}">${isBan?'<span class="ban">Banned</span>':lim!=null?`<span class="ban lim">Max ${lim}</span>`:''}</div><div class="nm" title="${esc(c.name)}">${esc(c.name)}</div><div class="ct"><button class="sm" type="button" data-dec="${c.id}" ${k?'':'disabled'}>−</button><b>${k}</b><button class="sm" type="button" data-inc="${c.id}">+</button></div></div>`}).join('')}</div>
     </div>
     <div class="deckpane panel${B.paneOpen?' open':''}">${paneBarHTML(d,v)}${paneBodyHTML(d,v)}</div></div>`;
   if(focusId){const el=main.querySelector('#'+focusId);if(el){el.focus();try{el.setSelectionRange(el.value.length,el.value.length)}catch(e){}}}
@@ -769,8 +772,9 @@ function renderBuilder(main){
   main.onclick=async e=>{const b=e.target.closest('[data-set],[data-type],[data-inc],[data-dec],[data-view],button');if(!b)return;
     if(b.dataset.set){if(B.sets.has(b.dataset.set))B.sets.delete(b.dataset.set);else B.sets.add(b.dataset.set);rerender()}
     else if(b.dataset.type){B.type=B.type===b.dataset.type?'':b.dataset.type;rerender()}
+    else if(b.dataset.indeck){B.inDeck=!B.inDeck;rerender()}
     else if(b.dataset.inc){const cid=b.dataset.inc;d.cards[cid]=(d.cards[cid]||0)+1;B.dirty=true;bumpTile(main,cid,d.cards[cid]);renderPane(main,rerender)}
-    else if(b.dataset.dec){const cid=b.dataset.dec;const k=(d.cards[cid]||0)-1;if(k<=0)delete d.cards[cid];else d.cards[cid]=k;B.dirty=true;bumpTile(main,cid,Math.max(0,k));renderPane(main,rerender)}
+    else if(b.dataset.dec){const cid=b.dataset.dec;const k=(d.cards[cid]||0)-1;if(k<=0)delete d.cards[cid];else d.cards[cid]=k;B.dirty=true;if(B.inDeck&&k<=0){rerender()}else{bumpTile(main,cid,Math.max(0,k));renderPane(main,rerender)}}
     else if(b.id==='dpbar'){B.paneOpen=!B.paneOpen;renderPane(main,rerender)}
     else if(b.dataset.view){viewCard(b.dataset.view)}
     else if(b.id==='dsave'){d.name=(main.querySelector('#dname').value.trim()||'Untitled deck');try{await saveDeck(d);B.dirty=false;toast('Deck saved')}catch(err){toast('Save failed ('+(err.code||'error')+')')}rerender()}
@@ -808,12 +812,14 @@ function renderPane(main,rerender){
   pane.classList.toggle('open',!!B.paneOpen);
   pane.innerHTML=paneBarHTML(d,v)+paneBodyHTML(d,v);
   const nb=pane.querySelector('.dp-body');if(nb)nb.scrollTop=st;const ndl=pane.querySelector('.dl');if(ndl)ndl.scrollTop=st2;
+  const ic=document.querySelector('#indeckct');if(ic)ic.textContent=deckCount(d);
   bindPane(main,rerender);
 }
 function bumpTile(main,cid,k){
   const inc=main.querySelector(`.cdgrid [data-inc="${cid}"]`);if(!inc)return;
   const ct=inc.parentElement;const b=ct.querySelector('b');if(b)b.textContent=k;
   const dec=ct.querySelector('[data-dec]');if(dec)dec.disabled=!k;
+  const tile=inc.closest('.tile');if(tile)tile.classList.toggle('have',k>0);
 }
 
 /* ---------- game: state helpers ---------- */
