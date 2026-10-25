@@ -137,6 +137,8 @@ textarea{width:100%;min-height:60px;resize:vertical}
   .deckpane .dp-bar .dp-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .deckpane .dp-bar .ok{color:var(--ok)}
   .deckpane .dp-bar .no{color:var(--danger)}
+  .deckpane .dp-bar .dp-save{font-size:12px;font-weight:700;opacity:.75}
+  .deckpane .dp-bar .dp-save.error{color:var(--danger);opacity:1}
   .deckpane .dp-body{display:none;overflow:auto;padding:0 14px 14px;overscroll-behavior:contain;flex:1 1 auto;min-height:0;-webkit-overflow-scrolling:touch}
   .deckpane.open .dp-body{display:block}
   .deckpane .dl{max-height:none;overflow:visible}
@@ -740,9 +742,25 @@ function confirmDeleteGame(id){showModal('Close this table?',`<p>The table and i
 
 /* ---------- deck builder ---------- */
 const B={deckId:null,deck:null,q:'',sets:new Set(['base1','base2','base3','base5','gym1','gym2']),st:'',type:'',stage:'',dirty:false,paneOpen:false,inDeck:false};
+let autoT=null,saveState='saved';
+function setSaveState(st){saveState=st;const el=document.querySelector('#dpsave');if(el){el.textContent=st==='saving'?'Saving…':st==='saved'?'Saved ✓':st==='error'?'Not saved ⚠':'Unsaved';el.className='dp-save '+st}}
+function markDirty(){B.dirty=true;const d=B.deck;if(d){d.updatedAt=Date.now();ls.set('cpl.draft',{id:d.id,name:d.name,cards:d.cards,updatedAt:d.updatedAt});ls.set('cpl.lastDeck',d.id)}setSaveState('dirty');scheduleAutosave()}
+function scheduleAutosave(){clearTimeout(autoT);autoT=setTimeout(flushAutosave,1200)}
+async function flushAutosave(){clearTimeout(autoT);const d=B.deck;if(!d||!B.dirty)return;
+  const nm=document.querySelector('#dname');if(nm&&nm.value.trim())d.name=nm.value.trim();
+  setSaveState('saving');
+  try{await saveDeck(d);if(B.deck===d){B.dirty=false;ls.set('cpl.draft',null);setSaveState('saved')}}
+  catch(err){setSaveState('error')}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&B.dirty)flushAutosave()});
+window.addEventListener('pagehide',()=>{if(B.dirty)flushAutosave()});
 function currentDeck(){
   if(B.deck)return B.deck;
-  if(B.deckId){const d=S.decks.find(x=>x.id===B.deckId);if(d){B.deck=clone(d);return B.deck}}
+  if(!B.deckId){ // after a refresh: come back to an unsaved draft, else the last deck you worked on
+    const dr=ls.get('cpl.draft',null);
+    if(dr&&dr.id&&dr.cards){const sv=S.decks.find(x=>x.id===dr.id);if(!sv||(sv.updatedAt||0)<(dr.updatedAt||0)){B.deck=dr;B.deckId=dr.id;B.dirty=true;scheduleAutosave();return B.deck}}
+    const last=ls.get('cpl.lastDeck',null);if(last&&S.decks.some(x=>x.id===last))B.deckId=last;
+  }
+  if(B.deckId){const d=S.decks.find(x=>x.id===B.deckId);if(d){B.deck=clone(d);ls.set('cpl.lastDeck',d.id);return B.deck}}
   B.deck={id:rid(),name:'New deck',cards:{'base1-96':4}};B.deckId=B.deck.id;return B.deck; // house rule: every new deck starts with 4 Double Colorless
 }
 function filteredCards(){
@@ -780,15 +798,15 @@ function renderBuilder(main){
     if(b.dataset.set){if(B.sets.has(b.dataset.set))B.sets.delete(b.dataset.set);else B.sets.add(b.dataset.set);rerender()}
     else if(b.dataset.type){B.type=B.type===b.dataset.type?'':b.dataset.type;rerender()}
     else if(b.dataset.indeck){B.inDeck=!B.inDeck;rerender()}
-    else if(b.dataset.inc){const cid=b.dataset.inc;d.cards[cid]=(d.cards[cid]||0)+1;B.dirty=true;bumpTile(main,cid,d.cards[cid]);renderPane(main,rerender)}
-    else if(b.dataset.dec){const cid=b.dataset.dec;const k=(d.cards[cid]||0)-1;if(k<=0)delete d.cards[cid];else d.cards[cid]=k;B.dirty=true;if(B.inDeck&&k<=0){rerender()}else{bumpTile(main,cid,Math.max(0,k));renderPane(main,rerender)}}
+    else if(b.dataset.inc){const cid=b.dataset.inc;d.cards[cid]=(d.cards[cid]||0)+1;markDirty();bumpTile(main,cid,d.cards[cid]);renderPane(main,rerender)}
+    else if(b.dataset.dec){const cid=b.dataset.dec;const k=(d.cards[cid]||0)-1;if(k<=0)delete d.cards[cid];else d.cards[cid]=k;markDirty();if(B.inDeck&&k<=0){rerender()}else{bumpTile(main,cid,Math.max(0,k));renderPane(main,rerender)}}
     else if(b.id==='dpbar'){B.paneOpen=!B.paneOpen;renderPane(main,rerender)}
     else if(b.dataset.view){viewCard(b.dataset.view)}
-    else if(b.id==='dsave'){d.name=(main.querySelector('#dname').value.trim()||'Untitled deck');try{await saveDeck(d);B.dirty=false;toast('Deck saved')}catch(err){toast('Save failed ('+(err.code||'error')+')')}rerender()}
-    else if(b.id==='dnew'){if(B.dirty&&!confirmDiscard())return;B.deck=null;B.deckId=null;B.dirty=false;rerender()}
-    else if(b.id==='dcopy'){const nd={id:rid(),name:d.name+' (copy)',cards:clone(d.cards)};B.deck=nd;B.deckId=nd.id;B.dirty=true;rerender();toast('Copied. Save to keep it.')}
-    else if(b.id==='ddel'){showModal('Delete this deck?',`<p><b>${esc(d.name)}</b> will be removed.</p>`,`<button class="dng" id="dok" type="button">Delete</button>`,m=>{m.querySelector('#dok').onclick=async()=>{closeModal();try{await deleteDeck(d.id)}catch(err){}B.deck=null;B.deckId=null;B.dirty=false;rerender()}})}
-    else if(b.id==='dio'){showModal('Import / export',`<p class="small muted">One card per line: <code>4 Pikachu (base2-60)</code>. The set code in parentheses is optional if the name is unique.</p><textarea id="dtxt" style="min-height:260px;font-family:ui-monospace,monospace;font-size:13px">${esc(deckText(d))}</textarea>`,`<button class="pri" id="dimp" type="button">Replace deck with this list</button><button id="dcp" type="button">Copy to clipboard</button>`,m=>{m.querySelector('#dimp').onclick=()=>{const r=parseDeckText(m.querySelector('#dtxt').value);d.cards=r.cards;B.dirty=true;closeModal();rerender();toast(r.bad.length?`Imported; ${r.bad.length} line(s) not recognized`:'Imported')};m.querySelector('#dcp').onclick=()=>{const ta=m.querySelector('#dtxt');navigator.clipboard.writeText(ta.value).then(()=>toast('Copied')).catch(()=>{ta.select();toast('Select and copy the text')})}})}
+    else if(b.id==='dsave'){d.name=(main.querySelector('#dname').value.trim()||'Untitled deck');try{clearTimeout(autoT);await saveDeck(d);B.dirty=false;ls.set('cpl.draft',null);setSaveState('saved');toast('Deck saved')}catch(err){toast('Save failed ('+(err.code||'error')+')')}rerender()}
+    else if(b.id==='dnew'){if(B.dirty)await flushAutosave();B.deck=null;B.deckId=null;B.dirty=false;ls.set('cpl.draft',null);ls.set('cpl.lastDeck',null);currentDeck();markDirty();rerender()}
+    else if(b.id==='dcopy'){const nd={id:rid(),name:d.name+' (copy)',cards:clone(d.cards)};B.deck=nd;B.deckId=nd.id;markDirty();rerender();toast('Copied')}
+    else if(b.id==='ddel'){showModal('Delete this deck?',`<p><b>${esc(d.name)}</b> will be removed.</p>`,`<button class="dng" id="dok" type="button">Delete</button>`,m=>{m.querySelector('#dok').onclick=async()=>{closeModal();try{await deleteDeck(d.id)}catch(err){}B.deck=null;B.deckId=null;B.dirty=false;ls.set('cpl.draft',null);ls.set('cpl.lastDeck',null);rerender()}})}
+    else if(b.id==='dio'){showModal('Import / export',`<p class="small muted">One card per line: <code>4 Pikachu (base2-60)</code>. The set code in parentheses is optional if the name is unique.</p><textarea id="dtxt" style="min-height:260px;font-family:ui-monospace,monospace;font-size:13px">${esc(deckText(d))}</textarea>`,`<button class="pri" id="dimp" type="button">Replace deck with this list</button><button id="dcp" type="button">Copy to clipboard</button>`,m=>{m.querySelector('#dimp').onclick=()=>{const r=parseDeckText(m.querySelector('#dtxt').value);d.cards=r.cards;markDirty();closeModal();rerender();toast(r.bad.length?`Imported; ${r.bad.length} line(s) not recognized`:'Imported')};m.querySelector('#dcp').onclick=()=>{const ta=m.querySelector('#dtxt');navigator.clipboard.writeText(ta.value).then(()=>toast('Copied')).catch(()=>{ta.select();toast('Select and copy the text')})}})}
   };
 }
 let debT=null;function debounce(f){clearTimeout(debT);debT=setTimeout(f,180)}
@@ -803,7 +821,7 @@ function paneStripHTML(d){
   return `<div class="dp-strip">${items.map(([cid,k,c])=>`<div class="mini" data-view="${cid}" title="${esc(c.name)}"><div class="cd" style="${cardStyle(cid)}"></div><b>×${k}</b></div>`).join('')}</div>`;
 }
 function paneBarHTML(d,v){const n=deckCount(d);const bad=v.some(x=>x.bad);
-  return `<button class="dp-bar" type="button" id="dpbar" aria-expanded="${!!B.paneOpen}"><span class="dp-n">${esc(d.name)}</span><span class="${bad?'no':'ok'}">${n}/${DEFAULT_RULES.deckSize} ${bad?'✕':'✓'}</span><span class="dp-ch">${B.paneOpen?'▾':'▴'}</span></button>`}
+  return `<button class="dp-bar" type="button" id="dpbar" aria-expanded="${!!B.paneOpen}"><span class="dp-n">${esc(d.name)}</span><span class="${bad?'no':'ok'}">${n}/${DEFAULT_RULES.deckSize} ${bad?'✕':'✓'}</span><span id="dpsave" class="dp-save ${saveState}">${saveState==='saving'?'Saving…':saveState==='saved'?'Saved ✓':saveState==='error'?'Not saved ⚠':'Unsaved'}</span><span class="dp-ch">${B.paneOpen?'▾':'▴'}</span></button>`}
 function paneBodyHTML(d,v){
   const groups={'Pokémon':[],'Trainer':[],'Energy':[]};for(const [cid,k] of Object.entries(d.cards)){const c=C(cid);(groups[c.st]||groups.Trainer).push([cid,k,c])}
   const gsum=Object.fromEntries(Object.entries(groups).map(([g,a])=>[g,a.reduce((s,x)=>s+x[1],0)]));
@@ -816,8 +834,8 @@ function paneBodyHTML(d,v){
   </div>`}
 function bindPane(main,rerender){
   const d=currentDeck();
-  const dn=main.querySelector('#dname');if(dn)dn.oninput=e=>{d.name=e.target.value;B.dirty=true};
-  const dp=main.querySelector('#dpick');if(dp)dp.onchange=e=>{if(!e.target.value)return;if(B.dirty&&!confirmDiscard())return;B.deckId=e.target.value;B.deck=null;B.dirty=false;B.paneOpen=false;rerender()};
+  const dn=main.querySelector('#dname');if(dn)dn.oninput=e=>{d.name=e.target.value;markDirty()};
+  const dp=main.querySelector('#dpick');if(dp)dp.onchange=e=>{if(!e.target.value)return;if(B.dirty)flushAutosave();ls.set('cpl.draft',null);B.deckId=e.target.value;ls.set('cpl.lastDeck',B.deckId);B.deck=null;B.dirty=false;B.paneOpen=false;rerender()};
 }
 function renderPane(main,rerender){
   const pane=main.querySelector('.deckpane');if(!pane)return;
