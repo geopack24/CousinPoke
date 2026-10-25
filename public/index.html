@@ -112,6 +112,7 @@ textarea{width:100%;min-height:60px;resize:vertical}
 .tag.ty i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
 .deckpane{position:sticky;top:calc(58px + env(safe-area-inset-top,0px))}
 .deckpane .dp-bar{display:none}
+.deckpane .dp-strip{display:none}
 .deckpane .dl{max-height:52vh;overflow:auto;display:flex;flex-direction:column;gap:2px;margin-top:8px}
 @media (pointer:coarse){
   .cdgrid .tile .ct{gap:8px}
@@ -120,12 +121,18 @@ textarea{width:100%;min-height:60px;resize:vertical}
 }
 @media (max-width:900px){
   .builder{grid-template-columns:1fr}
-  .cardpane{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+  .cardpane{padding-bottom:calc(126px + env(safe-area-inset-bottom,0px))}
   .cdgrid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
   .filters .chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
   .filters .chips::-webkit-scrollbar{display:none}
   .filters .chips .tag{flex:none;white-space:nowrap}
   .builder .deckpane{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:30;border-radius:14px 14px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.28);padding:0 0 env(safe-area-inset-bottom,0px);display:flex;flex-direction:column;overflow:hidden;max-height:72vh;max-height:72dvh}
+  .deckpane .dp-strip{display:flex;gap:7px;overflow-x:auto;padding:9px 12px 0;scrollbar-width:none;align-items:flex-start}
+  .deckpane .dp-strip::-webkit-scrollbar{display:none}
+  .deckpane .dp-strip .mini{flex:none;position:relative;width:35px}
+  .deckpane .dp-strip .mini .cd{width:35px;height:auto;aspect-ratio:240/330;border-radius:4px;background-size:1200% auto;background-position:calc(var(--x)*100%/11) calc(var(--y)*100%/var(--rows1));box-shadow:0 1px 3px rgba(0,0,0,.35)}
+  .deckpane .dp-strip .mini b{position:absolute;right:-4px;bottom:-4px;background:var(--accent);color:var(--accent-fg);border-radius:999px;font-size:10px;font-weight:800;padding:0 4px;line-height:1.5}
+  .deckpane.open .dp-strip{display:none}
   .deckpane .dp-bar{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:12px 16px;text-align:left;font-weight:800;border-radius:14px 14px 0 0}
   .deckpane .dp-bar .dp-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .deckpane .dp-bar .ok{color:var(--ok)}
@@ -747,7 +754,7 @@ function filteredCards(){
     return true});
 }
 function renderBuilder(main){
-  const d=currentDeck();let list=filteredCards();if(B.inDeck)list=list.filter(c=>d.cards[c.id]);const v=validateDeck(d);
+  const d=currentDeck();const list=B.inDeck?DATA.cards.filter(c=>d.cards[c.id]):filteredCards();const v=validateDeck(d);
   const ae=document.activeElement;const focusId=(ae&&(ae.id==='q'||ae.id==='dname'))?ae.id:null;const bannedSet=new Set(DEFAULT_RULES.banned);
   main.innerHTML=`<div class="builder">
     <div class="cardpane">
@@ -762,7 +769,7 @@ function renderBuilder(main){
       <div class="small muted" style="margin-bottom:8px">${list.length} cards</div>
       <div class="cdgrid">${list.map(c=>{const k=d.cards[c.id]||0;const isBan=bannedSet.has(c.name);const lim=DEFAULT_RULES.limits[c.name];return `<div class="tile${k?' have':''}"><div class="cd click" style="${cardStyle(c.id)}" data-cid="${c.id}" data-view="${c.id}" role="img" aria-label="${esc(c.name)}">${isBan?'<span class="ban">Banned</span>':lim!=null?`<span class="ban lim">Max ${lim}</span>`:''}</div><div class="nm" title="${esc(c.name)}">${esc(c.name)}</div><div class="ct"><button class="sm" type="button" data-dec="${c.id}" ${k?'':'disabled'}>−</button><b>${k}</b><button class="sm" type="button" data-inc="${c.id}">+</button></div></div>`}).join('')}</div>
     </div>
-    <div class="deckpane panel${B.paneOpen?' open':''}">${paneBarHTML(d,v)}${paneBodyHTML(d,v)}</div></div>`;
+    <div class="deckpane panel${B.paneOpen?' open':''}">${paneStripHTML(d)}${paneBarHTML(d,v)}${paneBodyHTML(d,v)}</div></div>`;
   if(focusId){const el=main.querySelector('#'+focusId);if(el){el.focus();try{el.setSelectionRange(el.value.length,el.value.length)}catch(e){}}}
   const rerender=()=>renderBuilder(main);
   main.querySelector('#q').oninput=e=>{B.q=e.target.value;debounce(rerender)};
@@ -788,6 +795,13 @@ let debT=null;function debounce(f){clearTimeout(debT);debT=setTimeout(f,180)}
 function confirmDiscard(){return true}
 /* The deck pane renders on its own so +/− taps don't rebuild the whole card grid (slow on phones).
    On small screens it is a bottom sheet: the dp-bar summary is always visible; tapping it opens dp-body. */
+function paneStripHTML(d){
+  const ids=Object.keys(d.cards);
+  if(!ids.length)return '<div class="dp-strip"><span class="small muted" style="padding:2px 4px">Deck is empty — tap + on cards below</span></div>';
+  const ORD={'Pokémon':0,'Trainer':1,'Energy':2};
+  const items=ids.map(cid=>[cid,d.cards[cid],C(cid)]).sort((a,b)=>(ORD[a[2].st]??1)-(ORD[b[2].st]??1)||a[2].name.localeCompare(b[2].name));
+  return `<div class="dp-strip">${items.map(([cid,k,c])=>`<div class="mini" data-view="${cid}" title="${esc(c.name)}"><div class="cd" style="${cardStyle(cid)}"></div><b>×${k}</b></div>`).join('')}</div>`;
+}
 function paneBarHTML(d,v){const n=deckCount(d);const bad=v.some(x=>x.bad);
   return `<button class="dp-bar" type="button" id="dpbar" aria-expanded="${!!B.paneOpen}"><span class="dp-n">${esc(d.name)}</span><span class="${bad?'no':'ok'}">${n}/${DEFAULT_RULES.deckSize} ${bad?'✕':'✓'}</span><span class="dp-ch">${B.paneOpen?'▾':'▴'}</span></button>`}
 function paneBodyHTML(d,v){
@@ -808,9 +822,10 @@ function bindPane(main,rerender){
 function renderPane(main,rerender){
   const pane=main.querySelector('.deckpane');if(!pane)return;
   const d=currentDeck();const v=validateDeck(d);
-  const body=pane.querySelector('.dp-body');const st=body?body.scrollTop:0;const dl=pane.querySelector('.dl');const st2=dl?dl.scrollTop:0;
+  const body=pane.querySelector('.dp-body');const st=body?body.scrollTop:0;const dl=pane.querySelector('.dl');const st2=dl?dl.scrollTop:0;const strip=pane.querySelector('.dp-strip');const st3=strip?strip.scrollLeft:0;
   pane.classList.toggle('open',!!B.paneOpen);
-  pane.innerHTML=paneBarHTML(d,v)+paneBodyHTML(d,v);
+  pane.innerHTML=paneStripHTML(d)+paneBarHTML(d,v)+paneBodyHTML(d,v);
+  const ns=pane.querySelector('.dp-strip');if(ns)ns.scrollLeft=st3;
   const nb=pane.querySelector('.dp-body');if(nb)nb.scrollTop=st;const ndl=pane.querySelector('.dl');if(ndl)ndl.scrollTop=st2;
   const ic=document.querySelector('#indeckct');if(ic)ic.textContent=deckCount(d);
   bindPane(main,rerender);
