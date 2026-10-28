@@ -246,6 +246,9 @@ textarea{width:100%;min-height:60px;resize:vertical}
 .mon.windup .poke{animation:windup .45s}
 @keyframes windup{0%,100%{transform:rotate(0)}15%{transform:rotate(-7deg) scale(1.04)}30%{transform:rotate(7deg) scale(1.07)}45%{transform:rotate(-6deg) scale(1.07)}60%{transform:rotate(5deg) scale(1.05)}80%{transform:translateY(-12px) rotate(0)}}
 .mon.charge .poke{animation:charge .7s}
+.mon.zcharge .poke{animation:zcharge 1.25s ease-in forwards}
+@keyframes zcharge{0%{transform:none;filter:none}30%{filter:drop-shadow(0 0 10px #ffe03a) brightness(1.15)}60%{transform:translateY(-6px) scale(1.06);filter:drop-shadow(0 0 22px #ffe03a) brightness(1.35)}85%{transform:translateY(-10px) scale(1.1) rotate(-1deg);filter:drop-shadow(0 0 34px #fff6a0) brightness(1.6)}100%{transform:translateY(-10px) scale(1.1);filter:drop-shadow(0 0 40px #fff) brightness(1.8)}}
+.stormstage{position:fixed;inset:0;z-index:1150;pointer-events:none}.stormstage .fxlayer{border-radius:0}
 @keyframes charge{0%{transform:scale(1)}40%{transform:scale(1.1);filter:drop-shadow(0 0 16px #ff6a00) brightness(1.3)}70%{transform:scale(1.14) rotate(-2deg);filter:drop-shadow(0 0 26px #ff2a00) brightness(1.5)}100%{transform:scale(1);filter:none}}
 /* beat-up look below half HP, worse below a quarter */
 .mon.hurt .poke .cd,.mon.critical .poke .cd{filter:saturate(.85) brightness(.93)}

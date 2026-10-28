@@ -202,6 +202,57 @@ export const MOVE_FX = {
     fx.at(260, () => { fx.glowSpot(t.cx, t.cy, { color: '#ff9a1f', r: 100, life: 500 }); fx.burst(t.cx, t.cy, { n: 30, colors: C, speed: 5, g: -0.08, size: 7, life: 600, glow: 8 }); });
     return { impact: 300, done: dur + 400 };
   },
+  // Zapdos's own Thunderbolt: the whole screen goes dark, a storm rolls in, Zapdos charges up and calls down one giant strike.
+  'base1-16|Thunderbolt'(fx, s) {
+    const t = s.targets[0], f = s.from; const IMPACT = 1550, DONE = 2900;
+    // the storm is drawn on its own full-screen layer above everything (so the board can shake under it)
+    const stage = document.createElement('div'); stage.className = 'stormstage'; stage.style.cssText = 'position:fixed;inset:0;z-index:1150;pointer-events:none'; document.body.appendChild(stage);
+    const S = new Layer(stage); S.sz = fx.sz; const br = s.boardEl.getBoundingClientRect(); const W = S.w, H = S.h;
+    const T = { cx: br.left + t.cx, cy: br.top + t.cy, w: t.w, h: t.h }, F = { cx: br.left + f.cx, cy: br.top + f.cy, w: f.w, h: f.h };
+    let lit = 0; const flicker = (amt) => { lit = Math.max(lit, amt); };
+    const env = (ms) => (ms < 450 ? ms / 450 : ms > 1900 ? Math.max(0, 1 - (ms - 1900) / 1000) : 1);
+    const drops = Array.from({ length: 170 }, () => ({ x: rnd(-60, W + 60), y: rnd(-H, H), sp: rnd(15, 24), len: rnd(14, 28) }));
+    const clouds = Array.from({ length: 9 }, (_, i) => ({ x: (i / 8) * W + rnd(-60, 60), y: rnd(-50, 70), r: rnd(140, 240), vx: rnd(0.15, 0.5) }));
+    S.add({ t: 0, life: DONE, draw: (ctx, k, dt) => {
+      const ms = k * DONE, e = env(ms); lit *= Math.pow(0.86, dt / 16.7);
+      ctx.globalAlpha = 0.84 * e; const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#04060d'); sky.addColorStop(1, '#0b1022'); ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+      if (lit > 0.02) { ctx.globalAlpha = lit * 0.35 * e; ctx.fillStyle = '#b9c8ff'; ctx.fillRect(0, 0, W, H); }
+      for (const c of clouds) { c.x += c.vx * dt / 16.7; if (c.x - c.r > W) c.x = -c.r; const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, c.r); const l = Math.round(34 + lit * 150); g.addColorStop(0, `rgba(${l},${l + 6},${l + 26},.95)`); g.addColorStop(1, 'rgba(10,14,30,0)'); ctx.globalAlpha = e; ctx.fillStyle = g; ctx.fillRect(c.x - c.r, c.y - c.r, c.r * 2, c.r * 2); }
+      ctx.globalAlpha = 0.45 * e; ctx.strokeStyle = '#a9bcff'; ctx.lineWidth = 1.2; ctx.beginPath();
+      for (const d of drops) { d.y += d.sp * dt / 16.7; d.x -= d.sp * 0.25 * dt / 16.7; if (d.y > H) { d.y = rnd(-80, -10); d.x = rnd(-60, W + 60); } ctx.moveTo(d.x, d.y); ctx.lineTo(d.x + d.len * 0.25, d.y - d.len); }
+      ctx.stroke();
+    } });
+    // far-off lightning while the storm builds
+    for (const [ms, a] of [[350, 0.7], [820, 0.55], [1180, 0.8]]) S.at(ms, () => { flicker(a); const x = rnd(W * 0.1, W * 0.9); S.bolt(x, -10, x + rnd(-120, 120), rnd(H * 0.25, H * 0.5), { life: 170, jitter: 30, width: 2.5, color: '#c9d6ff', segments: 10 }); });
+    // Zapdos charges: crackles all around it, sparks pulled in, a growing glow
+    if (s.fromEl) { s.fromEl.classList.add('zcharge'); fx.at(IMPACT, () => s.fromEl.classList.remove('zcharge')); }
+    S.add({ t: 0, life: 1150, draw: () => {} }); // keeps the clock running through the charge
+    for (let i = 0; i < 14; i++) S.at(300 + i * 80, () => { const a = rnd(0, Math.PI * 2), r = rnd(50, 95) * S.sz; S.bolt(F.cx, F.cy, F.cx + Math.cos(a) * r, F.cy + Math.sin(a) * r, { life: 120, jitter: 10, width: 2.5, segments: 6 }); });
+    S.emitter({ life: 1100, path: () => ({ x: F.cx, y: F.cy }), rate: 90, spawn: (x, y) => { const a = rnd(0, Math.PI * 2), r = rnd(80, 140) * S.sz; S.particle({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, vx: -Math.cos(a) * r / 26, vy: -Math.sin(a) * r / 26, size: rnd(2, 4), color: pick(PAL.Lightning), shape: 'spark', life: 420, glow: 10, drag: 1 }); } });
+    S.at(300, () => S.glowSpot(F.cx, F.cy, { color: '#ffe03a', r: 120, life: 1200, alpha: 0.55, grow: true }));
+    // it fires a bolt up into the clouds, the clouds over the target light up...
+    S.at(1180, () => { S.bolt(F.cx, F.cy, F.cx + rnd(-30, 30), -20, { life: 260, jitter: 22, width: 7 }); flicker(0.6); });
+    S.at(1420, () => { S.glowSpot(T.cx, 20, { color: '#eef3ff', r: 220, life: 260, alpha: 0.8, grow: true }); flicker(0.9); });
+    // ...and the giga strike
+    S.at(IMPACT, () => {
+      flicker(1); S.flash({ life: 420, alpha: 0.95, color: '#ffffff' });
+      const x0 = T.cx + rnd(-30, 30);
+      S.bolt(x0, -30, T.cx, T.cy, { life: 560, jitter: 46, width: 26, segments: 16 });
+      S.bolt(x0 + 14, -30, T.cx + rnd(-8, 8), T.cy, { life: 460, jitter: 36, width: 12, segments: 14 });
+      for (let i = 0; i < 6; i++) { const k = rnd(0.25, 0.75); const bx = lerp(x0, T.cx, k), by = lerp(-30, T.cy, k); S.bolt(bx, by, bx + rnd(-170, 170), by + rnd(40, 160), { life: 300, jitter: 20, width: 4, segments: 8 }); }
+      S.glowSpot(T.cx, T.cy, { color: '#fff7c2', r: 230, life: 650, alpha: 0.9 });
+      S.ring(T.cx, T.cy, { r0: 10, r1: 170, color: '#fff3a0', width: 12, life: 520, glow: 20 });
+      S.at(120, () => S.ring(T.cx, T.cy, { r0: 10, r1: 260, color: '#ffffff', width: 6, life: 650, alpha: 0.7, glow: 14 }));
+      S.burst(T.cx, T.cy, { n: 80, colors: PAL.Lightning, speed: 13, shape: 'spark', size: 5, life: 700, drag: 0.92 });
+      S.burst(T.cx, T.cy + T.h * 0.3, { n: 30, colors: ['#ffffff', '#cfd6e6', '#8a93a8'], speed: 6, size: 4, life: 900, g: 0.15, lift: -4 });
+      fx.shake(s.boardEl, 750, 15);
+    });
+    // after-crackles and smoke on the target
+    for (let i = 0; i < 6; i++) S.at(IMPACT + 180 + i * 120, () => { const a = rnd(0, Math.PI * 2), r = rnd(30, 70) * S.sz; S.bolt(T.cx, T.cy, T.cx + Math.cos(a) * r, T.cy + Math.sin(a) * r, { life: 110, jitter: 8, width: 2, segments: 5 }); });
+    S.at(IMPACT + 150, () => S.emitter({ life: 900, path: () => ({ x: T.cx, y: T.cy }), rate: 40, spawn: (x, y) => S.particle({ x: x + rnd(-T.w / 3, T.w / 3), y: y + rnd(-10, T.h / 3), vx: rnd(-0.4, 0.4), vy: rnd(-1.6, -0.6), size: rnd(8, 14), color: '#2a2d36', life: 900, fadeIn: 150, shrink: false }) }));
+    S.at(DONE + 60, () => stage.remove());
+    return { impact: IMPACT, done: DONE };
+  },
   Thunder(fx, s) { const t = s.targets[0]; lightningStrike(fx, t, { bolts: 4 }); fx.at(120, () => fx.shake(s.boardEl, 500, 8)); fx.at(200, () => fx.flash({ life: 220, alpha: 0.5, color: '#fff8c0' })); return { impact: 180, done: 900 }; },
   Thunderbolt(fx, s) { const t = s.targets[0]; fx.bolt(s.from.cx, s.from.cy, t.cx, t.cy, { life: 320, jitter: 26, width: 8 }); fx.at(60, () => fx.bolt(s.from.cx, s.from.cy, t.cx, t.cy, { life: 300, jitter: 30, width: 5 })); lightningStrike(fx, t, { bolts: 2 }); fx.at(120, () => fx.shake(s.boardEl, 350, 6)); return { impact: 150, done: 800 }; },
   'Hydro Pump'(fx, s) { const t = s.targets[0]; const C = PAL.Water; fx.beam(s.from.cx, s.from.cy, t.cx, t.cy, { life: 650, width: 30, color: '#4fb0ff', core: '#e8f7ff' }); fx.emitter({ life: 650, path: () => ({ x: t.cx, y: t.cy }), rate: 160, spawn: (x, y) => fx.particle({ x, y, vx: rnd(-6, 6), vy: rnd(-7, 1), g: 0.25, size: rnd(3, 7), color: pick(C), shape: 'drop', life: 600, glow: 6 }) }); fx.at(180, () => { fx.shake(s.boardEl, 500, 5); fx.ring(t.cx, t.cy, { r0: 10, r1: 110, color: '#bfe9ff', width: 10, life: 600, glow: 12 }); }); return { impact: 200, done: 1000 }; },

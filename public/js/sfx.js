@@ -62,6 +62,11 @@ const FX = {
   turn: (t) => arp(t, [784, 1047, 1319], 0.09, { type: 'triangle', g: 0.14 }),
   win: (t) => arp(t, [523, 659, 784, 1047, 784, 1047, 1319], 0.11, { type: 'square', g: 0.14 }),
   // Charizard's Fire Spin: charge, roar, stream, tornado, blast
+  // Zapdos's Thunderbolt: storm rumble, far thunder, a rising charge, the giant crack
+  'storm.rumble': (t) => { noise(t, { dur: 2.8, type: 'lowpass', f: 260, to: 120, g: 0.32, a: 0.4, hold: 0.7 }); tone(t, { type: 'sine', f: 48, to: 38, dur: 2.6, g: 0.22, a: 0.5, hold: 0.7 }); noise(t, { dur: 2.6, type: 'highpass', f: 5000, g: 0.05, a: 0.3, hold: 0.7 }); },
+  'storm.far': (t) => { noise(t, { dur: 1.1, type: 'lowpass', f: 420, to: 70, g: 0.3, a: 0.05 }); },
+  'storm.charge': (t) => { tone(t, { type: 'sawtooth', f: 70, to: 900, dur: 1.2, g: 0.09, filter: { f: 1800 }, hold: 0.9, lfo: { f: 22, depth: 18 } }); for (let i = 0; i < 14; i++) tone(t + i * 0.08, { type: 'square', f: rnd(1800, 4200), dur: 0.03, g: 0.06 }); },
+  'storm.crack': (t) => { noise(t, { dur: 0.18, type: 'highpass', f: 1800, g: 0.7, a: 0.001 }); noise(t + 0.02, { dur: 1.8, type: 'lowpass', f: 1400, to: 50, g: 0.85, hold: 0.15 }); tone(t, { type: 'sine', f: 70, to: 24, dur: 1.6, g: 0.6 }); for (let i = 0; i < 10; i++) tone(t + 0.05 + i * 0.045, { type: 'square', f: rnd(1500, 4500), dur: 0.035, g: 0.08 }); },
   'firespin.charge': (t) => { tone(t, { type: 'sawtooth', f: 50, to: 220, dur: 0.6, g: 0.18, filter: { f: 900 }, shape: 8 }); noise(t, { dur: 0.6, type: 'highpass', f: 4000, to: 800, g: 0.12 }); },
   'firespin.roar': (t) => { tone(t, { type: 'sawtooth', f: 180, to: 90, dur: 0.6, g: 0.3, shape: 20, filter: { f: 1200 }, lfo: { f: 30, depth: 25 } }); noise(t, { dur: 0.3, type: 'lowpass', f: 300, g: 0.5 }); },
   'firespin.stream': (t) => { noise(t, { dur: 0.8, f: 500, g: 0.35, q: 0.6, hold: 0.8 }); tone(t, { type: 'sawtooth', f: 110, dur: 0.8, g: 0.1, hold: 0.8, filter: { f: 500 }, lfo: { f: 14, depth: 15 } }); },
@@ -87,6 +92,7 @@ export function attack(key, type, times) {
   const lower = (type || 'Colorless').toLowerCase();
   play('windup', 0);
   if (key === 'base1-4|Fire Spin') { play('firespin.charge', 0); play('firespin.roar', 600); play('firespin.stream', 640); play('firespin.tornado', 1300); play('firespin.blast', 2200); return; }
+  if (key === 'base1-16|Thunderbolt') { play('storm.rumble', 0); play('storm.far', 350); play('storm.far', 820); play('storm.charge', 300); play('storm.far', 1180); play('storm.crack', times.impact); return; }
   if (key === 'basic:claw') return play('claw', times.impact);
   if (key === 'basic:thump') return play('thump', times.impact);
   if (['Thunder', 'Thunderbolt'].includes(key)) { play('lightning.launch', 0); play('lightning.impact', times.impact); play('lightning.impact', times.impact + 250); return; }

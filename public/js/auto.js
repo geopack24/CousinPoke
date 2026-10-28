@@ -337,8 +337,15 @@ export function render(main, doc) {
   phaseSeen[doc.id] = g.phase;
   if (doc.id in winSeen && !winSeen[doc.id] && g.winner) { pendingWin = g.seats[g.winner].name; } winSeen[doc.id] = g.winner || null;
   { const mine = !!(me && !g.winner && g.phase === 'main' && !g.pending.length && g.turn === me); if (doc.id in turnSeen && !turnSeen[doc.id] && mine) pendingTurn = true; turnSeen[doc.id] = mine; }
-  { const prev = activeSeen[doc.id]; const now = { a: g.p.a.active ? g.p.a.active.id : null, b: g.p.b.active ? g.p.b.active.id : null }; activeSeen[doc.id] = now;
-    if (prev && !battleStart && g.phase === 'main') for (const s of [other(bottom), bottom]) { const m = g.p[s].active; if (m && now[s] !== prev[s]) playPokemonMusic(C(m.c).name); } }
+  { const prev = activeSeen[doc.id]; const now = { a: g.p.a.active ? g.p.a.active.id : null, b: g.p.b.active ? g.p.b.active.id : null, cards: {} };
+    for (const s of ['a', 'b']) for (const m of mons(g.p[s])) now.cards[m.id] = m.c;
+    activeSeen[doc.id] = now;
+    if (prev && !battleStart && g.phase === 'main') {
+      // a Pokémon in play evolved (active or benched): the evolution is a new id with the old Pokémon right under it
+      const evolved = Object.keys(now.cards).filter((id) => { if (!prev.cards || prev.cards[id]) return false; const f = findMon(g, id); const u = f && f.m.un[0]; return !!(u && prev.cards[u.id] === u.c); });
+      if (evolved.length) playPokemonMusic(C(now.cards[evolved[evolved.length - 1]]).name);
+      else for (const s of [other(bottom), bottom]) { const m = g.p[s].active; if (m && now[s] !== prev[s]) playPokemonMusic(C(m.c).name); }
+    } }
   if (seenFxId === null) seenFxId = doc.fx ? doc.fx.id : '';
   else if (doc.fx && doc.fx.id !== seenFxId) { seenFxId = doc.fx.id; pendingFx = doc.fx.events; pendingScene = captureScene(pendingFx, g); }
   const legal = me ? legalActions(g, me, PT.CARDS) : [];
