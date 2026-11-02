@@ -84,6 +84,34 @@ const FLIP_LABELS = { confusion: 'Confusion check', sleep: 'Asleep: wake-up chec
 const isCheck = (f) => !!(f && f.seat && (f.label === 'sleep' || f.label === 'burn'));
 function checkTitle(f, me) { const whose = f.seat === me ? 'Your' : 'Opponent\u2019s'; return f.label === 'sleep' ? `💤 ${whose} ${f.name} is Asleep — wake-up flip` : `🔥 ${whose} ${f.name} is Burned — burn flip`; }
 function checkOutcome(f) { return f.label === 'sleep' ? (f.heads ? `HEADS — ${f.name} woke up!` : `TAILS — ${f.name} is still Asleep`) : (f.heads ? `HEADS — no burn damage` : `TAILS — ${f.name} takes 20 burn damage`); }
+/* House rule bench rescue: show the draw-for-a-Basic card by card, so a loss doesn't just appear out of nowhere.
+   The drawing player sees their cards; the other player sees backs, plus the Basic if one turned up. */
+let rescuePlaying = null;
+function showRescue(e, me) {
+  const mine = e.seat === me; const wrap = document.createElement('div'); wrap.className = 'coinflip rescue';
+  const who = mine ? 'You have' : `${esc(e.name)} has`;
+  wrap.innerHTML = `<div class="cf-box"><div class="cf-title">${who} no Pokémon left!</div>
+    <div class="cf-hint">Drawing until a Basic Pokémon turns up (up to 7)…</div>
+    <div class="rs-row"></div><div class="cf-hint rs-end"></div></div>`;
+  document.body.appendChild(wrap);
+  const row = wrap.querySelector('.rs-row'); let i = 0;
+  return new Promise((resolve) => {
+    const close = () => { if (wrap.isConnected) { wrap.remove(); resolve(); } };
+    const step = () => {
+      if (i < e.cards.length) {
+        const cid = e.cards[i]; const hit = e.found && i === e.cards.length - 1;
+        const slot = document.createElement('div'); slot.className = 'rs-card' + (hit ? ' hit' : '');
+        slot.innerHTML = mine || hit ? PT.cardHTML(cid, .26) : PT.backHTML(.26);
+        row.appendChild(slot); sfx.play('coin', 0, !!hit); i++; setTimeout(step, 600); return;
+      }
+      const end = wrap.querySelector('.rs-end');
+      end.textContent = e.found ? `Found ${C(e.found).name}! It comes in as the Active Pokémon.` : `No Basic Pokémon in ${e.cards.length} card${e.cards.length === 1 ? '' : 's'} — ${mine ? 'you lose' : e.name + ' loses'}.`;
+      end.classList.add('cf-outcome', e.found ? (mine ? 'good' : 'bad') : (mine ? 'bad' : 'good'));
+      wrap.onclick = close; setTimeout(close, 3200);
+    };
+    setTimeout(step, 700);
+  });
+}
 function clickCoins(flips, opts = {}) {
   return new Promise((resolve) => {
     const wrap = document.createElement('div'); wrap.className = 'coinflip';
@@ -201,7 +229,7 @@ function promptModal(prompt) {
 }
 
 /* ---------- events -> animations ---------- */
-const FX_EVENTS = ['attack', 'damage', 'heal', 'ko', 'flip', 'status', 'draw', 'confused', 'trainer', 'play', 'evolve', 'attach'];
+const FX_EVENTS = ['rescue', 'attack', 'damage', 'heal', 'ko', 'flip', 'status', 'draw', 'confused', 'trainer', 'play', 'evolve', 'attach'];
 /** Store the interesting events on the doc so the other player's screen animates them too. */
 function publishFx(doc, events) {
   const ev = events.filter((e) => FX_EVENTS.includes(e.t)); if (!ev.length) { return; }
@@ -309,6 +337,8 @@ async function playEvents(events, doc, scene, opts = {}) {
   const confFlip = atk ? events.find((e) => e.t === 'flip' && e.label === 'confusion') : null;
   const flips = events.filter((e) => e.t === 'flip' && e !== confFlip && !isCheck(e));
   const checks = events.filter((e) => e.t === 'flip' && isCheck(e));
+  const rescues = events.filter((e) => e.t === 'rescue');
+  if (rescues.length) { const me = mySeat(doc); rescuePlaying = new Promise((res) => setTimeout(async () => { for (const e of rescues) await showRescue(e, me); res(); }, 1400)).finally(() => { rescuePlaying = null; }); }
   if (checks.length && !opts.coinsDone) { const me = mySeat(doc); setTimeout(async () => { for (const f of checks) await clickCoins([f], { title: checkTitle(f, me), outcome: checkOutcome(f), auto: f.seat !== me }); }, 900); }
   const landHits = () => {
     const board = boardEl();
@@ -426,7 +456,7 @@ export function render(main, doc) {
   const chatNew = main.querySelector('#chatin'); if (chatNew && chatPrev) { chatNew.value = chatPrev; if (chatFocus) chatNew.focus(); }
   attachLayer(main.querySelector('.board.auto'));
   if (boardPickState) { if (boardHasMons(boardPickState.ids)) applyBoardPick(); else endBoardPick(null); }
-  if (pendingWin) { const n = pendingWin; pendingWin = null; setTimeout(() => { const bd = main.querySelector('.board.auto'); playEventMusic('victory', 30).then((ok) => playWin(bd, n, { quiet: ok }), () => playWin(bd, n)); }, 400); }
+  if (pendingWin) { const n = pendingWin; pendingWin = null; setTimeout(async () => { if (rescuePlaying) await rescuePlaying; const bd = main.querySelector('.board.auto'); playEventMusic('victory', 30).then((ok) => playWin(bd, n, { quiet: ok }), () => playWin(bd, n)); }, 400); }
   if (pendingTurn) { pendingTurn = false; const b = main.querySelector('.board.auto'); if (b) { const el = document.createElement('div'); el.className = 'turnbanner'; el.textContent = 'YOUR TURN'; b.appendChild(el); setTimeout(() => el.remove(), 1600); } playTurnChime(); }
   if (pendingFx) { const ev = pendingFx; pendingFx = null; const sc = pendingScene; pendingScene = null; playEvents(ev, doc, mergeScene(sc, captureScene(ev, g))); }
   maybeRunBot(doc);

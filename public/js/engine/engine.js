@@ -658,6 +658,7 @@ function benchRescue(ctx, s) {
   while (drawn.length < 7 && p.deck.length) { const c = p.deck.shift(); drawn.push(c); if (isBasicLike(db[c.c])) { basic = c; break; } }
   for (const c of drawn) if (c !== basic) p.hand.push(c);
   ctx.event({ t: 'draw', seat: s, n: drawn.length });
+  ctx.event({ t: 'rescue', seat: s, name: ctx.name(s), cards: drawn.map((c) => c.c), found: basic ? basic.c : null });
   if (!basic) { ctx.log(`${ctx.name(s)} had no Pokémon left and drew ${drawn.length} card${drawn.length === 1 ? '' : 's'} without finding a Basic Pokémon`); return false; }
   p.active = toMon(basic, g.turnNo); g.pending = g.pending.filter((t) => !(t.t === 'promote' && t.seat === s));
   ctx.log(`${ctx.name(s)} had no Pokémon left: drew ${drawn.length} card${drawn.length === 1 ? '' : 's'} and put ${nameOf(db, basic.c)} in as Active`);
