@@ -252,7 +252,7 @@ function makeCtx(g, db, rng, events, seat, nextAnswer, action) {
     name: (s) => g.seats[s].name,
     log(m) { g.log.push({ t: Date.now(), turn: g.turnNo, m }); if (g.log.length > 300) g.log = g.log.slice(-300); },
     event(e) { events.push(e); },
-    flip(label) { const h = rng() < 0.5; events.push({ t: 'flip', heads: h, label }); ctx.log(`Coin flip${label ? ' (' + label + ')' : ''}: ${h ? 'Heads' : 'Tails'}`); return h; },
+    flip(label, info) { const h = rng() < 0.5; events.push({ t: 'flip', heads: h, label, ...(info || {}) }); ctx.log(`Coin flip${label ? ' (' + label + ')' : ''}: ${h ? 'Heads' : 'Tails'}`); return h; },
     flips(n, label) { let k = 0; for (let i = 0; i < n; i++) if (ctx.flip(label)) k++; return k; },
     fail(msg) { throw new RuleError(msg); },
     /** Ask the acting player (or `forSeat`) to choose. Returns array of keys. */
@@ -594,8 +594,8 @@ function endTurn(ctx) {
   for (const s of ['a', 'b']) {
     const m = P(g, s).active; if (!m) continue;
     if (m.st.includes('PSN')) { const n = m.flags.toxic ? 20 : 10; m.dmg += n; ctx.log(`${ctx.name(s)}'s ${nameOf(db, m.c)} takes ${n} poison damage (now ${m.dmg})`); ctx.event({ t: 'damage', target: m.id, amount: n, poison: true }); }
-    if (m.st.includes('BRN')) { if (!ctx.flip('burn')) { m.dmg += 20; ctx.log(`${ctx.name(s)}'s ${nameOf(db, m.c)} takes 20 burn damage (now ${m.dmg})`); ctx.event({ t: 'damage', target: m.id, amount: 20, burn: true }); } else ctx.log(`${nameOf(db, m.c)} shrugs off the burn this time`); }
-    if (m.st.includes('SLP')) { if (ctx.flip('sleep')) { m.st = m.st.filter((x) => x !== 'SLP'); ctx.log(`${nameOf(db, m.c)} woke up`); } }
+    if (m.st.includes('BRN')) { if (!ctx.flip('burn', { seat: s, mon: m.id, name: nameOf(db, m.c) })) { m.dmg += 20; ctx.log(`${ctx.name(s)}'s ${nameOf(db, m.c)} takes 20 burn damage (now ${m.dmg})`); ctx.event({ t: 'damage', target: m.id, amount: 20, burn: true }); } else ctx.log(`${nameOf(db, m.c)} shrugs off the burn this time`); }
+    if (m.st.includes('SLP')) { if (ctx.flip('sleep', { seat: s, mon: m.id, name: nameOf(db, m.c) })) { m.st = m.st.filter((x) => x !== 'SLP'); ctx.log(`${ctx.name(s)}'s ${nameOf(db, m.c)} woke up`); } else ctx.log(`${ctx.name(s)}'s ${nameOf(db, m.c)} is still Asleep`); }
   }
   // expire effects
   if (g.fx) g.fx = g.fx.filter((f) => !(f.until != null && f.until <= T));

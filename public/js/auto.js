@@ -66,8 +66,11 @@ export async function submit(action, answers = [], opts = {}) {
   }
   const scene = captureScene(r.events, doc.state);
   const flips = r.events.filter((e) => e.t === 'flip');
-  const clicked = flips.length > 0 && fxEnabled();
-  if (clicked) await clickCoins(flips);
+  const me0 = mySeat(doc);
+  const plain = flips.filter((f) => !isCheck(f));
+  const clicked = plain.length > 0 && fxEnabled();
+  if (clicked) await clickCoins(plain);
+  for (const f of flips.filter(isCheck)) await clickCoins([f], { title: checkTitle(f, me0), outcome: checkOutcome(f), auto: f.seat !== me0 });
   recordUndo(doc, action, r.events, seat);
   doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner;
   publishFx(doc, r.events); PT.render(); playEvents(r.events, doc, scene, { coinsDone: clicked }); await PT.saveGame(doc);
@@ -78,15 +81,18 @@ export async function submit(action, answers = [], opts = {}) {
    The result is already decided by the move's random seed; clicking just reveals it. The board only shows the
    outcome after the last coin lands. The other player's flips still animate on their own. */
 const FLIP_LABELS = { confusion: 'Confusion check', sleep: 'Asleep: wake-up check', burn: 'Burn check', 'Sand-attack': 'Sand-attack', 'Baby Rule': 'Baby Rule', 'confused retreat': 'Confused retreat' };
-function clickCoins(flips) {
+const isCheck = (f) => !!(f && f.seat && (f.label === 'sleep' || f.label === 'burn'));
+function checkTitle(f, me) { const whose = f.seat === me ? 'Your' : 'Opponent\u2019s'; return f.label === 'sleep' ? `💤 ${whose} ${f.name} is Asleep — wake-up flip` : `🔥 ${whose} ${f.name} is Burned — burn flip`; }
+function checkOutcome(f) { return f.label === 'sleep' ? (f.heads ? `HEADS — ${f.name} woke up!` : `TAILS — ${f.name} is still Asleep`) : (f.heads ? `HEADS — no burn damage` : `TAILS — ${f.name} takes 20 burn damage`); }
+function clickCoins(flips, opts = {}) {
   return new Promise((resolve) => {
     const wrap = document.createElement('div'); wrap.className = 'coinflip';
     let i = 0, heads = 0; const results = [];
     const render = () => {
-      const f = flips[i]; const label = f && f.label ? (FLIP_LABELS[f.label] || f.label) : 'Coin flip';
+      const f = flips[i]; const label = opts.title || (f && f.label ? (FLIP_LABELS[f.label] || f.label) : 'Coin flip');
       wrap.innerHTML = `<div class="cf-box"><div class="cf-title">${esc(label)}${flips.length > 1 ? ` · coin ${Math.min(i + 1, flips.length)} of ${flips.length}` : ''}</div>
         <button type="button" class="cf-coin" aria-label="Flip the coin"><span class="cf-face">?</span></button>
-        <div class="cf-hint">Click the coin to flip</div>
+        <div class="cf-hint">${opts.auto ? 'Flipping…' : 'Tap the coin to flip'}</div>
         <div class="cf-results">${results.map((h) => `<span class="${h ? 'h' : 't'}">${h ? 'H' : 'T'}</span>`).join('')}</div>
         ${flips.length - i > 2 ? '<button type="button" class="sm cf-all">Flip the rest</button>' : ''}</div>`;
       wrap.querySelector('.cf-coin').onclick = flipOne;
@@ -94,7 +100,7 @@ function clickCoins(flips) {
     };
     let busy = false;
     const land = (h) => { results.push(h); if (h) heads++; i++; };
-    const finish = () => { const sum = wrap.querySelector('.cf-hint'); if (sum) sum.textContent = flips.length > 1 ? `${heads} heads, ${flips.length - heads} tails` : (results[0] ? 'Heads!' : 'Tails'); setTimeout(() => { wrap.remove(); resolve(); }, 900); };
+    const finish = () => { const sum = wrap.querySelector('.cf-hint'); if (sum) { sum.textContent = opts.outcome ? opts.outcome : flips.length > 1 ? `${heads} heads, ${flips.length - heads} tails` : (results[0] ? 'Heads!' : 'Tails'); if (opts.outcome) sum.classList.add('cf-outcome', results[0] ? 'good' : 'bad'); } setTimeout(() => { wrap.remove(); resolve(); }, opts.outcome ? 2200 : 900); };
     const flipOne = () => {
       if (busy || i >= flips.length) return; busy = true;
       const h = !!flips[i].heads; const coin = wrap.querySelector('.cf-coin'); const face = coin.querySelector('.cf-face');
@@ -108,6 +114,7 @@ function clickCoins(flips) {
     };
     const flipAll = () => { if (busy) return; while (i < flips.length) land(!!flips[i].heads); sfx.play('coin', 0, results[results.length - 1]); const res = wrap.querySelector('.cf-results'); if (res) res.innerHTML = results.map((x) => `<span class="${x ? 'h' : 't'}">${x ? 'H' : 'T'}</span>`).join(''); const all = wrap.querySelector('.cf-all'); if (all) all.remove(); finish(); };
     document.body.appendChild(wrap); render();
+    if (opts.auto) setTimeout(flipOne, 500);
   });
 }
 /** A move can be undone only if it revealed nothing: no flip, draw, search, prize, and it didn't hand the turn over. */
@@ -300,7 +307,9 @@ async function playEvents(events, doc, scene, opts = {}) {
   setTimeout(() => animateDraws(events, doc), 20);
   const atk = events.find((e) => e.t === 'attack');
   const confFlip = atk ? events.find((e) => e.t === 'flip' && e.label === 'confusion') : null;
-  const flips = events.filter((e) => e.t === 'flip' && e !== confFlip);
+  const flips = events.filter((e) => e.t === 'flip' && e !== confFlip && !isCheck(e));
+  const checks = events.filter((e) => e.t === 'flip' && isCheck(e));
+  if (checks.length && !opts.coinsDone) { const me = mySeat(doc); setTimeout(async () => { for (const f of checks) await clickCoins([f], { title: checkTitle(f, me), outcome: checkOutcome(f), auto: f.seat !== me }); }, 900); }
   const landHits = () => {
     const board = boardEl();
     for (const e of events) {
