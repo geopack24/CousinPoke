@@ -728,10 +728,10 @@ function onButton(act, btn, doc, legal, me) {
   if (act === 'useStadium') return submit({ type: 'useStadium' });
   if (act === 'toggleLog') { logOpen = !logOpen; if (logOpen) chatUnread = 0; return PT.render(); }
   if (act === 'sound') { setSoundVolume(soundOn() ? 0 : 0.6); PT.toast(soundOn() ? 'Sound on' : 'Sound off'); return PT.render(); }
-  if (act === 'rules') return PT.showModal('Rules at this table', `<p>${esc(PT.rulesSummary(g.rules))}</p>${g.rules.notes ? `<div class="notice info" style="white-space:pre-wrap">${esc(g.rules.notes)}</div>` : ''}<p class="small muted">Automated rules: the table enforces costs, timing, damage, conditions and prizes. Use "Fix" on a Pokémon or the More menu if a card isn't automated yet.</p>`);
+  if (act === 'rules') return PT.showModal('Rules at this table', `<p>${esc(PT.rulesSummary(g.rules))}</p>${g.rules.notes ? `<div class="notice info" style="white-space:pre-wrap">${esc(g.rules.notes)}</div>` : ''}<p class="small muted">Automated rules: the table enforces costs, timing, damage, conditions and prizes.</p>`);
   if (act === 'more') {
     const items = [];
-    if (me) items.push({ label: 'Draw a card (fix)', fn: () => submit({ type: 'override', op: 'draw', n: 1 }) }, { label: 'Shuffle my deck (fix)', fn: () => submit({ type: 'override', op: 'shuffle' }) }, { label: 'Force end of turn (fix)', fn: () => submit({ type: 'override', op: 'endTurn' }) }, { label: "It's my turn (fix)", fn: () => submit({ type: 'override', op: 'turn', seat: me }) }, { label: 'Clear pending steps (fix)', fn: () => submit({ type: 'override', op: 'clearPending' }) }, { sep: true }, { label: 'I concede', danger: true, fn: () => submit({ type: 'concede' }) }, { sep: true });
+    if (me) items.push({ label: 'I concede', danger: true, fn: () => submit({ type: 'concede' }) }, { sep: true });
     items.push({ label: fxEnabled() ? 'Attack animations: on' : 'Attack animations: off', fn: () => { setFxEnabled(!fxEnabled()); PT.toast(fxEnabled() ? 'Animations on' : 'Animations off'); } });
     items.push({ label: soundOn() ? 'Sound effects: on' : 'Sound effects: off', fn: () => { setSoundVolume(soundOn() ? 0 : 0.6); PT.toast(soundOn() ? 'Sound on' : 'Sound off'); } });
     items.push({ label: 'Back to lobby', fn: () => PT.go('lobby') });
@@ -760,8 +760,7 @@ function handMenu(doc, legal, iid, anchor) {
   if (acts.some((a) => a.type === 'placeActive')) items.push({ label: 'Place as Active', fn: () => submit({ type: 'placeActive', card: iid }) });
   if (acts.some((a) => a.type === 'placeBench')) items.push({ label: 'Place on Bench', fn: () => submit({ type: 'placeBench', card: iid }) });
   if (acts.some((a) => a.type === 'playTrainer')) items.push({ label: `Play ${c.name}`, fn: () => submit({ type: 'playTrainer', card: iid }) });
-  if (!acts.length && c.st === 'Trainer' && !scriptOf(card.c).trainer) items.push({ label: `${c.name} isn't automated yet`, fn: () => PT.toast('Apply its effect with the Fix menus, then discard it.') });
-  items.push({ sep: true }, { label: 'Fix: discard this card', fn: () => submit({ type: 'override', op: 'move', card: iid, to: 'discard' }) }, { label: 'Fix: put on top of deck', fn: () => submit({ type: 'override', op: 'move', card: iid, to: 'deckTop' }) });
+  if (!acts.length && c.st === 'Trainer' && !scriptOf(card.c).trainer) items.push({ label: `${c.name} isn't automated yet`, fn: () => PT.toast(`${c.name} can't be played yet`) });
   PT.showMenu(items, anchor, c.name);
 }
 function monMenu(doc, legal, pid, anchor, me) {
@@ -776,22 +775,11 @@ function monMenu(doc, legal, pid, anchor, me) {
     if (legal.some((a) => a.type === 'promote' && a.target === pid)) items.push({ label: 'Promote to Active', fn: () => submit({ type: 'promote', target: pid }) });
     if (legal.some((a) => a.type === 'discardDoll' && a.pokemon === pid)) items.push({ label: 'Discard', fn: () => submit({ type: 'discardDoll', pokemon: pid }) });
   }
-  if (me) {
-    // corrections live one tap deeper so they can't be hit by accident on a phone
-    const top = items; const fixes = []; items = fixes;
-    items.push({ label: 'Fix: +10 damage', fn: () => submit({ type: 'override', op: 'damage', target: pid, delta: 10 }) }, { label: 'Fix: −10 damage', fn: () => submit({ type: 'override', op: 'damage', target: pid, delta: -10 }) });
-    for (const [code, label] of Object.entries(STATUS_NAMES)) items.push({ label: `Fix: ${m.st.includes(code) ? 'remove' : 'set'} ${label}`, fn: () => submit({ type: 'override', op: 'status', target: pid, code }) });
-    if (m.en.length) items.push({ label: 'Fix: discard an attached card…', fn: () => PT.showMenu([...m.en, ...m.tools].map((x) => ({ label: nm(x), fn: () => submit({ type: 'override', op: 'move', card: x.id, to: 'discard', toSeat: f.seat }) })), anchor, 'Discard') });
-    items.push({ label: 'Fix: Knocked Out', danger: true, fn: () => submit({ type: 'override', op: 'ko', target: pid }) });
-    items = top; items.push({ sep: true }, { label: 'Fix / correct…', fn: () => PT.showMenu(fixes, anchor, `Fix ${g.seats[f.seat].name}'s ${c.name}`) });
-  }
   PT.showMenu(items, anchor, `${g.seats[f.seat].name}'s ${c.name}`);
 }
-function deckMenu(doc, anchor) { PT.showMenu([{ label: 'Draw a card (fix)', fn: () => submit({ type: 'override', op: 'draw', n: 1 }) }, { label: 'Shuffle (fix)', fn: () => submit({ type: 'override', op: 'shuffle' }) }], anchor, 'Deck'); }
+function deckMenu(doc, anchor) { const g = doc.state; const me = mySeat(doc); if (me) PT.toast(`${g.p[me].deck.length} cards left in your deck`); }
 function viewPile(doc, seat, zone) {
   const g = doc.state; const me = mySeat(doc); const cards = g.p[seat][zone].slice().reverse();
   PT.showModal(`${g.seats[seat].name}'s ${zone} · ${cards.length}`, `<div class="pickgrid">${cards.map((c) => `<div class="pk" data-card="${c.id}"><div class="cd" style="${PT.cardStyle(c.c)}" data-cid="${c.c}"></div><div class="nm">${esc(nm(c))}</div></div>`).join('') || '<p class="muted">Empty.</p>'}</div>`, me === seat ? '<span class="small muted">Click a card to move it (fix).</span>' : '', (m) => {
-    if (me !== seat) return;
-    m.querySelectorAll('.pk').forEach((el) => (el.onclick = () => { PT.closeModal(); PT.showMenu([{ label: 'To hand', fn: () => submit({ type: 'override', op: 'move', card: el.dataset.card, to: 'hand' }) }, { label: 'Top of deck', fn: () => submit({ type: 'override', op: 'move', card: el.dataset.card, to: 'deckTop' }) }, { label: 'Shuffle into deck', fn: () => submit({ type: 'override', op: 'move', card: el.dataset.card, to: 'deckShuffle' }) }, { label: 'To bench', fn: () => submit({ type: 'override', op: 'move', card: el.dataset.card, to: 'bench' }) }], el, nm(el.dataset.card ? g.p[seat][zone].find((c) => c.id === el.dataset.card) : '')); }));
   });
 }
