@@ -673,7 +673,7 @@ function runOverride(ctx, a) {
   const tag = (m) => ctx.log(`[override] ${who}: ${m}`);
   switch (a.op) {
     case 'damage': { const f = findMon(g, a.target); if (!f) ctx.fail('No such Pokémon'); f.m.dmg = Math.max(0, f.m.dmg + a.delta); tag(`${a.delta > 0 ? '+' : ''}${a.delta} damage on ${nameOf(db, f.m.c)} (now ${f.m.dmg})`); checkKOs(ctx); return; }
-    case 'status': { const f = findMon(g, a.target); if (!f) ctx.fail('No such Pokémon'); if (a.code === 'clear') { f.m.st = []; delete f.m.flags.toxic; tag(`cleared conditions on ${nameOf(db, f.m.c)}`); } else if (f.m.st.includes(a.code)) { f.m.st = f.m.st.filter((x) => x !== a.code); tag(`${nameOf(db, f.m.c)} no longer ${STATUS_NAMES[a.code]}`); } else applyStatus(ctx, f.m, a.code); return; }
+    case 'status': { const f = findMon(g, a.target); if (!f) ctx.fail('No such Pokémon'); if (a.code === 'clear') { f.m.st = []; delete f.m.flags.toxic; tag(`cleared conditions on ${nameOf(db, f.m.c)}`); } else if (f.m.st.includes(a.code)) { f.m.st = f.m.st.filter((x) => x !== a.code); tag(`${nameOf(db, f.m.c)} no longer ${STATUS_NAMES[a.code]}`); } else { tag(`set ${nameOf(db, f.m.c)} ${STATUS_NAMES[a.code]}`); applyStatus(ctx, f.m, a.code); } return; }
     case 'move': { // card -> zone
       const c = pullCard(g, a.card); if (!c) ctx.fail('No such card'); const p = P(g, a.toSeat || seat);
       if (a.to === 'hand') p.hand.push(c); else if (a.to === 'discard') p.discard.push(c); else if (a.to === 'deckTop') p.deck.unshift(c); else if (a.to === 'deckBottom') p.deck.push(c); else if (a.to === 'deckShuffle') { p.deck.push(c); ctx.shuffle(a.toSeat || seat); }

@@ -766,7 +766,7 @@ function handMenu(doc, legal, iid, anchor) {
 }
 function monMenu(doc, legal, pid, anchor, me) {
   const g = doc.state; const f = findMon(g, pid); if (!f) return; const m = f.m; const own = f.seat === me; const c = C(m.c);
-  const items = [{ label: 'View card', fn: () => PT.viewCard(m.c) }];
+  let items = [{ label: 'View card', fn: () => PT.viewCard(m.c) }];
   if (own && me) {
     const atks = (c.atk || []).map((a, i) => ({ a, i, chk: canAttack(g, me, i, PT.CARDS) }));
     if (f.p.active && f.p.active.id === pid && atks.length) { items.push({ sep: true }); for (const { a, i, chk } of atks) items.push({ label: `${a.n} ${a.d || ''} (${a.c.length} energy)${chk.ok ? '' : ' — ' + chk.why}`, disabled: !chk.ok, fn: () => chk.ok && submit({ type: 'attack', index: i }) }); }
@@ -777,10 +777,13 @@ function monMenu(doc, legal, pid, anchor, me) {
     if (legal.some((a) => a.type === 'discardDoll' && a.pokemon === pid)) items.push({ label: 'Discard', fn: () => submit({ type: 'discardDoll', pokemon: pid }) });
   }
   if (me) {
-    items.push({ sep: true }, { label: 'Fix: +10 damage', fn: () => submit({ type: 'override', op: 'damage', target: pid, delta: 10 }) }, { label: 'Fix: −10 damage', fn: () => submit({ type: 'override', op: 'damage', target: pid, delta: -10 }) });
+    // corrections live one tap deeper so they can't be hit by accident on a phone
+    const top = items; const fixes = []; items = fixes;
+    items.push({ label: 'Fix: +10 damage', fn: () => submit({ type: 'override', op: 'damage', target: pid, delta: 10 }) }, { label: 'Fix: −10 damage', fn: () => submit({ type: 'override', op: 'damage', target: pid, delta: -10 }) });
     for (const [code, label] of Object.entries(STATUS_NAMES)) items.push({ label: `Fix: ${m.st.includes(code) ? 'remove' : 'set'} ${label}`, fn: () => submit({ type: 'override', op: 'status', target: pid, code }) });
     if (m.en.length) items.push({ label: 'Fix: discard an attached card…', fn: () => PT.showMenu([...m.en, ...m.tools].map((x) => ({ label: nm(x), fn: () => submit({ type: 'override', op: 'move', card: x.id, to: 'discard', toSeat: f.seat }) })), anchor, 'Discard') });
     items.push({ label: 'Fix: Knocked Out', danger: true, fn: () => submit({ type: 'override', op: 'ko', target: pid }) });
+    items = top; items.push({ sep: true }, { label: 'Fix / correct…', fn: () => PT.showMenu(fixes, anchor, `Fix ${g.seats[f.seat].name}'s ${c.name}`) });
   }
   PT.showMenu(items, anchor, `${g.seats[f.seat].name}'s ${c.name}`);
 }
