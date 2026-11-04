@@ -191,6 +191,19 @@ textarea{width:100%;min-height:60px;resize:vertical}
 .mon .att{display:flex;gap:3px;flex-wrap:wrap;justify-content:center;margin-top:3px;max-width:calc(240px*var(--s) + 20px)}
 .mon .att i{width:14px;height:14px;border-radius:50%;border:1px solid rgba(0,0,0,.4);display:inline-block;box-shadow:0 1px 2px rgba(0,0,0,.3)}
 .mon .att b{background:#fff;color:#222;font-size:10px;padding:0 4px;border-radius:4px;border:1px solid rgba(0,0,0,.3);font-weight:800;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mon .boosts{position:absolute;left:calc(100% + 10px);top:18px;display:flex;flex-direction:row;align-items:flex-start;gap:10px;z-index:6}
+.mon .boost{position:relative;animation:boostin .45s cubic-bezier(.2,1.5,.4,1)}
+.mon .boost .cd{border-radius:6px}
+.mon .boost.pp .cd{box-shadow:0 0 0 2px #ff8a3d,0 0 16px rgba(255,120,40,.75)}
+.mon .boost.df .cd{box-shadow:0 0 0 2px #5b9bff,0 0 16px rgba(70,140,255,.75)}
+.mon .boost .bv,.mon .boostchips span{white-space:nowrap;font-family:var(--display);color:#fff;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,.5);text-shadow:0 1px 0 rgba(0,0,0,.35)}
+.mon .boost .bv{position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);font-size:14px;padding:2px 8px}
+.mon .boostchips{position:absolute;right:-8px;bottom:26px;display:flex;flex-direction:column;align-items:flex-end;gap:3px;z-index:6}
+.mon .boostchips span{font-size:11px;padding:1px 6px}
+.mon .pp .bv,.mon .boostchips .pp{background:linear-gradient(180deg,#ff8a3d,#e0421f)}
+.mon .df .bv,.mon .boostchips .df{background:linear-gradient(180deg,#5b9bff,#1f4fc7)}
+@keyframes boostin{0%{transform:translateX(-14px) scale(.6);opacity:0}100%{transform:none;opacity:1}}
+@media (max-width:700px){.mon .boosts{left:calc(100% + 5px);top:10px;gap:6px}.mon .boost .bv{font-size:11px;padding:1px 5px;bottom:-7px}}
 .mon .stk{position:absolute;right:-4px;bottom:6px;background:rgba(0,0,0,.75);color:#fff;font-size:10px;font-weight:800;border-radius:4px;padding:0 4px}
 .mon .dbtn{position:absolute;left:50%;transform:translateX(-50%);bottom:-8px;display:none;gap:4px;z-index:2}
 .mon:hover .dbtn,.mon:focus-within .dbtn{display:flex}

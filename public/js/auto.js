@@ -553,14 +553,26 @@ function describeFx(f, g) {
   return { label, desc: `${label}: ${what}${when}.` };
 }
 
+const BOOSTS = {
+  plusPower: { cls: 'pp', icon: '⚔', sign: '+', amt: 10, label: 'PlusPower', what: 'its attack does more damage this turn' },
+  defender: { cls: 'df', icon: '🛡', sign: '−', amt: 20, label: 'Defender', what: 'attacks do less damage to it until the end of the opponent’s next turn' },
+};
 function monHTML(m, seat, active, promoteClick, scale) {
   const c = C(m.c); const hp = c.hp; const sc = scale || (active ? .42 : .34); const compact = isCompact(); const step = Math.round(330 * sc * (compact ? 0.12 : 0.13));
-  const att = [...m.en, ...m.tools]; const n = att.length;
+  // PlusPower and Defender sit beside the Pokémon (a rail next to the Active, badges on the bench) instead of in the attached stack
+  const boostFx = m.fx.filter((f) => BOOSTS[f.k] && f.card); const boostIds = new Set(boostFx.map((f) => f.card));
+  const groups = Object.keys(BOOSTS).map((k) => ({ k, b: BOOSTS[k], cards: m.tools.filter((t) => boostFx.some((f) => f.k === k && f.card === t.id)) })).filter((x) => x.cards.length);
+  const tip = (x) => esc(`${x.cards.length > 1 ? x.cards.length + ' × ' : ''}${x.b.label}: ${x.b.what}`);
+  const bsc = sc * 0.6;
+  const boosts = !groups.length ? '' : active
+    ? `<div class="boosts">${groups.map((x) => `<div class="boost ${x.b.cls}" title="${tip(x)}"><div class="bc">${x.cards.map((t, i) => `<div style="margin-top:${i ? -Math.round(bsc * 330 * 0.8) : 0}px">${PT.cardHTML(t.c, bsc)}</div>`).join('')}</div><span class="bv">${x.b.icon} ${x.b.sign}${x.b.amt * x.cards.length}</span></div>`).join('')}</div>`
+    : `<div class="boostchips">${groups.map((x) => `<span class="${x.b.cls}" title="${tip(x)}">${x.b.icon} ${x.b.sign}${x.b.amt * x.cards.length}</span>`).join('')}</div>`;
+  const att = [...m.en, ...m.tools.filter((t) => !boostIds.has(t.id))]; const n = att.length;
   const stack = att.map((x, i) => `<div class="attc" data-att="${x.id}" data-owner="${m.id}" style="top:${i * step}px;z-index:${i + 1}">${PT.cardHTML(x.c, sc)}</div>`).join('');
   const GL = { SLP: 'Zz', CNF: '?!', PAR: '⚡', PSN: '☠', BRN: '🔥' }; const stChips = m.st.map((s) => `<span class="${s}" title="${STATUS_NAMES[s]}">${GL[s]} ${active ? STATUS_NAMES[s] : s}</span>`).join('');
-  const fxChips = m.fx.map((f) => { const d = describeFx(f, PT.S.game.state); return `<span class="FX" title="${esc(d.desc)}" data-desc="${esc(d.desc)}">${esc(d.label)}</span>`; }).join('');
+  const fxChips = m.fx.filter((f) => !(BOOSTS[f.k] && f.card)).map((f) => { const d = describeFx(f, PT.S.game.state); return `<span class="FX" title="${esc(d.desc)}" data-desc="${esc(d.desc)}">${esc(d.label)}</span>`; }).join('');
   const left = hp ? (hp - m.dmg) / hp : 1; const hurt = left <= 0.25 ? 'critical' : left <= 0.5 ? 'hurt' : '';
-  return `<div class="mon ${active ? 'active' : ''} ${promoteClick ? 'glow' : ''} ${hurt}" data-mon="${m.id}" tabindex="0"><div class="cdwrap" style="padding-top:${n * step}px">${stack}<div class="poke" style="z-index:${n + 1}">${PT.cardHTML(m.c, sc)}${hp ? `<span class="hp" style="--hpf:${Math.max(0, left).toFixed(2)};--hpc:${left > 0.5 ? '#4cd07d' : left > 0.25 ? '#ffcb05' : '#ff5a4e'}">${Math.max(0, hp - m.dmg)}/${hp}</span>` : ''}${m.dmg ? `<span class="dmg" data-dmg-of="${m.id}">${m.dmg}</span>` : ''}${m.st.length || fxChips ? `<div class="sts">${stChips}${fxChips}</div>` : ''}${m.un.length ? `<span class="stk">+${m.un.length} under</span>` : ''}</div></div>${n ? `<div class="attn">${n} attached</div>` : ''}</div>`;
+  return `<div class="mon ${active ? 'active' : ''} ${promoteClick ? 'glow' : ''} ${hurt}" data-mon="${m.id}" tabindex="0"><div class="cdwrap" style="padding-top:${n * step}px">${stack}<div class="poke" style="z-index:${n + 1}">${PT.cardHTML(m.c, sc)}${hp ? `<span class="hp" style="--hpf:${Math.max(0, left).toFixed(2)};--hpc:${left > 0.5 ? '#4cd07d' : left > 0.25 ? '#ffcb05' : '#ff5a4e'}">${Math.max(0, hp - m.dmg)}/${hp}</span>` : ''}${m.dmg ? `<span class="dmg" data-dmg-of="${m.id}">${m.dmg}</span>` : ''}${m.st.length || fxChips ? `<div class="sts">${stChips}${fxChips}</div>` : ''}${m.un.length ? `<span class="stk">+${m.un.length} under</span>` : ''}${boosts}</div></div>${n ? `<div class="attn">${n} attached</div>` : ''}</div>`;
 }
 
 /* ---------- the computer opponent ----------
