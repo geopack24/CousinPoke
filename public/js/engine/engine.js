@@ -598,6 +598,11 @@ function endTurn(ctx) {
     if (m.st.includes('BRN')) { if (!ctx.flip('burn', { seat: s, mon: m.id, name: nameOf(db, m.c) })) { m.dmg += 20; ctx.log(`${ctx.name(s)}'s ${nameOf(db, m.c)} takes 20 burn damage (now ${m.dmg})`); ctx.event({ t: 'damage', target: m.id, amount: 20, burn: true }); } else ctx.log(`${nameOf(db, m.c)} shrugs off the burn this time`); }
     if (m.st.includes('SLP')) { if (ctx.flip('sleep', { seat: s, mon: m.id, name: nameOf(db, m.c) })) { m.st = m.st.filter((x) => x !== 'SLP'); ctx.log(`${ctx.name(s)}'s ${nameOf(db, m.c)} woke up`); } else ctx.log(`${ctx.name(s)}'s ${nameOf(db, m.c)} is still Asleep`); }
   }
+  // conditions stay on the bench under the house rule, so an Asleep benched Pokémon still gets its wake-up flip
+  if (r.conditionsPersist) for (const s of ['a', 'b']) for (const m of P(g, s).bench) {
+    if (!m.st.includes('SLP')) continue;
+    if (ctx.flip('sleep', { seat: s, mon: m.id, name: nameOf(db, m.c) })) { m.st = m.st.filter((x) => x !== 'SLP'); ctx.log(`${ctx.name(s)}'s benched ${nameOf(db, m.c)} woke up`); } else ctx.log(`${ctx.name(s)}'s benched ${nameOf(db, m.c)} is still Asleep`);
+  }
   // expire effects
   if (g.fx) g.fx = g.fx.filter((f) => !(f.until != null && f.until <= T));
   for (const s of ['a', 'b']) { const p = P(g, s); if (p.fx) p.fx = p.fx.filter((f) => !(f.until != null && f.until <= T)); }

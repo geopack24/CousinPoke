@@ -601,3 +601,12 @@ test('askEveryChoice: a choice with only one option is still asked', () => {
   r = actWith(g, { type: 'playTrainer', card }, [[m.id], [m.en[0].id]]);
   assert.ok(!r.prompt); assert.equal(active(r.state, 'b').en.length, 0);
 });
+
+test('an Asleep Pokémon on the bench still gets its wake-up flip between turns (conditions stay on the bench)', () => {
+  const g = setup({ a: { active: N['Pikachu'], bench: [{ c: N['Squirtle'], st: ['SLP'] }], deck: [N['Bill'], N['Bill']] }, b: { active: N['Machop'], deck: [N['Bill'], N['Bill']] }, rules: { conditionsPersist: true } });
+  const awake = act(g, { type: 'endTurn' }, { seed: HEADS });
+  assert.deepEqual(awake.p.a.bench[0].st, []);
+  assert.ok(awake.log.some((l) => /benched Squirtle woke up/.test(l.m)));
+  const still = act(g, { type: 'endTurn' }, { seed: TAILS });
+  assert.deepEqual(still.p.a.bench[0].st, ['SLP']);
+});
