@@ -259,7 +259,8 @@ function makeCtx(g, db, rng, events, seat, nextAnswer, action) {
     choose(prompt) {
       const min = prompt.min == null ? 1 : prompt.min, max = prompt.max == null ? 1 : prompt.max;
       if (prompt.options.length === 0) return [];
-      if (prompt.options.length <= min && !prompt.ordered) return prompt.options.map((o) => o.key); // forced: never consumes an answer
+      // forced (as many options as must be picked): taken without asking, unless the table wants every choice made by hand
+      if (prompt.options.length <= min && !prompt.ordered && !R(g.rules).askEveryChoice) return prompt.options.map((o) => o.key);
       const a = nextAnswer();
       if (a === undefined) throw new NeedInput({ ...prompt, min, max, seat: prompt.seat || seat });
       const arr = Array.isArray(a) ? a : [a];

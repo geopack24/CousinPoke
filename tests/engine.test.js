@@ -22,7 +22,7 @@ const inst = (cid) => ({ id: 'c' + (++ids).toString(36), c: cid });
 
 /** Build a game with explicit hands/decks and an optional board, already in the main phase. */
 function setup({ a, b, first = 'a', rules = {} }) {
-  const g = newGame({ rules: { firstTurnAttack: true, weaknessBonus: 0, resistanceAmount: 30, ...rules }, seats: { a: { uid: 'ua', name: 'Ann', cards: { [N['Pikachu']]: 60 } }, b: { uid: 'ub', name: 'Bob', cards: { [N['Pikachu']]: 60 } } }, seed: 7, first });
+  const g = newGame({ rules: { firstTurnAttack: true, weaknessBonus: 0, resistanceAmount: 30, askEveryChoice: false, ...rules }, seats: { a: { uid: 'ua', name: 'Ann', cards: { [N['Pikachu']]: 60 } }, b: { uid: 'ub', name: 'Bob', cards: { [N['Pikachu']]: 60 } } }, seed: 7, first });
   for (const s of ['a', 'b']) {
     const spec = s === 'a' ? a : b; const p = g.p[s];
     p.hand = (spec.hand || []).map(inst); p.deck = (spec.deck || []).map(inst); p.prizes = (spec.prizes || Array(6).fill(N['Bill'])).map(inst); p.discard = []; p.prizesTaken = 6 - p.prizes.length;
@@ -587,4 +587,17 @@ test('Energy Removal can discard a Double Colorless (alone, or picked next to a 
   const r = actWith(g, { type: 'playTrainer', card: g.p.a.hand[0].id }, [[dce.id]]);
   assert.ok(!r.prompt, r.prompt && r.prompt.title);
   assert.deepEqual(r.state.p.b.bench[0].en.map((e) => e.c), [W]);
+});
+
+test('askEveryChoice: a choice with only one option is still asked', () => {
+  const ER = N['Energy Removal'], DCE = N['Double Colorless Energy'];
+  const g = setup({ a: { active: N['Pikachu'], hand: [ER] }, b: { active: { c: N['Machop'], en: [DCE] } }, rules: { askEveryChoice: true } });
+  const m = g.p.b.active; const card = g.p.a.hand[0].id;
+  let r = actWith(g, { type: 'playTrainer', card }, []);
+  assert.equal(r.prompt && r.prompt.id, 'erMon');
+  assert.deepEqual(r.prompt.options.map((o) => o.key), [m.id]);
+  r = actWith(g, { type: 'playTrainer', card }, [[m.id]]);
+  assert.equal(r.prompt && r.prompt.id, 'erCard');
+  r = actWith(g, { type: 'playTrainer', card }, [[m.id], [m.en[0].id]]);
+  assert.ok(!r.prompt); assert.equal(active(r.state, 'b').en.length, 0);
 });
