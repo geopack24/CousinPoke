@@ -317,6 +317,16 @@ textarea{width:100%;min-height:60px;resize:vertical}
 .flycard{position:fixed;z-index:900;pointer-events:none;transition:transform .42s cubic-bezier(.25,.9,.3,1),opacity .42s;box-shadow:0 8px 18px rgba(0,0,0,.5);transform:translate(0,0)}
 .hand .cd.incoming{opacity:0}
 .hand .cd.flipin{animation:flipin .45s ease-out}
+.drawcard{position:fixed;left:0;top:0;z-index:950;pointer-events:none;perspective:900px;transform-origin:50% 50%;transition:transform .28s cubic-bezier(.2,.85,.3,1),opacity .28s;will-change:transform;filter:drop-shadow(0 10px 18px rgba(0,0,0,.5))}
+.drawcard .dc-in{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .3s ease-out}
+.drawcard .dc-in.up{transform:rotateY(180deg)}
+.drawcard .dc-f{position:absolute;inset:0;-webkit-backface-visibility:hidden;backface-visibility:hidden}
+.drawcard .dc-f .cd{box-shadow:none}.drawcard .dc-front{transform:rotateY(180deg)}
+.hand .cd.landed{animation:landed .34s cubic-bezier(.2,1.6,.4,1)}
+@keyframes landed{0%{transform:translateY(-12px) scale(1.08)}100%{transform:none}}
+.drawcount{position:fixed;z-index:960;pointer-events:none;background:var(--accent);color:#1f1b16;font-family:var(--display);font-size:18px;line-height:1;padding:4px 10px;border-radius:999px;box-shadow:0 3px 10px rgba(0,0,0,.45);transform:translate(-50%,-50%);transition:opacity .3s}
+.drawcount.bump{animation:dcbump .22s ease-out}
+@keyframes dcbump{0%{transform:translate(-50%,-50%) scale(1.4)}100%{transform:translate(-50%,-50%) scale(1)}}
 @keyframes flipin{0%{transform:rotateY(90deg) scale(.9);opacity:.2}60%{transform:rotateY(-12deg) scale(1.03);opacity:1}100%{transform:rotateY(0) scale(1)}}
 /* whose turn it is */
 .board .side{border-radius:12px;transition:box-shadow .3s,opacity .3s;padding:4px}
@@ -566,7 +576,7 @@ let syncTimer=null,syncing=false;const lastSig={};
 function syncSoon(ms){clearTimeout(syncTimer);syncTimer=setTimeout(sync,ms||50)}
 async function sync(){
   if(syncing){syncSoon(500);return}
-  if(document.hidden){syncSoon(15000);return}
+  if(document.hidden&&S.screen!=='game'){syncSoon(15000);return}
   syncing=true;let changed=false;
   try{
     const d=await api('POST','sync',{pid:uid,lobby:S.screen!=='game',game:S.screen==='game'?S.gameId:null,gv:S.game?S.game.version:null});
@@ -580,7 +590,7 @@ async function sync(){
       else if(!d.game.unchanged&&(!S.game||S.game.id!==d.game.id||d.game.version!==S.game.version)){S.game=d.game;changed=true}
     }
   }catch(e){if(S.online||!lastSig.tried){S.online=false;setOnline(false);changed=true}lastSig.tried=true}
-  finally{syncing=false;if(changed&&S.ready)render();syncSoon(S.screen==='game'?2000:5000)}
+  finally{syncing=false;if(changed&&S.ready)render();syncSoon(S.screen==='game'?(document.hidden?5000:2000):5000)}
 }
 function setOnline(on){const el=$('#online');el.classList.toggle('on',on);el.title=on?'Connected to the game server':'Cannot reach the game server'}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncSoon(100)});

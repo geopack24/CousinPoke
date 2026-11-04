@@ -59,7 +59,9 @@ const FX = {
   heal: (t) => arp(t, [523, 659, 784, 1047, 1319], 0.07, { type: 'sine', g: 0.14 }),
   confused: (t) => { [520, 390, 560, 360, 600, 340].forEach((f, i) => tone(t + i * 0.075, { type: 'triangle', f, dur: 0.07, g: 0.09 })); tone(t + 0.48, { type: 'sine', f: 420, to: 140, dur: 0.32, g: 0.13 }); },
   self: (t) => { noise(t, { dur: 0.15, type: 'lowpass', f: 400, g: 0.3 }); tone(t, { type: 'square', f: 200, to: 80, dur: 0.2, g: 0.1 }); },
-  turn: (t) => arp(t, [784, 1047, 1319], 0.09, { type: 'triangle', g: 0.14 }),
+  // your turn: a clear two-note "ding-dong" (bell-like: a sine with a soft overtone)
+  turn: (t) => { for (const [dt, f] of [[0, 988], [0.18, 1319]]) { tone(t + dt, { type: 'sine', f, dur: 0.75, g: 0.3, a: 0.004, hold: 0.05 }); tone(t + dt, { type: 'sine', f: f * 2, dur: 0.35, g: 0.07, a: 0.004, hold: 0.05 }); } },
+  draw: (t) => noise(t, { dur: 0.09, type: 'highpass', f: 3200, to: 1400, g: 0.1, a: 0.004 }),
   win: (t) => arp(t, [523, 659, 784, 1047, 784, 1047, 1319], 0.11, { type: 'square', g: 0.14 }),
   // Charizard's Fire Spin: charge, roar, stream, tornado, blast
   // Zapdos's Thunderbolt: storm rumble, far thunder, a rising charge, the giant crack

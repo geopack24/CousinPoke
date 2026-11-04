@@ -31,6 +31,7 @@ let wasCompact = null;
 if (typeof window !== 'undefined') window.addEventListener('resize', () => { const c = isCompact(); if (wasCompact !== null && c !== wasCompact && PT) PT.render(); wasCompact = c; });
 const phaseSeen = {};     // doc id -> last phase this client saw (battle music plays when setup turns into main)
 const activeSeen = {};
+const handSeen = {}, freshHand = {}, drawFlying = new Set(); // my hand's card ids at the last render / the ones new since (for the draw animation)
 const winSeen = {};
 const turnSeen = {};      // doc id -> last 'waiting on me' state, to announce when the turn passes to me       // doc id -> winner seen (the win celebration plays when a winner first appears)    // doc id -> { seat: active mon id } (a Pokémon's own music plays when it becomes Active)
 
@@ -255,29 +256,61 @@ function captureScene(events, g) {
   return { type: atk.type, name: atk.name, cardId: f ? f.m.c : null, attacker: atk.attacker, from, targets, rects, ghosts };
 }
 /** Card backs fly from a seat's deck to its hand; the player's own new cards flip face up when they land. */
+/* ---------- drawing cards ----------
+   Every drawn card gets its own little trip: it pops off the deck, flips face up over your hand for a moment
+   (card backs for the other player), then drops into its spot. A counter on the deck ticks up +1, +2, ...
+   Your new cards are found by id (the hand is sorted, so they aren't always at the end). */
+const DRAW_STEP = 170;
 function animateDraws(events, doc) {
+  if (!fxEnabled()) return;
   const b = boardEl(); if (!b) return; const me = mySeat(doc);
   const draws = events.filter((e) => e.t === 'draw' && e.n > 0); if (!draws.length) return;
+  const ownTotal = draws.filter((e) => e.seat === me).reduce((k, e) => k + e.n, 0);
+  const queue = (freshHand[doc.id] || []).slice(-ownTotal); // the cards that just arrived, in the order they were drawn
   let delay = 0;
   for (const e of draws) {
     const deck = b.querySelector(`[data-pile="deck"][data-seat="${e.seat}"]`); const zone = b.querySelector(`[data-handzone="${e.seat}"]`); if (!deck || !zone) continue;
-    const own = e.seat === me; const n = Math.min(e.n, 8);
-    const cards = own ? [...zone.querySelectorAll('[data-hand]')].slice(-n) : [];
-    cards.forEach((c) => c.classList.add('incoming'));
-    const from = deck.getBoundingClientRect();
+    const own = e.seat === me; const n = Math.min(e.n, 12);
+    const ids = own ? queue.splice(0, e.n).slice(-n) : [];
+    const targets = ids.map((id) => zone.querySelector(`[data-hand="${id}"]`));
+    targets.forEach((t) => t && t.classList.add('incoming')); ids.forEach((id) => { drawFlying.add(id); setTimeout(() => drawFlying.delete(id), 6000); }); // (safety net so a card never stays hidden)
+    const counter = document.createElement('div'); counter.className = 'drawcount'; counter.style.opacity = '0';
+    setTimeout(() => { const r = deck.getBoundingClientRect(); counter.style.left = r.right - 4 + 'px'; counter.style.top = r.top + 4 + 'px'; document.body.appendChild(counter); }, delay);
     for (let i = 0; i < n; i++) {
-      const target = own ? cards[i] : null; const tr = (target || zone).getBoundingClientRect();
-      const d = delay + i * 90;
       setTimeout(() => {
-        const ghost = document.createElement('div'); ghost.className = 'cd back flycard';
-        const w = target ? tr.width : Math.max(40, from.width), h = target ? tr.height : Math.max(55, from.height);
-        ghost.style.cssText = `left:${from.left + from.width / 2 - w / 2}px;top:${from.top + from.height / 2 - h / 2}px;width:${w}px;height:${h}px`;
-        document.body.appendChild(ghost);
-        requestAnimationFrame(() => { ghost.style.transform = `translate(${tr.left + tr.width / 2 - (from.left + from.width / 2)}px,${tr.top + tr.height / 2 - (from.top + from.height / 2)}px) rotate(${own ? 0 : 180}deg)`; ghost.style.opacity = target ? '1' : '0.4'; });
-        setTimeout(() => { ghost.remove(); if (target) { target.classList.remove('incoming'); target.classList.add('flipin'); setTimeout(() => target.classList.remove('flipin'), 500); } }, 420);
-      }, d);
+        counter.textContent = `+${i + 1}`; counter.style.opacity = '1'; counter.classList.remove('bump'); void counter.offsetWidth; counter.classList.add('bump');
+        flyDrawnCard(deck, zone, targets[i], own && ids[i] ? (doc.state.p[e.seat].hand.find((c) => c.id === ids[i]) || {}).c : null, ids[i]);
+      }, delay + i * DRAW_STEP);
     }
-    delay += n * 90 + 200;
+    setTimeout(() => { counter.style.opacity = '0'; setTimeout(() => counter.remove(), 350); }, delay + (n - 1) * DRAW_STEP + 900);
+    delay += n * DRAW_STEP + 250;
+  }
+}
+function flyDrawnCard(deck, zone, target, cid, id) {
+  const fr = deck.getBoundingClientRect(); const zr = zone.getBoundingClientRect();
+  let tr = target && target.isConnected ? target.getBoundingClientRect() : zr;
+  if (tr.right < 0 || tr.left > innerWidth) tr = zr; // scrolled out of a phone's hand strip
+  const own = !!cid; const sc = own ? Math.max(0.34, Math.min(0.62, (tr.height / 330) * 1.5)) : Math.max(0.16, fr.height / 330);
+  const w = 240 * sc, h = 330 * sc;
+  const at = (x, y, s, r = 0) => `translate(${x - w / 2}px,${y - h / 2}px) scale(${s}) rotate(${r}deg)`;
+  const el = document.createElement('div'); el.className = 'drawcard'; el.style.width = w + 'px'; el.style.height = h + 'px';
+  el.innerHTML = `<div class="dc-in"><div class="dc-f">${PT.backHTML(sc)}</div>${own ? `<div class="dc-f dc-front">${PT.cardHTML(cid, sc)}</div>` : ''}</div>`;
+  el.style.transform = at(fr.left + fr.width / 2, fr.top + fr.height / 2, fr.height / h);
+  document.body.appendChild(el); void el.offsetWidth;
+  sfx.play('draw');
+  // the hand may have been redrawn meanwhile: land on whatever element has this card now
+  const land = () => { el.remove(); if (id) drawFlying.delete(id); const t = id ? document.querySelector(`.side.mine [data-hand="${id}"]`) : null; if (t) { t.classList.remove('incoming'); t.classList.add('landed'); setTimeout(() => t.classList.remove('landed'), 400); } };
+  if (own) {
+    // up over the hand, face up...
+    const rx = Math.min(innerWidth - w / 2 - 8, Math.max(w / 2 + 8, tr.left + tr.width / 2)), ry = Math.max(h / 2 + 8, zr.top - h * 0.3);
+    el.style.transform = at(rx, ry, 1); el.firstElementChild.classList.add('up');
+    // ...then into its spot
+    setTimeout(() => { el.style.transform = at(tr.left + tr.width / 2, tr.top + tr.height / 2, tr.height / h); }, 500);
+    setTimeout(land, 790);
+  } else {
+    el.style.transform = at(zr.left + zr.width / 2, zr.top + zr.height / 2, Math.min(1.2, Math.max(0.6, zr.height / h)), (Math.random() - 0.5) * 16);
+    setTimeout(() => { el.style.opacity = '0'; }, 220);
+    setTimeout(land, 520);
   }
 }
 /** A knocked-out card stays where it was (as a stand-in) until the attack lands, then breaks apart. */
@@ -376,6 +409,8 @@ export function render(main, doc) {
   phaseSeen[doc.id] = g.phase;
   if (doc.id in winSeen && !winSeen[doc.id] && g.winner) { pendingWin = g.seats[g.winner].name; } winSeen[doc.id] = g.winner || null;
   { const mine = !!(me && !g.winner && g.phase === 'main' && !g.pending.length && g.turn === me); if (doc.id in turnSeen && !turnSeen[doc.id] && mine) pendingTurn = true; turnSeen[doc.id] = mine; }
+  if (me) { const ids = g.p[me].hand.map((c) => c.id); const prev = handSeen[doc.id];
+    if (!prev || prev.size !== ids.length || ids.some((id) => !prev.has(id))) { if (prev) freshHand[doc.id] = ids.filter((id) => !prev.has(id)); handSeen[doc.id] = new Set(ids); } }
   { const prev = activeSeen[doc.id]; const now = { a: g.p.a.active ? g.p.a.active.id : null, b: g.p.b.active ? g.p.b.active.id : null, cards: {} };
     for (const s of ['a', 'b']) for (const m of mons(g.p[s])) now.cards[m.id] = m.c;
     activeSeen[doc.id] = now;
@@ -419,7 +454,7 @@ export function render(main, doc) {
     const name = `<div class="pname"><span>${esc(g.seats[seat].name)}${own ? ' (you)' : ''}</span>${g.phase === 'main' && g.turn === seat && !g.winner ? `<span class="chip">${own ? 'Your turn' : 'Their turn'}</span>` : ''}${g.phase === 'setup' ? `<span class="chip">${p.setupDone ? 'Ready' : 'Setting up'}</span>` : ''}${g.winner === seat ? '<span class="chip">Winner</span>' : ''}</div>`;
     const HORD = { 'Pokémon': 0, 'Trainer': 1, 'Energy': 2 };
     const handCards = own ? p.hand.slice().sort((x, y) => (HORD[C(x.c).st] ?? 1) - (HORD[C(y.c).st] ?? 1) || C(x.c).name.localeCompare(C(y.c).name)) : p.hand;
-    const hand = own ? `<div class="z" style="align-items:stretch"><span class="zlbl">${compact ? `Hand · ${p.hand.length} · drag to play` : `Your hand · ${p.hand.length} · drag a card onto a Pokémon or the bench, or tap it for options`}</span><div class="hand ${compact ? 'strip' : ''}" data-handzone="${seat}">${handCards.map((c) => PT.cardHTML(c.c, SC.hand, `data-hand="${c.id}"`, legal.some((a) => a.card === c.id) ? 'click can' : 'click')).join('') || '<span class="small muted">empty</span>'}</div></div>` : '';
+    const hand = own ? `<div class="z" style="align-items:stretch"><span class="zlbl">${compact ? `Hand · ${p.hand.length} · drag to play` : `Your hand · ${p.hand.length} · drag a card onto a Pokémon or the bench, or tap it for options`}</span><div class="hand ${compact ? 'strip' : ''}" data-handzone="${seat}">${handCards.map((c) => PT.cardHTML(c.c, SC.hand, `data-hand="${c.id}"`, (legal.some((a) => a.card === c.id) ? 'click can' : 'click') + (drawFlying.has(c.id) ? ' incoming' : ''))).join('') || '<span class="small muted">empty</span>'}</div></div>` : '';
     const live = g.phase === 'main' && !g.winner && ((pending && pending.seat === seat) || (!pending && g.turn === seat));
     const cls = `side ${own ? 'mine' : ''} ${live ? 'live' : (g.phase === 'main' && !g.winner ? 'idle' : '')}`;
     return isTop ? `<div class="${cls}">${name}${rail}${field}</div>` : `<div class="${cls}">${name}${field}${rail}${hand}</div>`;
@@ -457,7 +492,8 @@ export function render(main, doc) {
   attachLayer(main.querySelector('.board.auto'));
   if (boardPickState) { if (boardHasMons(boardPickState.ids)) applyBoardPick(); else endBoardPick(null); }
   if (pendingWin) { const n = pendingWin; pendingWin = null; setTimeout(async () => { if (rescuePlaying) await rescuePlaying; const bd = main.querySelector('.board.auto'); playEventMusic('victory', 30).then((ok) => playWin(bd, n, { quiet: ok }), () => playWin(bd, n)); }, 400); }
-  if (pendingTurn) { pendingTurn = false; const b = main.querySelector('.board.auto'); if (b) { const el = document.createElement('div'); el.className = 'turnbanner'; el.textContent = 'YOUR TURN'; b.appendChild(el); setTimeout(() => el.remove(), 1600); } playTurnChime(); }
+  if (pendingTurn) { pendingTurn = false; const b = main.querySelector('.board.auto'); if (b) { const el = document.createElement('div'); el.className = 'turnbanner'; el.textContent = 'YOUR TURN'; b.appendChild(el); setTimeout(() => el.remove(), 1600); } playTurnChime();
+    if (document.hidden) { const t0 = document.title; document.title = '🔔 Your turn! · ' + t0.replace(/^🔔 Your turn! · /, ''); const back = () => { if (!document.hidden) { document.title = t0.replace(/^🔔 Your turn! · /, ''); document.removeEventListener('visibilitychange', back); } }; document.addEventListener('visibilitychange', back); } }
   if (pendingFx) { const ev = pendingFx; pendingFx = null; const sc = pendingScene; pendingScene = null; playEvents(ev, doc, mergeScene(sc, captureScene(ev, g))); }
   maybeRunBot(doc);
   const chat = main.querySelector('#chat'); if (chat) chat.onsubmit = (e) => { e.preventDefault(); const i = chat.querySelector('#chatin'); const v = i.value.trim(); if (!v) return; i.value = ''; if (isCompact() && !logOpen) { logOpen = true; chatUnread = 0; } submit({ type: 'chat', text: v }); };
