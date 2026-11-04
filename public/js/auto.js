@@ -734,6 +734,7 @@ function onButton(act, btn, doc, legal, me) {
     if (me) items.push({ label: 'I concede', danger: true, fn: () => submit({ type: 'concede' }) }, { sep: true });
     items.push({ label: fxEnabled() ? 'Attack animations: on' : 'Attack animations: off', fn: () => { setFxEnabled(!fxEnabled()); PT.toast(fxEnabled() ? 'Animations on' : 'Animations off'); } });
     items.push({ label: soundOn() ? 'Sound effects: on' : 'Sound effects: off', fn: () => { setSoundVolume(soundOn() ? 0 : 0.6); PT.toast(soundOn() ? 'Sound on' : 'Sound off'); } });
+    items.push({ label: 'Report a problem…', fn: () => PT.report() });
     items.push({ label: 'Back to lobby', fn: () => PT.go('lobby') });
     return PT.showMenu(items, btn, 'More');
   }

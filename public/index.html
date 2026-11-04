@@ -61,6 +61,8 @@ h3{font-size:17px}
 #hdr nav button{border-color:transparent;background:transparent;font-weight:700;color:var(--muted)}
 #hdr nav button.on{background:var(--panel-2);color:var(--fg)}
 #hdr .who{margin-left:auto;display:flex;align-items:center;gap:8px}
+#hdr .bugbtn{font-size:13px;font-weight:700;color:var(--muted);padding:4px 8px}#hdr .bugbtn:hover{color:var(--fg)}
+@media (max-width:900px){#hdr .bugbtn .bl{display:none}}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
 .dot.on{background:var(--ok)}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);font-size:13px;font-weight:700}
@@ -456,6 +458,7 @@ button.sec:hover:not(:disabled){filter:brightness(1.07)}
     <button data-nav="game" id="nav-game" hidden>Table</button>
   </nav>
   <div class="who">
+    <button class="ghost bugbtn" id="bugbtn" type="button" title="Report a problem"><span aria-hidden="true">🐞</span><span class="bl"> Report a problem</span></button>
     <span class="dot" id="online" title="Not connected"></span>
     <button class="chip" id="namebtn" type="button">Set your name</button>
   </div>
@@ -466,6 +469,14 @@ button.sec:hover:not(:disabled){filter:brightness(1.07)}
 <script>
 (function(){
 'use strict';
+/* Problem reports keep the last few things that went wrong in this browser: script errors, failed loads,
+   console errors/warnings and the toasts the player saw. */
+const ERRS=[];
+function noteErr(kind,msg){ERRS.push({t:Date.now(),kind,msg:String(msg).slice(0,800)});if(ERRS.length>50)ERRS.shift()}
+window.addEventListener('error',e=>{if(e.target&&e.target!==window){noteErr('load',e.target.src||e.target.href||e.target.tagName);return}
+  noteErr('error',(e.message||'')+(e.filename?` @ ${e.filename.split('/').pop()}:${e.lineno}:${e.colno}`:'')+(e.error&&e.error.stack?'\n'+e.error.stack.split('\n').slice(0,5).join('\n'):''))},true);
+window.addEventListener('unhandledrejection',e=>{const r=e.reason;noteErr('promise',r&&r.stack?r.stack.split('\n').slice(0,5).join('\n'):String(r))});
+for(const k of ['error','warn']){const o=console[k].bind(console);console[k]=(...a)=>{try{noteErr(k,a.map(x=>x&&x.stack?x.stack.split('\n').slice(0,4).join('\n'):typeof x==='object'?JSON.stringify(x):String(x)).join(' '))}catch(_){}o(...a)}}
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rid=()=>Math.random().toString(36).slice(2,10);
@@ -499,7 +510,7 @@ function activeRules(){return R(S.game&&S.game.rules)}
 
 /* ---------- ui helpers ---------- */
 let toastT=null;
-function toast(m){let t=$('.toast');if(!t){t=document.createElement('div');t.className='toast';document.body.appendChild(t)}t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},2600)}
+function toast(m){noteErr('toast',m);let t=$('.toast');if(!t){t=document.createElement('div');t.className='toast';document.body.appendChild(t)}t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},2600)}
 function closeMenu(){document.removeEventListener('click',closeMenu);const m=$('#menu');if(m)m.remove()}
 function showMenu(items,anchor,title){
   closeMenu();const m=document.createElement('div');m.id='menu';
@@ -617,6 +628,26 @@ $('#logo').addEventListener('click',e=>{e.preventDefault();go('lobby')});
 function pinHash(pin){const t=pin.trim().toLowerCase();const fnv=(seed)=>{let h=seed>>>0;for(let i=0;i<t.length;i++){h^=t.charCodeAt(i);h=Math.imul(h,16777619)>>>0}return h.toString(16).padStart(8,'0')};return 'pin_'+fnv(2166136261)+fnv(0x9747b28c)}
 async function setPin(pin){if(pin.trim().length<4){toast('Use at least 4 characters');return false}try{await api('PUT','players/'+pinHash(pin),{data:{alias:uid,updatedAt:Date.now()}});ls.set('pinSet',true);toast('PIN set. Enter it on another device to play as you there.');return true}catch(e){toast('Could not save the PIN ('+(e.code||'error')+')');return false}}
 async function usePin(pin){if(!pin.trim())return;try{const d=await api('GET','players/'+pinHash(pin));if(!d||d.missing||!d.alias||!/^p_[a-z0-9]{8,}$/.test(d.alias)){toast('No player has that PIN');return}if(d.alias===uid){toast('That PIN is already yours');return}const who=await api('GET','players/'+d.alias);ls.set('pid',d.alias);ls.set('name',(who&&who.name)||'');ls.set('pinSet',true);toast('Signed in as '+((who&&who.name)||'that player'));setTimeout(()=>location.reload(),600)}catch(e){toast('Could not check the PIN ('+(e.code||'error')+')')}}
+/* ---------- problem reports ----------
+   Saved to the reports collection for review: the player's note, the table (log + state) if they're at one,
+   the deck if they're building, recent browser errors and some device info. */
+function reportModal(){
+  const g=S.screen==='game'&&S.game&&!S.game.missing?S.game:null;const nErr=ERRS.filter(e=>e.kind!=='toast').length;
+  showModal('Report a problem',`<p class="small muted">Say what went wrong and what you expected. This saves ${g?'this table’s game log and a snapshot of the game':S.screen==='builder'?'the deck you have open':'which screen you were on'}${nErr?`, plus ${nErr} error${nErr===1?'':'s'} your browser hit`:''}, so it can be looked at and fixed.</p>
+    <label class="lbl" for="bugnote">What happened?</label><textarea id="bugnote" maxlength="2000" rows="5" placeholder="e.g. I played Energy Retrieval but no Energy came back to my hand" style="width:100%"></textarea>`,
+    `<button class="pri" id="bugok" type="button">Send report</button>`,m=>{const ta=m.querySelector('#bugnote');ta.focus();
+    m.querySelector('#bugok').onclick=async e=>{const note=ta.value.trim();if(!note){toast('Write a few words about what went wrong');ta.focus();return}
+      e.target.disabled=true;
+      const r={at:Date.now(),by:uid,byName:S.name||'',note,status:'open',screen:S.screen,gameId:g?g.id:null,gameName:g?g.name:null,
+        game:g?{id:g.id,version:g.version,name:g.name,mode:g.mode,status:g.status,host:g.host,seats:g.seats,rules:g.rules,winner:g.winner||null,log:g.log||null,state:g.state||null,fx:g.fx||null,inflight:g.inflight||null}:null,
+        deck:S.screen==='builder'&&B.deck?{id:B.deck.id,name:B.deck.name,cards:B.deck.cards}:null,
+        errors:ERRS.slice(),client:{ua:navigator.userAgent,w:innerWidth,h:innerHeight,dpr:devicePixelRatio,touch:navigator.maxTouchPoints||0,screen:location.hash}};
+      // stay under the server's size limit: trim the oldest log lines, then drop the snapshot (the log stays)
+      const size=()=>JSON.stringify(r).length;
+      if(r.game&&size()>380000){if(r.game.state&&r.game.state.log)r.game.state={...r.game.state,log:r.game.state.log.slice(-400)};if(size()>380000){r.game.fx=null;r.game.inflight=null}if(size()>380000){r.game.log=r.game.state&&r.game.state.log||r.game.log;r.game.state=null}}
+      try{await api('PUT','reports/r'+Date.now().toString(36)+rid(),{data:r});closeModal();toast('Thanks! Your report was saved.')}
+      catch(err){e.target.disabled=false;toast('Could not send the report ('+(err.code||'error')+')')}}})}
+$('#bugbtn').addEventListener('click',reportModal);
 $('#namebtn').addEventListener('click',()=>{showModal('Your name',`<p class="small muted">Shown to your opponents at the table.</p><input type="text" id="nm" maxlength="24" value="${esc(S.name)}" placeholder="e.g. George" style="width:100%">
   <div class="lbl" style="margin:16px 0 4px">Other devices</div>
   <p class="small muted">Your decks live with this player. Set a PIN here, then enter the same PIN on your phone or another PC to play as you there.${ls.get('pinSet',false)?' <b>A PIN is set on this player.</b>':''}</p>
@@ -1136,7 +1167,7 @@ async function saveGame(doc){
     if(r&&r.version!=null&&S.game&&S.game.id===id){S.game.version=r.version}return true}
   catch(e){toast('Could not save ('+(e.code||'error')+')');return false}
 }
-window.PT={esc,confirmDeleteGame,get CARDS(){return CARDS},cardHTML,backHTML,cardStyle,showModal,closeModal,showMenu,toast,nameOf,uid:()=>uid,S,saveGame,render,go,viewCard,rulesSummary};
+window.PT={esc,confirmDeleteGame,report:reportModal,get CARDS(){return CARDS},cardHTML,backHTML,cardStyle,showModal,closeModal,showMenu,toast,nameOf,uid:()=>uid,S,saveGame,render,go,viewCard,rulesSummary};
 start();
 })();
 </script>

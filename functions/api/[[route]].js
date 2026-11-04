@@ -4,9 +4,10 @@
 //   GET  :col/:id             -> the document, or { missing: true }
 //   PUT  :col/:id             -> body { data, ifVersion? }; returns { version } or 409 { conflict, doc }
 //   DELETE :col/:id
-// Collections: games, decks, players. No accounts: anyone with the link can play.
+//   GET  reports              -> [{ id, at, byName, gameName, note, status }] newest first (problem reports)
+// Collections: games, decks, players, reports. No accounts: anyone with the link can play.
 
-const COLS = new Set(['games', 'decks', 'players']);
+const COLS = new Set(['games', 'decks', 'players', 'reports']);
 const ID = /^[A-Za-z0-9_-]{1,48}$/;
 const MAX_BYTES = 400000;
 let schemaReady = false;
@@ -81,6 +82,12 @@ export async function onRequest({ request, env, params }) {
     }
     const [col, id] = parts;
     if (!COLS.has(col)) return json({ error: 'not_found' }, 404);
+    if (col === 'reports' && !id && method === 'GET') {
+      const rs = await db
+        .prepare("SELECT id, json_extract(data, '$.at') AS at, json_extract(data, '$.byName') AS byName, json_extract(data, '$.gameName') AS gameName, json_extract(data, '$.note') AS note, json_extract(data, '$.status') AS status FROM docs WHERE col = 'reports' ORDER BY updated_at DESC LIMIT 100")
+        .all();
+      return json(rs.results);
+    }
     if (id && !ID.test(id)) return json({ error: 'bad_id' }, 400);
 
     if (method === 'GET' && id) {

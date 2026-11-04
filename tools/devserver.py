@@ -8,7 +8,7 @@ DBP = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dev.sqlite')
 if os.path.exists(DBP): os.remove(DBP)
 db = sqlite3.connect(DBP, check_same_thread=False)
 db.execute('CREATE TABLE IF NOT EXISTS docs (col TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL, PRIMARY KEY (col,id))')
-COLS = {'games', 'decks', 'players'}
+COLS = {'games', 'decks', 'players', 'reports'}
 ID = re.compile(r'^[A-Za-z0-9_-]{1,48}$')
 import threading
 lock = threading.Lock()
@@ -34,6 +34,9 @@ class H(SimpleHTTPRequestHandler):
         if self.path.startswith('/api/'):
             parts = self.path[5:].split('?')[0].split('/')
             col, id = (parts + [None])[:2]
+            if col == 'reports' and not id:
+                with lock: rs = db.execute("SELECT id, json_extract(data,'$.at'), json_extract(data,'$.byName'), json_extract(data,'$.gameName'), json_extract(data,'$.note'), json_extract(data,'$.status') FROM docs WHERE col='reports' ORDER BY updated_at DESC LIMIT 100").fetchall()
+                return self.send_json([dict(zip(['id', 'at', 'byName', 'gameName', 'note', 'status'], r)) for r in rs])
             if col in COLS and id:
                 with lock: d = get_doc(col, id)
                 return self.send_json(d or {'missing': True})
