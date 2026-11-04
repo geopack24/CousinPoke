@@ -572,3 +572,19 @@ test('played Trainers go to the discard pile (Bill used to vanish)', () => {
   assert.equal(g.p.a.discard.filter((c) => c.c === N['Bill']).length, 1, 'Bill is in the discard pile');
   assert.equal(g.p.a.hand.length, 2);
 });
+
+test('Energy Removal can discard a Double Colorless (alone, or picked next to a basic Energy)', () => {
+  const ER = N['Energy Removal'], DCE = N['Double Colorless Energy'], W = N['Water Energy'];
+  // only a Double Colorless attached: the engine picks it without asking
+  let g = setup({ a: { active: N['Pikachu'], hand: [ER] }, b: { active: { c: N['Machop'], en: [DCE] } } });
+  let s = act(g, { type: 'playTrainer', card: g.p.a.hand[0].id });
+  assert.equal(active(s, 'b').en.length, 0);
+  assert.ok(s.p.b.discard.some((c) => c.c === DCE));
+  // Double Colorless and Water on a benched Pokémon: choose the Double Colorless
+  g = setup({ a: { active: N['Pikachu'], hand: [ER] }, b: { active: N['Machop'], bench: [{ c: N['Squirtle'], en: [W, DCE] }] } });
+  const tgt = g.p.b.bench[0]; const dce = tgt.en.find((e) => e.c === DCE);
+  // (only one of their Pokémon has Energy, so the Pokémon question answers itself; then pick the Double Colorless)
+  const r = actWith(g, { type: 'playTrainer', card: g.p.a.hand[0].id }, [[dce.id]]);
+  assert.ok(!r.prompt, r.prompt && r.prompt.title);
+  assert.deepEqual(r.state.p.b.bench[0].en.map((e) => e.c), [W]);
+});
