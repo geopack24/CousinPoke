@@ -750,7 +750,7 @@ $('#namebtn').addEventListener('click',()=>{showModal('Your name',`<p class="sma
 
 /* ---------- render root ---------- */
 function render(){
-  if(!S.ready)return;renderHeader();const main=$('#main');main.className=S.screen==='game'?'wide':'';
+  if(!S.ready)return;renderHeader();const main=$('#main');main.className=S.screen==='game'?'wide':S.screen==='builder'?'roomy':'';
   if(S.screen==='lobby')renderLobby(main);else if(S.screen==='builder')renderBuilder(main);else if(S.screen==='league'){if(LG())LG().render(main);else main.innerHTML='<div class="panel muted">Loading the league…</div>'}else renderGame(main);
 }
 
@@ -809,39 +809,61 @@ function heroCards(){
     HERO=[];while(HERO.length<5&&pool.length)HERO.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0])}
   return HERO}
 function heroHTML(games){
-  const live=games.filter(g=>g.status==='playing').length;const n=heroCards().length;const t=(Date.now()%5000)/1000;
-  const fan=heroCards().map((id,i)=>{const k=i-(n-1)/2;return `<div class="fan" style="--dx0:${k*62}px;--dx:${k*62}px;--dy:${Math.abs(k)*10}px;--r:${k*9}deg;--d:${-(t+i*.6).toFixed(2)}s;z-index:${5-Math.abs(Math.round(k))}">${cardHTML(id,.5,'','click')}</div>`}).join('');
-  const sparks=[[8,20,0],[42,12,1.1],[30,80,2.2],[88,18,.6],[70,86,1.7],[56,40,2.8]].map(([x,y,d])=>`<i class="spark" style="left:${x}%;top:${y}%;animation-delay:${d}s"></i>`).join('');
-  return `<section class="hero">${sparks}<div><h1 class="wordmark"><small>Cousin</small>Pokémon League</h1><p class="slogan">There's only one right way to play</p>
-    <div class="hstats"><span><b>${live}</b> ${live===1?'table':'tables'} in play</span><span><b>${S.decks.length}</b> ${S.decks.length===1?'deck':'decks'}</span>${S.name?`<span>Hi, ${esc(S.name)}</span>`:''}</div></div>
+  const live=games.filter(g=>g.status==='playing').length;const t=(Date.now()%5000)/1000;
+  const players=S.league&&Array.isArray(S.league.members)?S.league.members.length:0;
+  const ids=heroCards().slice(0,3);
+  const fan=ids.map((id,i)=>{const k=i-1;return `<div class="fan" style="--dx0:${k*52}px;--dx:${k*52}px;--dy:${Math.abs(k)*9}px;--r:${k*11}deg;--d:${-(t+i*.6).toFixed(2)}s;z-index:${3-Math.abs(k)}">${cardHTML(id,.4,'','click')}</div>`}).join('');
+  const sparks=[[8,20,0],[42,12,1.1],[30,70,2.2],[88,18,.6],[70,60,1.7],[56,30,2.8]].map(([x,y,d])=>`<i class="spark" style="left:${x}%;top:${y}%;animation-delay:${d}s"></i>`).join('');
+  return `<section class="hero">${sparks}
+    <div class="hero-copy"><h1 class="wordmark"><small>Cousin</small>Pokémon League</h1><p class="slogan">There's only one right way to play</p>
+      <div class="hero-cta"><button class="pri cta" type="button" data-hero="play"><span aria-hidden="true">⚔</span> Play a Match</button><button class="sec cta" type="button" data-hero="build"><span aria-hidden="true">✦</span> Build a Deck</button><button class="gold-ghost cta" type="button" data-hero="league"><span aria-hidden="true">🏆</span> League Standings</button></div>
+      <div class="hcount"><div class="hc gold"><b>${live}</b><span>${live===1?'Table':'Tables'} live</span></div><div class="hc"><b>${S.decks.length}</b><span>Your ${S.decks.length===1?'deck':'decks'}</span></div><div class="hc"><b>${players}</b><span>League ${players===1?'player':'players'}</span></div></div></div>
     <div class="hero-fan" aria-hidden="true">${fan}</div></section>`}
+/** A deck's look in the lobby: its two headline Pokémon and its main types. */
+function deckLook(d){
+  const rank=cid=>{const c=C(cid);return (['Basic','Stage 1','Stage 2'].indexOf(c.sub)+1)*1000+(/Holo/.test(c.rar||'')?500:0)+(+c.hp||0)};
+  const ids=Object.keys(d.cards||{}).filter(cid=>C(cid).st==='Pokémon').sort((a,b)=>rank(b)-rank(a));
+  const tc={};for(const [cid,k] of Object.entries(d.cards||{})){const c=C(cid);if(c.st==='Energy'){const t=energyType(c);if(t&&t!=='Colorless')tc[t]=(tc[t]||0)+k}else if(c.st==='Pokémon'){for(const t of c.types||[])if(t!=='Colorless')tc[t]=(tc[t]||0)+k*.5}}
+  const types=Object.entries(tc).sort((a,b)=>b[1]-a[1]).map(x=>x[0]).slice(0,3);if(!types.length)types.push('Colorless');
+  return {cards:ids.slice(0,2),types};
+}
+function tableCard(g){
+  const a=g.seats?.a||{},b=g.seats?.b||{};const mine=a.uid===uid||b.uid===uid;const open=(!a.uid||!b.uid)&&g.status==='lobby';
+  const st=g.status==='lobby'?'<span class="pill">Setting up</span>':g.status==='playing'?`<span class="live">LIVE</span><span class="pill">Turn ${g.state?.turnNo||1}</span>`:'<span class="pill done">Finished</span>';
+  const plate=(s,p)=>`<div class="plate${p.uid?'':' open'}${g.winner===s?' won':''}" title="${p.uid?esc(nameOf(p.uid)):'Open seat'}">${g.winner===s?'<span aria-label="Winner">👑</span> ':''}${p.uid?esc(nameOf(p.uid)):'Open seat'}</div>`;
+  const act=mine?`<button class="sec" data-open="${g.id}" type="button">Open table</button>`:open?`<button class="pri" data-join="${g.id}" type="button">Take a seat</button>`:`<button data-open="${g.id}" type="button">Watch</button>`;
+  return `<article class="tcard${mine?' mine':''}${g.ranked?' ranked':''}">
+    <div class="tc-top"><h3 class="tc-name">${esc(g.name)}</h3>${g.ranked?'<span class="rkchip">Ranked</span>':''}${g.host===uid||(g.status==='done'&&mine)?`<button class="sm ghost tc-x" data-del="${g.id}" type="button" title="Close table" aria-label="Close table">✕</button>`:''}</div>
+    <div class="tc-st">${st}<span>${g.mode==='auto'?'Auto rules':'Tabletop'} · host ${esc(nameOf(g.host))}</span></div>
+    <div class="tc-vs">${plate('a',a)}<span class="vs">VS</span>${plate('b',b)}</div>
+    <div class="tc-act">${act}</div></article>`}
+function deckCard(d){
+  const bad=validateDeck(d).filter(x=>x.bad);const look=deckLook(d);const c1=TCOL[look.types[0]],c2=TCOL[look.types[1]||look.types[0]];
+  const art=look.cards.length?look.cards.map((cid,i)=>`<div class="dc-c dc-c${i}">${cardHTML(cid,.3)}</div>`).reverse().join(''):`<div class="dc-c dc-c0">${backHTML(.3)}</div>`;
+  return `<article class="dcard" style="--t1:${c1};--t2:${c2}"><div class="dc-art" aria-hidden="true">${art}</div><div class="dc-info"><h3 class="dc-name">${esc(d.name)}</h3>
+    <div class="dc-types">${look.types.map(t=>`<span class="orb" style="--c:${TCOL[t]}"></span>`).join('')}<span>${look.types.join(' · ')}</span></div>
+    <div class="dc-meta ${bad.length?'bad':'ok'}">${deckCount(d)} cards · ${bad.length?esc(bad[0].m):'ready to play'}</div>
+    <button class="sm" data-edit="${d.id}" type="button">Edit deck</button></div></article>`}
 function renderLobby(main){
   const online=S.online;
   const games=S.games.filter(g=>g.status!=='done'||g.host===uid||(g.seats&&((g.seats.a||{}).uid===uid||(g.seats.b||{}).uid===uid)));
+  const decks=S.decks.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
   main.innerHTML=`${heroHTML(games)}${LG()?LG().tickerHTML():''}
   ${!online?`<div class="notice" style="margin-bottom:16px"><b>Can't reach the game server.</b> Check your connection; the page reconnects on its own. Saving decks and playing need the server.</div>`:''}
-  <div class="grid2">
-    <div class="stack">
-      <div class="panel">
-        <div class="row" style="margin-bottom:10px"><h2 class="grow">Tables</h2>${online?`<button class="pri" id="newgame" type="button">New table</button>`:''}</div>
-        ${games.length?`<div class="list">${games.map(g=>{const a=g.seats?.a||{},b=g.seats?.b||{};const mine=a.uid===uid||b.uid===uid;const open=(!a.uid||!b.uid)&&g.status==='lobby';
-          return `<div class="item${mine?' mine':''}"><div class="grow"><div class="t">${esc(g.name)}${g.ranked?'<span class="rkchip">Ranked</span>':''}</div><div class="small muted">${g.status==='lobby'?'Setting up':g.status==='playing'?`<span class="live">LIVE</span> turn ${g.state?.turnNo||1}`:'Finished'} · ${g.mode==='auto'?'auto rules':'tabletop'} · host ${esc(nameOf(g.host))}</div>
-            <div class="row" style="margin-top:6px"><span class="seat ${a.uid?'full':''}">${esc(nameOf(a.uid))}</span><span class="vs">VS</span><span class="seat ${b.uid?'full':''}">${esc(nameOf(b.uid))}</span></div></div>
-            <div class="row">${mine?`<button class="sec" data-open="${g.id}" type="button">Open</button>`:open?`<button class="pri" data-join="${g.id}" type="button">Take a seat</button>`:`<button data-open="${g.id}" type="button">Watch</button>`}${g.host===uid||(g.status==='done'&&mine)?`<button class="sm dng ghost" data-del="${g.id}" type="button" title="Close table">✕</button>`:''}</div></div>`}).join('')}</div>`
-          :`<div class="scene moon"></div><p class="muted">No tables yet. ${online?'Start one and your cousins can take the other seat from their own device.':''}</p>`}
-      </div>
-    </div>
-    <div class="stack">
-      ${LG()?LG().lobbyPanel():''}
-      <div class="panel">
-        <div class="row" style="margin-bottom:10px"><h2 class="grow">Your decks</h2><button class="sec" id="todeck" type="button">Deck builder</button></div>
-        ${S.decks.length?`<div class="list">${S.decks.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).map(d=>{const v=validateDeck(d);const bad=v.filter(x=>x.bad);return `<div class="item"><div class="grow"><div class="t">${esc(d.name)}</div><div class="small ${bad.length?'muted':''}">${deckCount(d)} cards${bad.length?` · <span style="color:var(--danger)">${esc(bad[0].m)}</span>`:' · ready'}</div></div><button data-edit="${d.id}" type="button">Edit</button></div>`}).join('')}</div>`:`<p class="muted">No decks yet. Build one from Base Set, Jungle, Fossil, Team Rocket, Gym Heroes and Gym Challenge.</p>`}
-      </div>
-      <div class="panel small muted">Tabletop style: the table shuffles, deals, tracks damage, status, energy, prizes and the log. You read the cards and apply their effects, like at a real table. Every action is logged so your opponent can follow along.</div>
-    </div>
+  <div class="realms">
+    <section class="realm realm-tables"><header class="realm-head moon"><div class="rh-copy"><span class="kicker">The Moonlit Garden</span><h2>Tables</h2></div>${online?`<button class="pri" id="newgame" type="button">✦ Create Table</button>`:''}</header>
+      <div class="realm-body">${games.length?`<div class="tgrid">${games.map(tableCard).join('')}</div>`:`<div class="empty"><img src="art/orb.webp" alt="" width="542" height="203"><p><b>No tables yet.</b> ${online?'Create one and your cousins can take the other seat from their own device.':''}</p></div>`}
+        <p class="realm-note">Auto-rules tables enforce every card for you. Tabletop tables only move the cards and count damage, like a real table.</p></div></section>
+    ${LG()?LG().lobbyFeature():''}
+    <section class="realm realm-decks"><header class="realm-head sunset"><div class="rh-copy"><span class="kicker">Sunset Peaks</span><h2>Your Decks</h2></div><button class="sec" id="todeck" type="button">Open the Deck Builder</button></header>
+      <div class="realm-body">${decks.length?`<div class="dgrid">${decks.map(deckCard).join('')}<button class="dcard dnew" data-newdeck="1" type="button"><span aria-hidden="true">＋</span>New deck</button></div>`:`<div class="empty"><img src="art/orb.webp" alt="" width="542" height="203"><p><b>No decks yet.</b> Build one from Base Set, Jungle, Fossil, Team Rocket, Gym Heroes and Gym Challenge.</p><button class="pri" data-newdeck="1" type="button">Build your first deck</button></div>`}</div></section>
   </div>`;
   main.onclick=e=>{const hc=e.target.closest('.hero .cd[data-cid]');if(hc){viewCard(hc.dataset.cid);return}if(e.target.closest('.ticker')){go('league');return}const b=e.target.closest('button');if(!b)return;
-    if(b.id==='todeck')go('builder');
+    if(b.dataset.hero==='play'){if(S.online)newGameModal();else toast("Can't reach the game server right now")}
+    else if(b.dataset.hero==='build')go('builder');
+    else if(b.dataset.hero==='league')go('league');
+    else if(b.id==='todeck')go('builder');
+    else if(b.dataset.newdeck){B.deck=null;B.deckId=null;B.dirty=false;ls.set('cpl.draft',null);ls.set('cpl.lastDeck',null);go('builder')}
     else if(b.dataset.league)go('league');
     else if(b.dataset.edit){B.deckId=b.dataset.edit;B.deck=null;go('builder')}
     else if(b.id==='newgame')newGameModal();
@@ -913,6 +935,7 @@ function renderBuilder(main){
   const ae=document.activeElement;const focusId=(ae&&(ae.id==='q'||ae.id==='dname'))?ae.id:null;const bannedSet=new Set(DEFAULT_RULES.banned);
   main.innerHTML=`<div class="builder">
     <div class="cardpane">
+      <div class="cp-head"><h2>Card Library</h2><span class="cp-count">${list.length} cards</span></div>
       <div class="filters">
         <button class="tag ${B.inDeck?'on':''}" type="button" data-indeck="1">In deck · <b id="indeckct">${deckCount(d)}</b></button>
         ${lgBuilder()?`<button class="tag ${B.league?'on':''}" type="button" data-lgf="1" title="Only show Pokémon you can use in ranked games">My league roster</button>`:''}
@@ -920,9 +943,8 @@ function renderBuilder(main){
         <select id="fst"><option value="">All kinds</option><option ${B.st==='Pokémon'?'selected':''}>Pokémon</option><option ${B.st==='Trainer'?'selected':''}>Trainer</option><option ${B.st==='Energy'?'selected':''}>Energy</option></select>
         <select id="fstage"><option value="">Any stage</option>${['Basic','Stage 1','Stage 2'].map(s=>`<option ${B.stage===s?'selected':''}>${s}</option>`).join('')}</select>
       </div>
-      <div class="filters"><div class="chips">${SETS.map(s=>`<button type="button" class="tag ${B.sets.has(s.id)?'on':''}" data-set="${s.id}">${esc(s.name)}</button>`).join('')}</div>
-        <div class="chips">${TYPES.map(t=>`<button type="button" class="tag ty ${B.type===t?'on':''}" data-type="${t}"><i style="background:${TCOL[t]}"></i>${t}</button>`).join('')}</div></div>
-      <div class="small muted" style="margin-bottom:8px">${list.length} cards</div>
+      <div class="filters fl-sets"><span class="flabel">Sets</span><div class="chips">${SETS.map(s=>`<button type="button" class="tag ${B.sets.has(s.id)?'on':''}" data-set="${s.id}">${esc(s.name)}</button>`).join('')}</div></div>
+      <div class="filters fl-types"><span class="flabel">Types</span><div class="chips">${TYPES.map(t=>`<button type="button" class="tag ty ${B.type===t?'on':''}" data-type="${t}"><i style="background:${TCOL[t]}"></i>${t}</button>`).join('')}</div></div>
       <div class="cdgrid">${list.map(c=>{const k=d.cards[c.id]||0;const isBan=bannedSet.has(c.name);const lim=DEFAULT_RULES.limits[c.name];return `<div class="tile${k?' have':''}"><div class="cd click" style="${cardStyle(c.id)}" data-cid="${c.id}" data-view="${c.id}" role="img" aria-label="${esc(c.name)}">${isBan?'<span class="ban">Banned</span>':lim!=null?`<span class="ban lim">Max ${lim}</span>`:''}</div><div class="nm" title="${esc(c.name)}">${esc(c.name)}</div><div class="ct"><button class="sm" type="button" data-dec="${c.id}" ${k?'':'disabled'}>−</button><b>${k}</b><button class="sm" type="button" data-inc="${c.id}">+</button></div></div>`}).join('')}</div>
     </div>
     <div class="deckpane panel${B.paneOpen?' open':''}">${paneStripHTML(d)}${paneBarHTML(d,v)}${paneBodyHTML(d,v)}</div></div>`;
@@ -965,11 +987,14 @@ function paneBodyHTML(d,v){
   const groups={'Pokémon':[],'Trainer':[],'Energy':[]};for(const [cid,k] of Object.entries(d.cards)){const c=C(cid);(groups[c.st]||groups.Trainer).push([cid,k,c])}
   const gsum=Object.fromEntries(Object.entries(groups).map(([g,a])=>[g,a.reduce((s,x)=>s+x[1],0)]));
   const sortMon=(a,b)=>{const sa=['Basic','Stage 1','Stage 2'].indexOf(a[2].sub),sb=['Basic','Stage 1','Stage 2'].indexOf(b[2].sub);return a[2].name.localeCompare(b[2].name)||sa-sb};
+  const n=deckCount(d),size=DEFAULT_RULES.deckSize;
   return `<div class="dp-body">
-    <div class="row"><input type="text" id="dname" value="${esc(d.name)}" maxlength="40" class="grow" aria-label="Deck name"><button class="pri" id="dsave" type="button">Save</button></div>
-    <div class="row small" style="margin-top:8px"><select id="dpick" aria-label="Switch deck"><option value="">Switch deck…</option>${S.decks.map(x=>`<option value="${x.id}" ${x.id===B.deckId?'selected':''}>${esc(x.name)} (${deckCount(x)})</option>`).join('')}</select><button class="sm" id="dnew" type="button">New</button><button class="sm" id="dcopy" type="button">Duplicate</button><button class="sm" id="dio" type="button">Import / export</button><button class="sm dng" id="ddel" type="button">Delete</button></div>
+    <div class="dp-head"><span class="lbl">Deck collection</span><input type="text" id="dname" value="${esc(d.name)}" maxlength="40" aria-label="Deck name">
+      <div class="dp-meter${n===size?' full':n>size?' over':''}"><i style="--f:${Math.min(1,n/size).toFixed(3)}"></i><span><b>${n}</b> / ${size} cards</span></div></div>
+    <button class="pri dp-savebtn" id="dsave" type="button">Save deck</button>
+    <div class="row small dp-tools"><select id="dpick" aria-label="Switch deck"><option value="">Switch deck…</option>${S.decks.map(x=>`<option value="${x.id}" ${x.id===B.deckId?'selected':''}>${esc(x.name)} (${deckCount(x)})</option>`).join('')}</select><button class="sm" id="dnew" type="button">New</button><button class="sm" id="dcopy" type="button">Duplicate</button><button class="sm" id="dio" type="button">Import / export</button><button class="sm dng" id="ddel" type="button">Delete</button></div>
     <div class="val">${v.map(x=>`<span class="${x.bad?'bad':x.good?'good':''}">${x.bad?'✕':'✓'} ${esc(x.m)}</span>`).join('')}${lgBuilder()?(()=>{const lg=LG().legality(d.cards,uid);return `<span class="${lg.ok?'good':'bad'}">${lg.ok?'✓ League-legal for ranked':'✕ Not on your league roster: '+esc(lg.bad.join(', '))}</span>`})():''}</div>
-    <div class="dl">${['Pokémon','Trainer','Energy'].map(g=>groups[g].length?`<div class="sec lbl">${g} · ${gsum[g]}</div>${groups[g].sort(g==='Pokémon'?sortMon:(a,b)=>a[2].name.localeCompare(b[2].name)).map(([cid,k,c])=>`<div class="r"><span class="c">${k}</span><span class="n" data-view="${cid}">${c.st==='Energy'?`<i class="tydot" style="background:${TCOL[energyType(c)]||'#999'}"></i> `:''}${esc(c.name)} <span class="set">${esc(setName(c.set))} ${esc(c.n)}${c.sub&&c.st==='Pokémon'&&c.sub!=='Basic'?' · '+esc(c.sub):''}</span></span><button class="sm" type="button" data-dec="${cid}">−</button><button class="sm" type="button" data-inc="${cid}">+</button></div>`).join('')}`:'').join('')||'<p class="muted small">Tap + on a card to add it.</p>'}</div>
+    <div class="dl">${['Pokémon','Trainer','Energy'].map(g=>groups[g].length?`<div class="sec dsec dsec-${g==='Pokémon'?'mon':g.toLowerCase()}"><span>${g==='Trainer'?'Trainers':g}</span><b>${gsum[g]}</b></div>${groups[g].sort(g==='Pokémon'?sortMon:(a,b)=>a[2].name.localeCompare(b[2].name)).map(([cid,k,c])=>`<div class="r"><div class="cd th" style="--s:.125;${cardStyle(cid)}" data-view="${cid}"></div><span class="c">${k}</span><span class="n" data-view="${cid}">${c.st==='Energy'?`<i class="tydot" style="background:${TCOL[energyType(c)]||'#999'}"></i> `:''}${esc(c.name)} <span class="set">${esc(setName(c.set))} ${esc(c.n)}${c.sub&&c.st==='Pokémon'&&c.sub!=='Basic'?' · '+esc(c.sub):''}</span></span><button class="sm qb" type="button" data-dec="${cid}" aria-label="Remove one">−</button><button class="sm qb plus" type="button" data-inc="${cid}" aria-label="Add one">+</button></div>`).join('')}`:'').join('')||'<p class="muted small">Tap + on a card to add it.</p>'}</div>
   </div>`}
 function bindPane(main,rerender){
   const d=currentDeck();

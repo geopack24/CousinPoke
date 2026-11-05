@@ -27,7 +27,7 @@ const recording = new Set();
 
 export function installLeague(pt) {
   PT = pt;
-  return { render, lobbyPanel, onLeague, noteGames, legality, legalNames, isMember, season, rankedOk, liveDraft, gameChip, tickerHTML };
+  return { render, lobbyPanel, lobbyFeature, onLeague, noteGames, legality, legalNames, isMember, season, rankedOk, liveDraft, gameChip, tickerHTML };
 }
 
 /* ---------- helpers ---------- */
@@ -458,7 +458,7 @@ function standings(l, key) {
     for (let i = r.seq.length - 1; i >= 0 && r.seq[i] === last; i--) k++;
     return { ...r, g, pct: g ? r.w / g : 0, streak: last ? last + k : '–', last5: r.seq.slice(-5) };
   });
-  out.sort((a, b) => b.w - a.w || b.pct - a.pct || a.l - b.l);
+  out.sort((a, b) => (b.g > 0) - (a.g > 0) || b.w - a.w || b.pct - a.pct || a.l - b.l);
   return { rows: out, res };
 }
 function h2h(res, members) {
@@ -485,6 +485,26 @@ function lobbyPanel() {
   return `<div class="panel lgpanel${mine ? ' hot' : ''}"><div class="scene castle"></div><div class="row"><h2 class="grow">Ranked league</h2><button class="${mine ? 'pri' : 'sec'}" type="button" data-league="1">${mine ? 'Pick now' : 'Open'}</button></div>
     <p class="small" style="margin:6px 0 0">${line}${pend ? ` · <b>${pend} trade${pend === 1 ? '' : 's'} waiting on you</b>` : ''}</p></div>`;
 }
+/** The lobby's Ranked League section: the castle, this season's status and a standings preview. */
+function lobbyFeature() {
+  { const nav = document.querySelector('#nav-league'); if (nav) nav.classList.toggle('drafting', liveDraft()); }
+  const l = L();
+  const head = (btn) => `<header class="realm-head castle"><div class="rh-copy"><span class="kicker">Championship Castle</span><h2>Ranked League</h2></div>${btn}</header>`;
+  if (!l) return `<section class="realm realm-league">${head('<button class="pri" type="button" data-league="1">Visit the League</button>')}<div class="realm-body"><p>A yearly draft where every Pokémon name is its own pick, one keeper per player, trades, and standings from ranked games.</p><p class="small muted">Not set up yet. Whoever sets it up becomes the commissioner.</p></div></section>`;
+  const s = season(l);
+  const clock = s && s.status === 'drafting' ? onClock(s) : null;
+  const mine = clock && clock === me();
+  const pend = (l.trades || []).filter((t) => (t.status === 'proposed' && t.to === me()) || (t.status === 'approval' && l.commish === me())).length;
+  const rows = s ? standings(l, l.current).rows : [];
+  const played = rows.some((r) => r.g);
+  const status = !s ? '' : s.status === 'setup' ? `The ${esc(s.year)} draft hasn't started` : s.status === 'drafting' ? (mine ? "<b>You're on the clock!</b>" : `Draft live · <b>${esc(nm(clock))}</b> is picking`) : `Draft complete · ${s.picks.length} picks`;
+  const top = rows.slice(0, 3).map((r, i) => `<div class="lp-row${r.uid === me() ? ' me' : ''}"><span class="lp-rank">${r.g ? `<img src="art/badge-${['champion', 'silver', 'bronze'][i]}.webp" alt="${i + 1}" title="${['1st', '2nd', '3rd'][i]} place">` : `<i>${i + 1}</i>`}</span><span class="lp-name">${esc(nm(r.uid))}</span><span class="lp-rec">${r.g ? `${r.w}–${r.l}` : 'no games'}</span></div>`).join('');
+  return `<section class="realm realm-league${mine ? ' hot' : ''}">${head(`<button class="pri" type="button" data-league="1">${mine ? 'Pick now' : 'View the League'}</button>`)}<div class="realm-body">
+    <div class="season-plate"><span class="kicker">${esc(s ? s.year : '')} season</span><div class="sp-status">${status}</div><div class="sp-meta">${l.members.length} players · commissioner ${esc(nm(l.commish))}</div></div>
+    <div class="lp"><div class="lp-title">Standings</div>${top}</div>
+    ${!played ? '<p class="small muted lp-note">Rank badges appear once ranked games are played.</p>' : ''}
+    ${pend ? `<p class="small lp-note"><b>${pend} trade${pend === 1 ? '' : 's'} waiting on you</b></p>` : ''}</div></section>`;
+}
 function gameChip(g) { return g && g.ranked ? '<span class="rkchip" title="Ranked league game">Ranked</span>' : ''; }
 
 function render(main) {
@@ -508,7 +528,7 @@ function render(main) {
   const keepFocus = document.activeElement && document.activeElement.id === 'lq';
   const body = V.tab === 'draft' ? draftTab(l, s) : V.tab === 'rosters' ? rostersTab(l) : V.tab === 'trades' ? tradesTab(l, s) : V.tab === 'commish' ? commishTab(l, s) : overviewTab(l, s);
   main.innerHTML = `<div class="lg">
-    <div class="lghead"><img class="lgcrest" src="art/crest.webp" alt="" width="301" height="194"><div class="grow"><h1>${esc(l.name || 'Ranked league')}</h1><div class="small muted">${esc(s ? s.year : '')} season · <img class="cbadge" src="art/badge-purple.webp" alt="">commissioner ${esc(nm(l.commish))} · ${l.members.map((u) => esc(nm(u))).join(', ')}</div></div>
+    <div class="lghead"><img class="lgcrest" src="art/crest.webp" alt="" width="301" height="194"><div class="grow"><h1>${esc(l.name || 'Ranked league')}</h1><div class="ornate" aria-hidden="true"></div><div class="small muted">${esc(s ? s.year : '')} season · <img class="cbadge" src="art/badge-purple.webp" alt="">commissioner ${esc(nm(l.commish))} · ${l.members.map((u) => esc(nm(u))).join(', ')}</div></div>
       ${!isMember(me(), l) ? '<span class="chip">Watching (not in the league)</span>' : ''}</div>
     <div class="lgtabs" role="tablist">${tabs.map(([k, t]) => `<button type="button" role="tab" class="tag ${V.tab === k ? 'on' : ''}" data-tab="${k}">${t}</button>`).join('')}</div>
     ${body}</div>`;
@@ -534,18 +554,20 @@ function overviewTab(l, s) {
     <div class="gtile"><span class="gl">Draft</span><span class="gv">${s.status === 'setup' ? 'Not started' : s.status === 'drafting' ? 'Live' : `${s.picks.length} picks`}</span><span class="gs">${s.status === 'drafting' ? `${esc(nm(clock))} is picking` : s.status === 'done' ? 'free agents open' : `${order(s).length} players`}</span><img src="art/badge-purple.webp" alt=""></div>
     <div class="gtile"><span class="gl">Ranked games</span><span class="gv">${res.length}</span><span class="gs">this season</span><img src="art/badge-blue.webp" alt=""></div>
     <div class="gtile"><span class="gl">Trades</span><span class="gv">${done}</span><span class="gs">completed this season</span><img src="art/badge-silver.webp" alt=""></div></div>`;
-  return `${glance}<div class="grid2">
-    <div class="stack">
-      ${champs.length ? `<div class="panel"><h2>Champions</h2><div class="champs">${champs.map((c) => `<div class="champ"><img src="art/badge-red.webp" alt=""><div><b>${esc(nm(c.top.uid))}</b><div class="small muted">${esc(c.k)} champion · ${c.top.w}–${c.top.l}</div></div></div>`).join('')}</div></div>` : ''}
-      <div class="panel"><div class="row"><h2 class="grow">${esc(s.year)} standings</h2>${s.status !== 'setup' ? `<button class="sm" type="button" data-tab="draft">${s.status === 'drafting' ? 'Go to the draft' : 'Draft board'}</button>` : ''}</div><p class="small muted">${status}</p>${table(rows)}
-        <p class="small muted" style="margin:8px 0 0">Start a ranked game from the lobby: New table → Ranked league game. Decks may only use Pokémon on your roster and anything they evolve from.</p></div>
-      ${members.length > 1 ? `<div class="panel"><h3>Head to head</h3><table class="lgt hh"><thead><tr><th></th>${members.map((u) => `<th>${esc(nm(u))}</th>`).join('')}</tr></thead><tbody>${members.map((a) => `<tr><th class="l">${esc(nm(a))}</th>${members.map((b) => (a === b ? '<td class="muted">–</td>' : `<td>${hh[a][b][0]}–${hh[a][b][1]}</td>`)).join('')}</tr>`).join('')}</tbody></table><p class="small muted" style="margin:6px 0 0">Row player's record against the column player this season.</p></div>` : ''}
-      ${all ? `<div class="panel"><h3>All-time</h3>${table(all.rows)}</div>` : ''}
+  const podium = `<div class="podium">${[1, 0, 2].map((i) => { const r = rows[i]; const earned = !!(r && r.g); const badge = ['champion', 'silver', 'bronze'][i];
+    return `<div class="pod p${i + 1}${earned ? '' : ' preview'}"><img src="art/badge-${badge}.webp" alt="" width="109" height="109"><div class="pod-place">${['1st place', '2nd place', '3rd place'][i]}</div>${earned ? `<div class="pod-name">${esc(nm(r.uid))}</div><div class="pod-rec">${r.w}–${r.l} · ${Math.round(r.pct * 100)}%</div>` : `<div class="pod-name">Unclaimed</div><div class="pod-rec">${r ? 'play ranked games to claim it' : 'needs more players'}</div>`}</div>`; }).join('')}</div>`;
+  return `${glance}
+    <section class="hall"><div class="frame-head"><h2>${esc(s.year)} Standings</h2></div>
+      ${podium}
+      <div class="panel lb"><div class="row lb-top"><p class="small muted grow">${status}</p>${s.status !== 'setup' ? `<button class="sm" type="button" data-tab="draft">${s.status === 'drafting' ? 'Go to the draft' : 'Draft board'}</button>` : ''}</div>${table(rows)}
+        <p class="small muted" style="margin:10px 0 0">Start a ranked game from the lobby: Create Table → Ranked league game. Decks may only use Pokémon on your roster and anything they evolve from.</p></div></section>
+    ${champs.length ? `<div class="panel"><h2>Champions</h2><div class="champs">${champs.map((c) => `<div class="champ"><img src="art/badge-red.webp" alt=""><div><b>${esc(nm(c.top.uid))}</b><div class="small muted">${esc(c.k)} champion · ${c.top.w}–${c.top.l}</div></div></div>`).join('')}</div></div>` : ''}
+    <div class="grid2 lg-mid">
+      ${members.length > 1 ? `<div class="panel"><h2>Head to Head</h2><table class="lgt hh"><thead><tr><th></th>${members.map((u) => `<th>${esc(nm(u))}</th>`).join('')}</tr></thead><tbody>${members.map((a) => `<tr><th class="l">${esc(nm(a))}</th>${members.map((b) => (a === b ? '<td class="muted">–</td>' : `<td>${hh[a][b][0]}–${hh[a][b][1]}</td>`)).join('')}</tr>`).join('')}</tbody></table><p class="small muted" style="margin:8px 0 0">Row player's record against the column player this season.</p></div>` : ''}
+      <div class="panel"><h2>Recent Ranked Matches</h2>${recent.length ? `<div class="list">${recent.map((r) => `<div class="item match"><img src="art/badge-champion.webp" alt="" class="mw"><div class="grow"><b>${esc(nm(r.w))}</b> beat ${esc(nm(r.l))}<div class="small muted">${esc(r.wd || 'deck')} vs ${esc(r.ld || 'deck')}${r.turns ? ` · ${r.turns} turns` : ''} · ${when(r.at)}</div></div></div>`).join('')}</div>` : '<p class="muted small">No ranked games yet.</p>'}</div>
     </div>
-    <div class="stack">
-      <div class="panel"><h3>Recent ranked games</h3>${recent.length ? `<div class="list">${recent.map((r) => `<div class="item"><div class="grow"><b>${esc(nm(r.w))}</b> beat ${esc(nm(r.l))}<div class="small muted">${esc(r.wd || 'deck')} vs ${esc(r.ld || 'deck')}${r.turns ? ` · ${r.turns} turns` : ''} · ${when(r.at)}</div></div></div>`).join('')}</div>` : '<p class="muted small">No ranked games yet.</p>'}</div>
-      <div class="panel"><h3>League activity</h3><div class="lglog">${(l.log || []).slice(-30).reverse().map((e) => `<div><span class="t">${when(e.at)}</span> ${esc(e.t)}</div>`).join('') || '<span class="muted small">Nothing yet.</span>'}</div></div>
-    </div></div>`;
+    ${all ? `<div class="panel"><h2>All-time</h2>${table(all.rows)}</div>` : ''}
+    <div class="panel"><h2>League Activity</h2><div class="lglog">${(l.log || []).slice(-40).reverse().map((e) => `<div><span class="t">${when(e.at)}</span> ${esc(e.t)}</div>`).join('') || '<span class="muted small">Nothing yet.</span>'}</div></div>`;
 }
 
 function filteredPool(s) {
