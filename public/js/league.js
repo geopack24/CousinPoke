@@ -11,6 +11,7 @@
 // Draft rule: you draft Pokémon by exact card name (Charizard, Dark Charizard and Blaine's Charizard are three picks).
 // Pre-evolutions are free: owning a Pokémon lets you play everything it evolves from. Trainers and Energy are free for everyone.
 import { playTurnChime } from './fx.js';
+import * as sfx from './sfx.js';
 
 const LID = 'main';
 const SETS_OK = new Set(['base1', 'base2', 'base3', 'base5', 'gym1', 'gym2']); // no promos
@@ -21,11 +22,12 @@ let PT = null;
 const V = { tab: 'overview', q: '', type: '', stage: '', avail: 'open', sort: 'name', season: null, tradeWith: '', give: new Set(), get: new Set(), note: '', busy: false, moveName: '' };
 let POOL = null, BYNAME = null, PRE = null;
 let clockKey = null;
+let pickSeen = null; // 'season:count' of picks already shown, so only new picks get the reveal
 const recording = new Set();
 
 export function installLeague(pt) {
   PT = pt;
-  return { render, lobbyPanel, onLeague, noteGames, legality, legalNames, isMember, season, rankedOk, liveDraft, gameChip };
+  return { render, lobbyPanel, onLeague, noteGames, legality, legalNames, isMember, season, rankedOk, liveDraft, gameChip, tickerHTML };
 }
 
 /* ---------- helpers ---------- */
@@ -116,6 +118,7 @@ async function mutate(fn, okMsg, quiet) {
       const r = await PT.api('PUT', 'leagues/' + LID, { data: doc, ifVersion: ver });
       if (r && r.conflict) { cur = r.doc; PT.S.league = r.doc; continue; }
       PT.S.league = { id: LID, version: r.version, ...doc };
+      try { onLeague(); } catch (e) { /* cosmetic */ }
       if (okMsg) PT.toast(okMsg);
       return true;
     }
@@ -134,6 +137,17 @@ async function mutate(fn, okMsg, quiet) {
 /** Called by the page whenever a new copy of the league arrives: announce when the draft comes to you. */
 function onLeague() {
   const s = season();
+  const nav = document.querySelector('#nav-league');
+  if (nav) nav.classList.toggle('drafting', !!(s && s.status === 'drafting'));
+  if (s) {
+    const real = (s.picks || []).filter((p) => !p.keeper);
+    const sig = L().current + ':' + real.length;
+    if (pickSeen && pickSeen !== sig && pickSeen.split(':')[0] === L().current && real.length > +pickSeen.split(':')[1]) {
+      const last = real.reduce((a, b) => (b.at > a.at ? b : a));
+      if (PT.S.screen !== 'game') revealPick(s, last);
+    }
+    pickSeen = sig;
+  }
   const key = s && s.status === 'drafting' && onClock(s) === me() ? L().current + ':' + nextIndex(s) : null;
   if (key && key !== clockKey) {
     try { playTurnChime(); } catch (e) { /* audio locked */ }
@@ -387,6 +401,50 @@ const A = {
   }, { accept: 'Trade accepted', approve: 'Trade approved', decline: 'Trade declined', cancel: 'Offer cancelled', veto: 'Trade vetoed' }[how]),
 };
 
+/* ---------- hype: the pick reveal and the lobby ticker ---------- */
+function revealPick(s, p) {
+  pool();
+  const e = BYNAME.get(p.name);
+  if (!e) return;
+  const n = order(s).length || 1;
+  document.querySelectorAll('.reveal').forEach((x) => x.remove());
+  const el = document.createElement('div');
+  el.className = 'reveal';
+  el.setAttribute('role', 'status');
+  el.innerHTML = `<div class="rv-in"><div class="rv-top">Round ${Math.floor(p.i / n) + 1} · Pick ${(p.i % n) + 1}</div>
+    <div class="rv-who">${p.uid === me() ? 'You select' : `${esc(nm(p.uid))} selects`}</div>
+    <div class="rv-card">${PT.cardHTML(e.rep, 0.86)}</div>
+    <div class="rv-name">${esc(p.name)}</div><div class="rv-sub">tap to continue</div></div>`;
+  document.body.appendChild(el);
+  try { sfx.play('draw'); sfx.play('coin', 650); sfx.play('win', 760); } catch (err) { /* audio locked */ }
+  let gone = false;
+  const close = () => { if (gone) return; gone = true; el.classList.add('out'); setTimeout(() => el.remove(), 380); };
+  el.addEventListener('click', close);
+  setTimeout(close, 3600);
+}
+/** A sports-style ticker of league news for the lobby (empty when there's nothing to say). */
+function tickerHTML() {
+  const l = L(), s = season(l);
+  if (!l || !s) return '';
+  const items = [];
+  if (s.status === 'drafting') { const c = onClock(s); items.push(`<b>DRAFT LIVE</b> · ${c === me() ? "<b>you're</b>" : esc(nm(c))} on the clock`); }
+  if (s.status === 'setup') items.push(`The <b>${esc(s.year)}</b> draft is coming. ${s.order.length} players: ${s.order.map((u) => esc(nm(u))).join(', ')}`);
+  const st = standings(l, l.current).rows.filter((r) => r.g);
+  if (st[0]) items.push(`👑 <b>${esc(nm(st[0].uid))}</b> leads ${esc(s.year)} at ${st[0].w}–${st[0].l}`);
+  for (const r of st) { const k = parseInt(String(r.streak).slice(1), 10); if (r.streak[0] === 'W' && k >= 2) items.push(`🔥 <b>${esc(nm(r.uid))}</b> has won ${k} straight`); }
+  const res = Object.values(l.results || {}).sort((a, b) => b.at - a.at).slice(0, 4);
+  for (const r of res) items.push(`<b>${esc(nm(r.w))}</b> def. ${esc(nm(r.l))}${r.wd ? ` with ${esc(r.wd)}` : ''}`);
+  const picks = (s.picks || []).slice().sort((a, b) => b.at - a.at).slice(0, 5);
+  for (const p of picks) items.push(`${esc(nm(p.uid))} ${p.keeper ? 'kept' : 'drafted'} <b>${esc(p.name)}</b>`);
+  const trades = (l.trades || []).filter((t) => t.status === 'done').sort((a, b) => b.doneAt - a.doneAt).slice(0, 2);
+  for (const t of trades) items.push(`TRADE: ${esc(nm(t.from))} sends ${esc(t.give.join(', ') || 'nothing')} to ${esc(nm(t.to))} for ${esc(t.get.join(', ') || 'nothing')}`);
+  if (!items.length) return '';
+  const run = items.map((x) => `<span>${x}</span>`).join('');
+  const dur = Math.max(24, items.length * 7);
+  const d = -((Date.now() / 1000) % dur);
+  return `<div class="ticker" data-league="1" role="marquee" aria-label="League news"><div class="tk-tag">⚡ LEAGUE</div><div class="tk-track"><div class="tk-run" style="--dur:${dur}s;--d:${d.toFixed(2)}s">${run}${run}</div></div></div>`;
+}
+
 /* ---------- stats ---------- */
 function standings(l, key) {
   const rows = new Map();
@@ -417,6 +475,7 @@ const typeDot = (t) => `<i class="tydot" style="background:${TCOL[t] || '#999'}"
 
 function lobbyPanel() {
   const l = L();
+  { const nav = document.querySelector('#nav-league'); if (nav) nav.classList.toggle('drafting', liveDraft()); }
   if (!l) return `<div class="panel lgpanel"><div class="row"><h2 class="grow">Ranked league</h2><button class="sec" type="button" data-league="1">Open</button></div><p class="small muted" style="margin:6px 0 0">Yearly draft, keepers, trades and standings. Not set up yet.</p></div>`;
   const s = season(l);
   const clock = s && s.status === 'drafting' ? onClock(s) : null;
@@ -431,6 +490,7 @@ function gameChip(g) { return g && g.ranked ? '<span class="rkchip" title="Ranke
 function render(main) {
   const l = L();
   pool();
+  { const nav = document.querySelector('#nav-league'); if (nav) nav.classList.toggle('drafting', liveDraft()); }
   if (!l) {
     main.innerHTML = `<div class="lg"><div class="panel" style="max-width:640px;margin:0 auto"><h2>Ranked league</h2>
       <p>A yearly draft where each Pokémon name is its own pick (Charizard, Dark Charizard and Blaine's Charizard are three different picks), one keeper per player, trades, and standings from ranked games.</p>
@@ -465,7 +525,7 @@ function overviewTab(l, s) {
   const clock = onClock(s);
   const status = s.status === 'setup' ? `The ${s.year} draft hasn't started yet.` : s.status === 'drafting' ? `The ${s.year} draft is live. ${clock === me() ? "<b>You're on the clock.</b>" : `${esc(nm(clock))} is picking.`}` : `Draft finished: ${s.picks.length} picks. Ranked games count toward these standings.`;
   const table = (rs) => `<table class="lgt"><thead><tr><th>#</th><th class="l">Player</th><th>W</th><th>L</th><th>Win %</th><th>Streak</th><th class="l">Last 5</th></tr></thead><tbody>
-    ${rs.map((r, i) => `<tr class="${r.uid === me() ? 'me' : ''}"><td>${i + 1}</td><td class="l"><b>${esc(nm(r.uid))}</b>${r.uid === l.commish ? ' <span class="small muted">(commish)</span>' : ''}</td><td>${r.w}</td><td>${r.l}</td><td>${r.g ? Math.round(r.pct * 100) + '%' : '–'}</td><td>${r.streak}</td><td class="l">${r.last5.map((x) => `<span class="wl ${x}">${x}</span>`).join('') || '<span class="muted small">no games</span>'}</td></tr>`).join('')}</tbody></table>`;
+    ${rs.map((r, i) => `<tr class="${r.uid === me() ? 'me' : ''}${i === 0 && r.g ? ' lead' : ''}"><td>${i + 1}</td><td class="l">${i === 0 && r.g ? '<span class="crown" aria-label="Leader">👑</span>' : ''}<b>${esc(nm(r.uid))}</b>${r.uid === l.commish ? ' <span class="small muted">(commish)</span>' : ''}</td><td>${r.w}</td><td>${r.l}</td><td>${r.g ? Math.round(r.pct * 100) + '%' : '–'}</td><td>${r.streak}${r.streak[0] === 'W' && parseInt(r.streak.slice(1), 10) >= 3 ? ' <span class="fire">🔥</span>' : ''}</td><td class="l">${r.last5.map((x) => `<span class="wl ${x}">${x}</span>`).join('') || '<span class="muted small">no games</span>'}</td></tr>`).join('')}</tbody></table>`;
   return `<div class="grid2">
     <div class="stack">
       <div class="panel"><div class="row"><h2 class="grow">${esc(s.year)} standings</h2>${s.status !== 'setup' ? `<button class="sm" type="button" data-tab="draft">${s.status === 'drafting' ? 'Go to the draft' : 'Draft board'}</button>` : ''}</div><p class="small muted">${status}</p>${table(rows)}
@@ -514,7 +574,7 @@ function poolGrid(l, s, mode) {
       else if (mode === 'fa' && member) btn = `<button class="sec sm" type="button" data-claim="${esc(e.name)}">Claim</button>`;
     }
     const pre = [...(PRE.get(e.name) || [])];
-    return `<div class="tile ltile${owner ? ' taken' : ''}${owner === me() ? ' mine' : ''}"><div class="cd click" style="${PT.cardStyle(e.rep)}" data-view="${e.rep}" role="img" aria-label="${esc(e.name)}">${owner ? `<span class="own">${esc(nm(owner))}</span>` : ''}</div>
+    return `<div class="tile ltile${owner ? ' taken' : ''}${owner === me() ? ' mine' : ''}" style="--tc:${TCOL[e.type] || '#ffcb05'}"><div class="cd click" style="${PT.cardStyle(e.rep)}" data-view="${e.rep}" role="img" aria-label="${esc(e.name)}">${owner ? `<span class="own">${esc(nm(owner))}</span>` : ''}</div>
       <div class="nm" title="${esc(e.name)}">${esc(e.name)}</div>
       <div class="meta small muted">${typeDot(e.type)}${e.stage}${e.ids.length > 1 ? ` · <span class="vers">${e.ids.map((id, k) => `<a href="#" data-view="${id}" title="${esc(PT.CARDS[id].set)}">v${k + 1}</a>`).join(' ')}</span>` : ''}</div>
       ${pre.length ? `<div class="meta small muted" title="Free with this pick">+ ${esc(pre.join(', '))}</div>` : ''}
