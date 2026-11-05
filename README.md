@@ -40,6 +40,16 @@ Tables created in "auto" mode run a rules engine (`public/js/engine/`) with scri
 
 New table → "Practice against the computer" puts a computer opponent in seat B with one of three built-in decks (Haymaker, Rain Dance, Charizard) or any of your own decks. It plays with the same rules engine, choosing from the table's legal actions: it benches Basics, evolves, attaches energy where it is needed, draws with Bill, Oak and Computer Search, uses PlusPower, Defender and Energy Removal when they matter, retreats a stuck Active, and picks the strongest attack, going for knockouts. Its moves run in your browser one at a time, so you see every animation. `public/js/bot.js` holds the policy; prompts it cannot reason about get a sensible default answer.
 
+## Ranked league
+
+The League tab (`public/js/league.js`) runs a yearly draft and the standings for ranked play. Everything is one document, `leagues/main`; whoever sets the league up is the commissioner.
+
+- **Draft.** Every Pokémon name is its own pick: Charizard, Dark Charizard and Blaine's Charizard are three different players' Pokémon. Snake order, set by the commissioner. The draft keeps going until every player presses "I'm done drafting" (or the commissioner ends it); whatever is left becomes a free agent that any player can claim. Whoever is on the clock hears the turn chime.
+- **Free cards.** Owning a Pokémon lets you play everything it evolves from (own Charizard, play Charmander and Charmeleon). Trainers and Energy are free for everyone. Promo printings aren't allowed.
+- **Keepers.** From the second season on, each player can keep one Pokémon from last season's roster; it uses their round 1 pick. Turning keepers off for a season is a keeper reset.
+- **Trades.** Offer Pokémon for Pokémon on the Trades tab. When the other player accepts, the commissioner approves it (trades involving the commissioner go through on acceptance). The commissioner can veto, undo picks, move Pokémon between rosters and start the next season.
+- **Ranked tables.** New table → Ranked league game. It uses the automated rules with the standard league rules, only league players can sit, and both decks must only use Pokémon from that player's roster. The winner is written into the league's results, which feed the standings, streaks and head-to-head records. The deck builder has a "My league roster" filter and shows whether a deck is league-legal.
+
 ## Playing from another device
 
 Decks belong to a player id stored in the browser. To carry yours to a phone or another PC, open "Set your name", enter a PIN or passphrase and press "Set PIN"; on the other device enter the same PIN and press "Sign in with PIN". That device then plays as you, with your name and decks. The PIN itself is never stored, only a hash that points at your player.

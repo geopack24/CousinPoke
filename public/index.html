@@ -469,6 +469,62 @@ button.sec:hover:not(:disabled){filter:brightness(1.07)}
   .hero-fan .fan{--dx:calc(var(--dx0) * .62)!important}
   .hero-fan .fan .cd{--s:.34!important}
 }
+/* ---------- ranked league ---------- */
+.lg{max-width:1280px;margin:0 auto}
+.lghead{display:flex;gap:12px;align-items:flex-end;margin-bottom:10px}
+.lghead h1{margin:0;font-size:26px;letter-spacing:-.01em}
+.lgtabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+.lgtabs .tag{font-size:14px;padding:6px 14px}
+.lgtabs .badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--danger);color:var(--danger-fg);font-size:11px;margin-left:4px}
+.lgpanel.hot{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent),var(--shadow)}
+table.lgt{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+table.lgt th,table.lgt td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:center}
+table.lgt th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+table.lgt .l{text-align:left}
+table.lgt tr.me td{background:var(--panel-2)}
+.wl{display:inline-block;width:18px;height:18px;line-height:18px;border-radius:4px;font-size:11px;font-weight:800;text-align:center;margin-right:2px;color:#fff}
+.wl.W{background:var(--ok)}.wl.L{background:var(--danger)}
+.lglog{max-height:340px;overflow:auto;font-size:13px;display:flex;flex-direction:column;gap:6px}
+.lglog .t{color:var(--muted);font-size:11px;margin-right:4px}
+.clock{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line);margin-bottom:12px}
+.clock .big{font-size:22px;font-weight:900}
+.clock.mine{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);animation:clockpulse 1.6s ease-in-out infinite}
+.clock.mine button{background:var(--accent-fg);color:var(--accent);border-color:var(--accent-fg)}
+@keyframes clockpulse{50%{box-shadow:0 0 0 6px rgba(242,183,5,.25)}}
+.stopbar{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.votes{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.vote{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel)}
+.vote.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.lgsplit{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,380px);gap:14px;align-items:start}
+.lgsplit>.panel{min-width:0}
+.lg .stack{min-width:0}
+.lg .panel:has(>table.lgt){overflow-x:auto}
+.lgsplit>.panel:last-child{position:sticky;top:12px}
+.lgrid{grid-template-columns:repeat(auto-fill,minmax(128px,1fr))}
+.lgrid .ltile .meta{text-align:center;line-height:1.3;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lgrid .ltile .vers a{color:inherit}
+.lgrid .ltile.taken .cd{filter:grayscale(.85) brightness(.8)}
+.lgrid .ltile.mine .cd{filter:none;outline:3px solid var(--accent);outline-offset:-3px;border-radius:8px}
+.ltile .cd .own{position:absolute;left:4px;right:4px;bottom:6px;background:rgba(0,0,0,.75);color:#fff;font-size:11px;font-weight:800;text-align:center;border-radius:4px;padding:2px}
+.tydot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:0}
+.boardwrap{max-height:70vh;overflow:auto}
+table.board td{font-size:12px;text-align:left;white-space:nowrap}
+table.board td a{color:inherit;text-decoration:none;font-weight:700}
+table.board td.now{background:var(--accent);color:var(--accent-fg);font-weight:800}
+table.board td.kp{background:var(--panel-2)}
+table.board .k{font-size:10px;font-weight:900;background:var(--accent-2);color:var(--accent-2-fg);border-radius:3px;padding:0 3px}
+table.board th.me{color:var(--fg)}
+.lgorder{padding-left:22px;display:flex;flex-direction:column;gap:6px}
+.lgorder li>span.grow{display:inline-block;min-width:140px}
+.rostgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;align-items:start}
+.rlist{display:flex;flex-direction:column;gap:6px;max-height:520px;overflow:auto}
+.ritem{display:flex;gap:10px;align-items:center}
+.ritem .cd{--s:.16;flex:none}
+.tbox{display:flex;flex-direction:column;gap:2px;max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--panel-2)}
+.tchk{font-size:13px;display:flex;gap:6px;align-items:center}
+.rkchip{display:inline-block;font-size:10px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;background:var(--accent-2);color:var(--accent-2-fg);border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:2px}
+@media (max-width:900px){.lgsplit{grid-template-columns:minmax(0,1fr)}.lgsplit>.panel:last-child{position:static}}
+@media (max-width:700px){.lghead h1{font-size:21px}.lgrid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}.clock .big{font-size:18px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -478,6 +534,7 @@ button.sec:hover:not(:disabled){filter:brightness(1.07)}
   <nav>
     <button data-nav="lobby" id="nav-lobby">Lobby</button>
     <button data-nav="builder" id="nav-builder">Deck builder</button>
+    <button data-nav="league" id="nav-league">League</button>
     <button data-nav="game" id="nav-game" hidden>Table</button>
   </nav>
   <div class="who">
@@ -513,7 +570,8 @@ const STATUS=[['SLP','Asleep'],['CNF','Confused'],['PAR','Paralyzed'],['PSN','Po
 
 let DATA=null,CARDS={},SETS=[],SETIDX={};
 let uid=null;
-const S={screen:'lobby',gameId:null,games:[],decks:[],players:{},game:null,name:'',ready:false,online:false};
+const S={screen:'lobby',gameId:null,games:[],decks:[],players:{},game:null,league:null,name:'',ready:false,online:false};
+const LG=()=>window.LEAGUE||null;
 
 /* ---------- data ---------- */
 async function loadData(){
@@ -589,10 +647,10 @@ let syncTimer=null,syncing=false;const lastSig={};
 function syncSoon(ms){clearTimeout(syncTimer);syncTimer=setTimeout(sync,ms||50)}
 async function sync(){
   if(syncing){syncSoon(500);return}
-  if(document.hidden&&S.screen!=='game'){syncSoon(15000);return}
+  if(document.hidden&&S.screen!=='game'&&!(LG()&&LG().liveDraft())){syncSoon(15000);return}
   syncing=true;let changed=false;
   try{
-    const d=await api('POST','sync',{pid:uid,lobby:S.screen!=='game',game:S.screen==='game'?S.gameId:null,gv:S.game?S.game.version:null});
+    const d=await api('POST','sync',{pid:uid,lobby:S.screen!=='game',game:S.screen==='game'?S.gameId:null,gv:S.game?S.game.version:null,league:1,lv:S.league?S.league.version:null});
     if(!S.online){S.online=true;changed=true;setOnline(true)}
     const sig=k=>JSON.stringify(d[k]);
     if(d.players&&sig('players')!==lastSig.players){lastSig.players=sig('players');S.players=d.players;changed=true}
@@ -602,8 +660,12 @@ async function sync(){
       if(d.game.missing){if(S.screen==='game'){toast('That table was closed');S.gameId=null;S.game=null;go('lobby')}}
       else if(!d.game.unchanged&&(!S.game||S.game.id!==d.game.id||d.game.version!==S.game.version)){S.game=d.game;changed=true}
     }
+    if(d.league){const lgScreen=S.screen!=='game';
+      if(d.league.missing){if(S.league){S.league=null;if(lgScreen)changed=true}}
+      else if(!d.league.unchanged){S.league=d.league;if(lgScreen)changed=true;if(LG())LG().onLeague()}}
+    if(LG()&&S.league){if(d.games)LG().noteGames(S.games);if(S.game&&S.game.ranked)LG().noteGames([S.game])}
   }catch(e){if(S.online||!lastSig.tried){S.online=false;setOnline(false);changed=true}lastSig.tried=true}
-  finally{syncing=false;if(changed&&S.ready)render();syncSoon(S.screen==='game'?(document.hidden?5000:2000):5000)}
+  finally{syncing=false;if(changed&&S.ready)render();syncSoon(S.screen==='game'?(document.hidden?5000:2000):(LG()&&LG().liveDraft()?2500:5000))}
 }
 function setOnline(on){const el=$('#online');el.classList.toggle('on',on);el.title=on?'Connected to the game server':'Cannot reach the game server'}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncSoon(100)});
@@ -679,7 +741,7 @@ $('#namebtn').addEventListener('click',()=>{showModal('Your name',`<p class="sma
 /* ---------- render root ---------- */
 function render(){
   if(!S.ready)return;renderHeader();const main=$('#main');main.className=S.screen==='game'?'wide':'';
-  if(S.screen==='lobby')renderLobby(main);else if(S.screen==='builder')renderBuilder(main);else renderGame(main);
+  if(S.screen==='lobby')renderLobby(main);else if(S.screen==='builder')renderBuilder(main);else if(S.screen==='league'){if(LG())LG().render(main);else main.innerHTML='<div class="panel muted">Loading the league…</div>'}else renderGame(main);
 }
 
 /* ---------- lobby ---------- */
@@ -753,13 +815,14 @@ function renderLobby(main){
       <div class="panel">
         <div class="row" style="margin-bottom:10px"><h2 class="grow">Tables</h2>${online?`<button class="pri" id="newgame" type="button">New table</button>`:''}</div>
         ${games.length?`<div class="list">${games.map(g=>{const a=g.seats?.a||{},b=g.seats?.b||{};const mine=a.uid===uid||b.uid===uid;const open=(!a.uid||!b.uid)&&g.status==='lobby';
-          return `<div class="item"><div class="grow"><div class="t">${esc(g.name)}</div><div class="small muted">${g.status==='lobby'?'Setting up':g.status==='playing'?`In play · turn ${g.state?.turnNo||1}`:'Finished'} · ${g.mode==='auto'?'auto rules':'tabletop'} · host ${esc(nameOf(g.host))}</div>
+          return `<div class="item"><div class="grow"><div class="t">${esc(g.name)}${g.ranked?'<span class="rkchip">Ranked</span>':''}</div><div class="small muted">${g.status==='lobby'?'Setting up':g.status==='playing'?`In play · turn ${g.state?.turnNo||1}`:'Finished'} · ${g.mode==='auto'?'auto rules':'tabletop'} · host ${esc(nameOf(g.host))}</div>
             <div class="row" style="margin-top:6px"><span class="seat ${a.uid?'full':''}">${esc(nameOf(a.uid))}</span><span class="muted small">vs</span><span class="seat ${b.uid?'full':''}">${esc(nameOf(b.uid))}</span></div></div>
             <div class="row">${mine?`<button class="sec" data-open="${g.id}" type="button">Open</button>`:open?`<button class="pri" data-join="${g.id}" type="button">Take a seat</button>`:`<button data-open="${g.id}" type="button">Watch</button>`}${g.host===uid||(g.status==='done'&&mine)?`<button class="sm dng ghost" data-del="${g.id}" type="button" title="Close table">✕</button>`:''}</div></div>`}).join('')}</div>`
           :`<p class="muted">No tables yet. ${online?'Start one and your cousins can take the other seat from their own device.':''}</p>`}
       </div>
     </div>
     <div class="stack">
+      ${LG()?LG().lobbyPanel():''}
       <div class="panel">
         <div class="row" style="margin-bottom:10px"><h2 class="grow">Your decks</h2><button class="sec" id="todeck" type="button">Deck builder</button></div>
         ${S.decks.length?`<div class="list">${S.decks.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).map(d=>{const v=validateDeck(d);const bad=v.filter(x=>x.bad);return `<div class="item"><div class="grow"><div class="t">${esc(d.name)}</div><div class="small ${bad.length?'muted':''}">${deckCount(d)} cards${bad.length?` · <span style="color:var(--danger)">${esc(bad[0].m)}</span>`:' · ready'}</div></div><button data-edit="${d.id}" type="button">Edit</button></div>`}).join('')}</div>`:`<p class="muted">No decks yet. Build one from Base Set, Jungle, Fossil, Team Rocket, Gym Heroes and Gym Challenge.</p>`}
@@ -769,6 +832,7 @@ function renderLobby(main){
   </div>`;
   main.onclick=e=>{const hc=e.target.closest('.hero .cd[data-cid]');if(hc){viewCard(hc.dataset.cid);return}const b=e.target.closest('button');if(!b)return;
     if(b.id==='todeck')go('builder');
+    else if(b.dataset.league)go('league');
     else if(b.dataset.edit){B.deckId=b.dataset.edit;B.deck=null;go('builder')}
     else if(b.id==='newgame')newGameModal();
     else if(b.dataset.open)openGame(b.dataset.open);
@@ -781,9 +845,10 @@ function newGameModal(){
     <div class="lbl" style="margin-bottom:6px">How the table runs</div>
     <label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px"><input type="radio" name="gmode" value="auto" checked><span><b>Automated rules</b><br><span class="small muted">The table enforces energy, timing, damage, conditions and prizes. Base Set cards are fully scripted; cards from other sets without text work too, and anything else has a Fix menu.</span></span></label>
     <label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px"><input type="radio" name="gmode" value="manual"><span><b>Tabletop</b><br><span class="small muted">The table only moves cards and counts damage. You apply every effect yourselves.</span></span></label>
+    ${(()=>{const ok=LG()?LG().rankedOk():'The league is still loading';return `<label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px"><input type="radio" name="gmode" value="ranked" ${ok===true?'':'disabled'}><span><b>Ranked league game</b><br><span class="small muted">${ok===true?'Automated rules with the standard league rules. Each deck may only use Pokémon on that player’s roster (plus what they evolve from). The result counts in the standings.':esc(ok)+'.'}</span></span></label>`})()}
     <label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px"><input type="radio" name="gmode" value="bot"><span><b>Practice against the computer</b><br><span class="small muted">Automated rules, with the computer in the other seat. Good for testing a deck.</span></span></label>
     <div id="botdeckrow" style="margin:0 0 12px 26px;display:none"><label class="lbl" for="botdeck">The computer plays</label><select id="botdeck" style="width:100%">${Object.entries((window.AUTO&&window.AUTO.BOT_DECKS)||{}).map(([k,d])=>`<option value="${k}">${esc(d.name)}</option>`).join('')}${S.decks.map(d=>`<option value="${esc(d.id)}">${esc(d.name)} (your deck)</option>`).join('')}</select></div>
-    <div class="lbl" style="margin-bottom:6px">Rules</div>${rulesForm(DEFAULT_RULES)}`,`<button class="pri" id="gok" type="button">Create table</button>`,m=>{m.querySelector('#gname').focus();m.querySelectorAll('input[name=gmode]').forEach(r=>r.addEventListener('change',()=>{m.querySelector('#botdeckrow').style.display=(m.querySelector('input[name=gmode]:checked')||{}).value==='bot'?'block':'none'}));m.querySelector('#gok').onclick=async()=>{const name=m.querySelector('#gname').value.trim()||`${S.name||'Someone'}'s table`;const rules=readRulesForm(m);let mode=(m.querySelector('input[name=gmode]:checked')||{}).value||'auto';const botDeck=mode==='bot'?m.querySelector('#botdeck').value:null;if(mode==='bot')mode='auto';const id=rid();closeModal();try{let seatB={uid:null,deckId:null,deckName:null};if(botDeck){seatB=await prepareBotSeat(botDeck)}await api('PUT','games/'+id,{data:{name,mode,host:uid,createdAt:Date.now(),updatedAt:Date.now(),status:'lobby',rules,seats:{a:{uid,deckId:null,deckName:null},b:seatB},state:null,log:botDeck?[{t:Date.now(),m:'Practice table: the computer is in seat B. Pick your deck and press Start.'}]:[],v:0}});openGame(id)}catch(e){toast('Could not create table ('+(e.code||'error')+')')}}});
+    <p id="rkrules" class="small muted" style="display:none">Ranked tables always use the standard league rules.</p><div id="rulesec"><div class="lbl" style="margin-bottom:6px">Rules</div>${rulesForm(DEFAULT_RULES)}</div>`,`<button class="pri" id="gok" type="button">Create table</button>`,m=>{m.querySelector('#gname').focus();m.querySelectorAll('input[name=gmode]').forEach(r=>r.addEventListener('change',()=>{const md=(m.querySelector('input[name=gmode]:checked')||{}).value;m.querySelector('#botdeckrow').style.display=md==='bot'?'block':'none';m.querySelector('#rulesec').style.display=md==='ranked'?'none':'';m.querySelector('#rkrules').style.display=md==='ranked'?'':'none'}));m.querySelector('#gok').onclick=async()=>{let mode=(m.querySelector('input[name=gmode]:checked')||{}).value||'auto';const ranked=mode==='ranked'&&S.league;if(mode==='ranked')mode='auto';const name=m.querySelector('#gname').value.trim()||(ranked?`Ranked: ${S.name||'Someone'}'s table`:`${S.name||'Someone'}'s table`);const rules=ranked?clone(DEFAULT_RULES):readRulesForm(m);const botDeck=mode==='bot'?m.querySelector('#botdeck').value:null;if(mode==='bot')mode='auto';const id=rid();closeModal();try{let seatB={uid:null,deckId:null,deckName:null};if(botDeck){seatB=await prepareBotSeat(botDeck)}await api('PUT','games/'+id,{data:{name,mode,host:uid,createdAt:Date.now(),updatedAt:Date.now(),status:'lobby',rules,seats:{a:{uid,deckId:null,deckName:null},b:seatB},...(ranked?{ranked:{season:S.league.current}}:{}),state:null,log:botDeck?[{t:Date.now(),m:'Practice table: the computer is in seat B. Pick your deck and press Start.'}]:[],v:0}});openGame(id)}catch(e){toast('Could not create table ('+(e.code||'error')+')')}}});
 }
 /** Make sure the computer's player record and the chosen deck exist, then describe seat B. */
 async function prepareBotSeat(deckKey){
@@ -794,6 +859,7 @@ async function prepareBotSeat(deckKey){
 }
 async function joinGame(id){
   try{const g=await api('GET','games/'+id);if(!g||g.missing){toast('That table is gone');return}
+    if(g.ranked&&!(LG()&&LG().isMember(uid))){toast('Only league players can sit at a ranked table');return}
     const seat=!g.seats.a.uid?'a':!g.seats.b.uid?'b':null;if(!seat){toast('Both seats are taken');return}
     const ver=g.version;delete g.id;delete g.version;g.seats[seat]={uid,deckId:null,deckName:null};g.updatedAt=Date.now();pushLog(g,`${S.name||'A player'} sat down`);
     const r=await api('PUT','games/'+id,{data:g,ifVersion:ver});if(r&&r.conflict){toast('Someone else just took that seat. Try again.');return}
@@ -801,7 +867,8 @@ async function joinGame(id){
 function confirmDeleteGame(id){showModal('Close this table?',`<p>The table and its log are removed for everyone.</p>`,`<button class="dng" id="dok" type="button">Close table</button>`,m=>{m.querySelector('#dok').onclick=async()=>{closeModal();try{await api('DELETE','games/'+id);if(S.gameId===id){S.gameId=null;S.game=null;if(S.screen==='game')go('lobby')}syncSoon(100)}catch(e){toast('Could not close ('+(e.code||'error')+')')}}})}
 
 /* ---------- deck builder ---------- */
-const B={deckId:null,deck:null,q:'',sets:new Set(['base1','base2','base3','base5','gym1','gym2']),st:'',type:'',stage:'',dirty:false,paneOpen:false,inDeck:false};
+const B={deckId:null,deck:null,q:'',sets:new Set(['base1','base2','base3','base5','gym1','gym2']),st:'',type:'',stage:'',dirty:false,paneOpen:false,inDeck:false,league:false};
+const lgBuilder=()=>{const l=LG();if(!l||!S.league||!l.isMember(uid))return false;const s=l.season();return !!(s&&s.status!=='setup')};
 let autoT=null,saveState='saved';
 function setSaveState(st){saveState=st;const el=document.querySelector('#dpsave');if(el){el.textContent=st==='saving'?'Saving…':st==='saved'?'Saved ✓':st==='error'?'Not saved ⚠':'Unsaved';el.className='dp-save '+st}}
 function markDirty(){B.dirty=true;const d=B.deck;if(d){d.updatedAt=Date.now();ls.set('cpl.draft',{id:d.id,name:d.name,cards:d.cards,updatedAt:d.updatedAt});ls.set('cpl.lastDeck',d.id)}setSaveState('dirty');scheduleAutosave()}
@@ -824,8 +891,8 @@ function currentDeck(){
   B.deck={id:rid(),name:'New deck',cards:{'base1-96':4}};B.deckId=B.deck.id;return B.deck; // house rule: every new deck starts with 4 Double Colorless
 }
 function filteredCards(){
-  const q=B.q.trim().toLowerCase();
-  return DATA.cards.filter(c=>{if(!B.sets.has(c.set))return false;if(B.st&&c.st!==B.st)return false;
+  const q=B.q.trim().toLowerCase();const lgset=B.league&&lgBuilder()?LG().legalNames(uid):null;
+  return DATA.cards.filter(c=>{if(!B.sets.has(c.set))return false;if(B.st&&c.st!==B.st)return false;if(lgset&&c.st==='Pokémon'&&(!lgset.has(c.name)||c.set==='basep'))return false;
     if(B.type){if(c.st==='Pokémon'){if(!(c.types||[]).includes(B.type))return false}else if(c.st==='Energy'){if(energyType(c)!==B.type)return false}else return false}
     if(B.stage&&c.sub!==B.stage)return false;
     if(q){const hay=(c.name+' '+(c.txt||'')+' '+(c.atk||[]).map(a=>a.n+' '+a.t).join(' ')+' '+(c.pw||[]).map(p=>p.n+' '+p.t).join(' ')).toLowerCase();if(!hay.includes(q))return false}
@@ -838,6 +905,7 @@ function renderBuilder(main){
     <div class="cardpane">
       <div class="filters">
         <button class="tag ${B.inDeck?'on':''}" type="button" data-indeck="1">In deck · <b id="indeckct">${deckCount(d)}</b></button>
+        ${lgBuilder()?`<button class="tag ${B.league?'on':''}" type="button" data-lgf="1" title="Only show Pokémon you can use in ranked games">My league roster</button>`:''}
         <input type="text" id="q" placeholder="Search name or card text" value="${esc(B.q)}" style="flex:1;min-width:160px">
         <select id="fst"><option value="">All kinds</option><option ${B.st==='Pokémon'?'selected':''}>Pokémon</option><option ${B.st==='Trainer'?'selected':''}>Trainer</option><option ${B.st==='Energy'?'selected':''}>Energy</option></select>
         <select id="fstage"><option value="">Any stage</option>${['Basic','Stage 1','Stage 2'].map(s=>`<option ${B.stage===s?'selected':''}>${s}</option>`).join('')}</select>
@@ -858,6 +926,7 @@ function renderBuilder(main){
     if(b.dataset.set){if(B.sets.has(b.dataset.set))B.sets.delete(b.dataset.set);else B.sets.add(b.dataset.set);rerender()}
     else if(b.dataset.type){B.type=B.type===b.dataset.type?'':b.dataset.type;rerender()}
     else if(b.dataset.indeck){B.inDeck=!B.inDeck;rerender()}
+    else if(b.dataset.lgf){B.league=!B.league;rerender()}
     else if(b.dataset.inc){const cid=b.dataset.inc;d.cards[cid]=(d.cards[cid]||0)+1;markDirty();bumpTile(main,cid,d.cards[cid]);renderPane(main,rerender)}
     else if(b.dataset.dec){const cid=b.dataset.dec;const k=(d.cards[cid]||0)-1;if(k<=0)delete d.cards[cid];else d.cards[cid]=k;markDirty();if(B.inDeck&&k<=0){rerender()}else{bumpTile(main,cid,Math.max(0,k));renderPane(main,rerender)}}
     else if(b.id==='dpbar'){B.paneOpen=!B.paneOpen;renderPane(main,rerender)}
@@ -889,7 +958,7 @@ function paneBodyHTML(d,v){
   return `<div class="dp-body">
     <div class="row"><input type="text" id="dname" value="${esc(d.name)}" maxlength="40" class="grow" aria-label="Deck name"><button class="pri" id="dsave" type="button">Save</button></div>
     <div class="row small" style="margin-top:8px"><select id="dpick" aria-label="Switch deck"><option value="">Switch deck…</option>${S.decks.map(x=>`<option value="${x.id}" ${x.id===B.deckId?'selected':''}>${esc(x.name)} (${deckCount(x)})</option>`).join('')}</select><button class="sm" id="dnew" type="button">New</button><button class="sm" id="dcopy" type="button">Duplicate</button><button class="sm" id="dio" type="button">Import / export</button><button class="sm dng" id="ddel" type="button">Delete</button></div>
-    <div class="val">${v.map(x=>`<span class="${x.bad?'bad':x.good?'good':''}">${x.bad?'✕':'✓'} ${esc(x.m)}</span>`).join('')}</div>
+    <div class="val">${v.map(x=>`<span class="${x.bad?'bad':x.good?'good':''}">${x.bad?'✕':'✓'} ${esc(x.m)}</span>`).join('')}${lgBuilder()?(()=>{const lg=LG().legality(d.cards,uid);return `<span class="${lg.ok?'good':'bad'}">${lg.ok?'✓ League-legal for ranked':'✕ Not on your league roster: '+esc(lg.bad.join(', '))}</span>`})():''}</div>
     <div class="dl">${['Pokémon','Trainer','Energy'].map(g=>groups[g].length?`<div class="sec lbl">${g} · ${gsum[g]}</div>${groups[g].sort(g==='Pokémon'?sortMon:(a,b)=>a[2].name.localeCompare(b[2].name)).map(([cid,k,c])=>`<div class="r"><span class="c">${k}</span><span class="n" data-view="${cid}">${c.st==='Energy'?`<i class="tydot" style="background:${TCOL[energyType(c)]||'#999'}"></i> `:''}${esc(c.name)} <span class="set">${esc(setName(c.set))} ${esc(c.n)}${c.sub&&c.st==='Pokémon'&&c.sub!=='Basic'?' · '+esc(c.sub):''}</span></span><button class="sm" type="button" data-dec="${cid}">−</button><button class="sm" type="button" data-inc="${cid}">+</button></div>`).join('')}`:'').join('')||'<p class="muted small">Tap + on a card to add it.</p>'}</div>
   </div>`}
 function bindPane(main,rerender){
@@ -955,6 +1024,9 @@ async function startGame(){
   const decks={};
   for(const s of ['a','b']){const did=g.seats[s].deckId;if(!did){toast('Both players need a deck');return}
     try{const d=await api('GET','decks/'+did);if(!d||d.missing){toast(`${who(g,s)}'s deck was deleted`);return}decks[s]=d}catch(e){toast('Could not load a deck');return}}
+  if(g.ranked){if(!LG()||!S.league){toast('The league is still loading. Try again in a moment.');return}
+    for(const s of ['a','b']){const u=g.seats[s].uid;if(!LG().isMember(u)){toast(`${who(g,s)} isn't in the league`);return}
+      const lg=LG().legality(decks[s].cards,u);if(!lg.ok){toast(`${who(g,s)}'s deck has Pokémon that aren't on their roster: ${lg.bad.slice(0,4).join(', ')}${lg.bad.length>4?'…':''}`);return}}}
   if(g.mode==='auto'){commit(g=>{g.state=window.AUTO.startGame(g,decks);g.status='playing';g.startedAt=Date.now();g.inflight=null;g.log=[]});return}
   const first=Math.random()<.5?'a':'b';
   commit(g=>{
@@ -1024,17 +1096,19 @@ function renderSetup(main,g){
   const my=mySeat(g);const host=g.host===uid;const both=g.seats.a.uid&&g.seats.b.uid;const ready=both&&g.seats.a.deckId&&g.seats.b.deckId;
   const seatHTML=s=>{const st=g.seats[s];const mine=st.uid===uid;return `<div class="panel"><div class="lbl">Seat ${s.toUpperCase()}</div><h3>${esc(nameOf(st.uid))}${mine?' (you)':''}</h3>
     ${st.uid?`<p class="small">Deck: <b>${!st.deckName?'not chosen':(mine||g.status==='done')?esc(st.deckName):'chosen (name hidden until the game ends)'}</b></p>`:`<p class="small muted">Open seat</p>`}
-    ${mine?`<div class="row"><select id="deck-${s}"><option value="">Choose a deck…</option>${S.decks.map(d=>{const bad=validateDeck(d,g.rules).filter(x=>x.bad);return `<option value="${d.id}" ${d.id===st.deckId?'selected':''}>${esc(d.name)} (${deckCount(d)})${bad.length?' · '+esc(bad[0].m):''}</option>`}).join('')}</select><button class="sm" type="button" data-leave="${s}">Leave seat</button></div>`:(!st.uid&&uid&&!my?`<button class="pri" type="button" data-sit="${s}">Take this seat</button>`:'')}
+    ${mine?`<div class="row"><select id="deck-${s}"><option value="">Choose a deck…</option>${S.decks.map(d=>{const bad=validateDeck(d,g.rules).filter(x=>x.bad);const lg=g.ranked&&LG()?LG().legality(d.cards,uid):null;return `<option value="${d.id}" ${d.id===st.deckId?'selected':''}>${esc(d.name)} (${deckCount(d)})${bad.length?' · '+esc(bad[0].m):''}${lg&&!lg.ok?' · not league-legal':''}</option>`}).join('')}</select><button class="sm" type="button" data-leave="${s}">Leave seat</button></div>`:(!st.uid&&uid&&!my?`<button class="pri" type="button" data-sit="${s}">Take this seat</button>`:'')}
   </div>`};
   main.innerHTML=`<div style="max-width:900px;margin:0 auto" class="stack">
-    <div class="row"><h2 class="grow">${esc(g.name)}</h2><span class="muted small">host ${esc(nameOf(g.host))}</span></div>
+    <div class="row"><h2 class="grow">${esc(g.name)}${g.ranked?'<span class="rkchip">Ranked</span>':''}</h2><span class="muted small">host ${esc(nameOf(g.host))}</span></div>
+    ${g.ranked?(()=>{const sd=my?S.decks.find(x=>x.id===g.seats[my].deckId):null;const lg=sd&&LG()?LG().legality(sd.cards,uid):null;return `<div class="notice info small">Ranked league game (${esc(g.ranked.season)} season). Each deck may only use Pokémon on that player's roster plus anything they evolve from; Trainers and Energy are free. The winner is recorded in the league standings.${lg&&!lg.ok?`<br><b style="color:var(--danger)">Your deck isn't league-legal:</b> ${esc(lg.bad.join(', '))}`:lg?'<br><b>Your deck is league-legal ✓</b>':''}</div>`})():''}
     <div class="grid2">${seatHTML('a')}${seatHTML('b')}</div>
-    <div class="panel"><div class="row"><h3 class="grow">Rules</h3>${host?`<button class="sm" type="button" id="editrules">Edit</button>`:''}</div><p class="small">${esc(rulesSummary(g.rules))}</p>${g.rules.notes?`<div class="notice info small" style="white-space:pre-wrap">${esc(g.rules.notes)}</div>`:''}</div>
+    <div class="panel"><div class="row"><h3 class="grow">Rules</h3>${host&&!g.ranked?`<button class="sm" type="button" id="editrules">Edit</button>`:''}</div><p class="small">${esc(rulesSummary(g.rules))}</p>${g.rules.notes?`<div class="notice info small" style="white-space:pre-wrap">${esc(g.rules.notes)}</div>`:''}</div>
     <div class="row">${host||my?`<button class="pri" type="button" id="start" ${ready?'':'disabled'}>Start game</button><span class="small muted">${ready?'Shuffles both decks, deals hands and prizes, flips for who goes first.':both?'Waiting for both decks.':'Waiting for a second player.'}</span>`:`<span class="muted small">${ready?'Waiting for the host to start.':'Waiting for everyone to pick a deck.'}</span>`}<span class="grow"></span><button type="button" id="back">Back to lobby</button></div>
   </div>`;
   main.onclick=async e=>{const b=e.target.closest('button');if(!b)return;
     if(b.id==='back')go('lobby');
     else if(b.id==='start')startGame();
+    else if(b.dataset.sit&&g.ranked&&!(LG()&&LG().isMember(uid)))toast('Only league players can sit at a ranked table');
     else if(b.dataset.sit)commit(g=>{g.seats[b.dataset.sit]={uid,deckId:null,deckName:null};pushLog(g,`${whoDo()} sat down`)});
     else if(b.dataset.leave)commit(g=>{g.seats[b.dataset.leave]={uid:null,deckId:null,deckName:null};pushLog(g,`${whoDo()} left the seat`)});
     else if(b.id==='editrules')showModal('Edit rules',rulesForm(g.rules),`<button class="pri" id="rok" type="button">Save rules</button>`,m=>{m.querySelector('#rok').onclick=()=>{const r=readRulesForm(m);closeModal();commit(g=>{g.rules=r;pushLog(g,`${whoDo()} changed the rules: ${rulesSummary(r)}`)})}});
@@ -1180,7 +1254,7 @@ async function start(){
   try{await loadData()}catch(e){$('#main').innerHTML='<div class="panel"><b>Could not load the card database.</b> Reload the page to try again.</div>';return}
   initIdentity();S.ready=true;renderHeader();
   const v=ls.get('view',{screen:'lobby'});
-  if(v.screen==='game'&&v.gameId)openGame(v.gameId);else if(v.screen==='builder')go('builder');else go('lobby');
+  if(v.screen==='game'&&v.gameId)openGame(v.gameId);else if(v.screen==='builder')go('builder');else if(v.screen==='league')go('league');else go('lobby');
   if(S.name)savePlayerName(S.name,true);
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();closeModal()}});
@@ -1191,14 +1265,16 @@ async function saveGame(doc){
     if(r&&r.version!=null&&S.game&&S.game.id===id){S.game.version=r.version}return true}
   catch(e){toast('Could not save ('+(e.code||'error')+')');return false}
 }
-window.PT={esc,confirmDeleteGame,report:reportModal,get CARDS(){return CARDS},cardHTML,backHTML,cardStyle,showModal,closeModal,showMenu,toast,nameOf,uid:()=>uid,S,saveGame,render,go,viewCard,rulesSummary};
+window.PT={esc,api,syncSoon,confirmDeleteGame,report:reportModal,get CARDS(){return CARDS},cardHTML,backHTML,cardStyle,showModal,closeModal,showMenu,toast,nameOf,uid:()=>uid,S,saveGame,render,go,viewCard,rulesSummary};
 start();
 })();
 </script>
 <script type="module">
 import { install } from './js/auto.js';
+import { installLeague } from './js/league.js';
 window.AUTO = install(window.PT);
-if (window.PT && window.PT.S && window.PT.S.screen === 'game') window.PT.render();
+window.LEAGUE = installLeague(window.PT);
+if (window.PT && window.PT.S && ['game', 'league', 'lobby'].includes(window.PT.S.screen)) window.PT.render();
 </script>
 </body>
 </html>
