@@ -98,7 +98,7 @@ export const base1 = {
   'base1-13': { attacks: { 'Water Gun': extraWater(30, 3, 2), Whirlpool: discardDefenderEnergy(40) } },
   'base1-14': { attacks: { Agility: { effect: (ctx, m) => { ctx.damage(20); if (ctx.flip()) { ctx.addFx(m, { k: 'preventAll', until: T(ctx) + 1 }); ctx.log('Agility: Raichu is protected next turn'); } } }, Thunder: tailsSelf(60, 30) } },
   'base1-15': { powers: { 'Energy Trans': {
-    canUse: ({ g, db, seat }) => (mons(P(g, seat)).some((m) => m.en.some((e) => energyIs(db, e, 'Grass'))) ? true : 'No Grass Energy to move'),
+    canUse: ({ g, db, seat }) => (mons(P(g, seat)).length < 2 ? 'No other Pokémon to move Energy to' : mons(P(g, seat)).some((m) => m.en.some((e) => energyIs(db, e, 'Grass'))) ? true : 'No Grass Energy to move'),
     use: (ctx) => {
       const from = ctx.chooseMon('Take a Grass Energy from…', ownPokemon(ctx).filter((m) => m.en.some((e) => energyIs(ctx.db, e, 'Grass'))), { id: 'transFrom' })[0];
       const fm = findMon(ctx.g, from).m; const card = ctx.chooseCards('Which Grass Energy?', fm.en.filter((e) => energyIs(ctx.db, e, 'Grass')), { id: 'transCard' })[0];
