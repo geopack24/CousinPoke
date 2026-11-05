@@ -121,8 +121,12 @@ textarea{width:100%;min-height:60px;resize:vertical}
   .cdgrid .tile .ct button,.dl .r button{min-width:42px;min-height:34px;font-size:16px}
   .tag{padding:6px 12px}
 }
+@media (pointer:coarse) and (max-width:480px){
+  .cdgrid .tile .ct{gap:4px}
+  .cdgrid .tile .ct button{min-width:36px}
+}
 @media (max-width:900px){
-  .builder{grid-template-columns:1fr}
+  .builder{grid-template-columns:minmax(0,1fr)}
   .cardpane{padding-bottom:calc(126px + env(safe-area-inset-bottom,0px))}
   .cdgrid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
   .filters .chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
