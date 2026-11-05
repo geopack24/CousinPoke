@@ -610,3 +610,14 @@ test('an Asleep Pokémon on the bench still gets its wake-up flip between turns 
   const still = act(g, { type: 'endTurn' }, { seed: TAILS });
   assert.deepEqual(still.p.a.bench[0].st, ['SLP']);
 });
+
+test("Rocket's Mewtwo's Juxtapose swaps damage counters and can Knock Out the Defending Pokémon", () => {
+  const RM = DATA.cards.find((c) => c.name === "Rocket's Mewtwo").id;
+  const mk = () => setup({ a: { active: { c: RM, dmg: 60, en: [N['Psychic Energy']] }, deck: [N['Bill'], N['Bill']] }, b: { active: N['Machop'], bench: [N['Machop']], deck: [N['Bill'], N['Bill']] } });
+  const hit = act(mk(), { type: 'attack', index: 0 }, { seed: HEADS });
+  assert.equal(hit.p.a.active.dmg, 0);
+  assert.ok(hit.p.b.discard.some((c) => c.c === N['Machop']), 'Machop (50 HP) took 60 and was Knocked Out');
+  const miss = act(mk(), { type: 'attack', index: 0 }, { seed: TAILS });
+  assert.equal(miss.p.a.active.dmg, 60);
+  assert.equal(miss.p.b.active.dmg, 0);
+});
