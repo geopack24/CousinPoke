@@ -1,0 +1,123 @@
+/* League art theme: George's fantasy-arena asset pack (public/art/).
+   Purple / blue / navy / orange / gold. Visual only; loaded after hype.css. */
+:root{
+  --hype:linear-gradient(105deg,#ffc63d 0%,#ff824c 38%,#d154dc 70%,#886ef2 100%);
+  --rainbow:var(--hype);
+  --gold:#ffc83d; --fuchsia:#d74be9; --violet:#886ef2; --coral:#ff824c; --sky:#50a8ff;
+  --edge-hot-1:color-mix(in srgb,#ffc83d 70%,transparent);
+  --edge-hot-2:color-mix(in srgb,#d74be9 60%,transparent);
+  --pg1:color-mix(in srgb,var(--panel) 100%,#fff 5%); --pg2:var(--panel);
+  --ink:#10141e;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0d1120; --panel:#1d2337; --panel-2:#262d45; --fg:#eef0f7; --muted:#a4adc2; --line:#373f5c;
+  --accent-2:#6fa8ff; --pg1:#283046; --pg2:#1a2031;
+  --glow-1:rgba(255,200,61,.12); --glow-2:rgba(136,110,242,.22); --glow-3:rgba(215,75,233,.12) } }
+:root[data-theme="dark"]{
+  --bg:#0d1120; --panel:#1d2337; --panel-2:#262d45; --fg:#eef0f7; --muted:#a4adc2; --line:#373f5c;
+  --accent-2:#6fa8ff; --pg1:#283046; --pg2:#1a2031;
+  --glow-1:rgba(255,200,61,.12); --glow-2:rgba(136,110,242,.22); --glow-3:rgba(215,75,233,.12) }
+
+/* ---- backdrop: night sky with violet and fuchsia nebula light ---- */
+body{background:
+  radial-gradient(900px 380px at 50% -160px,var(--glow-1),transparent 70%),
+  radial-gradient(800px 600px at -10% 20%,var(--glow-2),transparent 65%),
+  radial-gradient(800px 600px at 110% 55%,var(--glow-3),transparent 65%),
+  var(--pattern),var(--bg)}
+
+/* ---- header: the league crest hangs off the bar ---- */
+#hdr{min-height:54px}
+#hdr .logo{position:relative;padding-left:66px;min-height:38px}
+#hdr .logo i{display:none}
+#hdr .logo .crest{position:absolute;left:0;top:50%;width:60px;height:auto;transform:translateY(-38%);filter:drop-shadow(0 4px 8px rgba(0,0,0,.45));transition:transform .25s cubic-bezier(.2,1.5,.4,1)}
+#hdr .logo:hover .crest{transform:translateY(-38%) rotate(-4deg) scale(1.08)}
+#hdr .logo span{font-size:20px}
+@media (max-width:480px){#hdr .logo{padding-left:50px;min-width:50px}#hdr .logo .crest{width:48px}#hdr .logo .lg-short{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}}
+
+/* ---- panels: navy glass, neon top edge, crest-badge headings ---- */
+.panel{background:
+  var(--hype) top/100% 2px no-repeat padding-box,
+  linear-gradient(165deg,var(--pg1),var(--pg2)) padding-box,
+  linear-gradient(155deg,var(--edge-hot-1),var(--edge) 26%,var(--edge) 70%,var(--edge-hot-2)) border-box;
+  box-shadow:0 6px 22px rgba(0,0,0,.28),0 0 26px rgba(145,70,239,.06)}
+.panel>h2::before,.panel>.row>h2::before{width:26px;height:26px;border-radius:0;background:url(art/badge-bronze.webp) center/contain no-repeat;box-shadow:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))}
+.panel>h3::before,.panel>.row>h3::before{width:17px;height:17px;border-radius:0;background:url(art/badge-bronze.webp) center/contain no-repeat;box-shadow:none;vertical-align:-3px}
+
+/* ---- buttons: the gold → coral → fuchsia pill ---- */
+button.pri,.board button.pri{background:linear-gradient(105deg,#ffc63d,#ff824c 55%,#d154dc);border-color:transparent;color:var(--ink);border-radius:999px;box-shadow:0 2px 14px rgba(221,95,142,.3),inset 0 1px 0 rgba(255,255,255,.45);text-shadow:none}
+button.pri:hover:not(:disabled),.board button.pri:hover:not(:disabled){filter:brightness(1.08);box-shadow:0 4px 20px rgba(221,95,142,.45),inset 0 1px 0 rgba(255,255,255,.45)}
+button.sec{border-radius:999px;background:linear-gradient(105deg,#6fa8ff,#886ef2);border-color:transparent;color:#0c1222}
+
+/* ---- lobby hero: the fantasy arena, live title in the sky, cards on the platform ---- */
+.hero{display:grid;grid-template-columns:1fr;justify-items:center;text-align:center;gap:0;padding:26px 20px 18px;min-height:clamp(330px,32vw,440px);background:#0a1228 url(art/arena.webp) center 62%/cover no-repeat;border:1px solid rgba(220,159,76,.5);box-shadow:0 12px 55px rgba(0,0,0,.5),0 0 30px rgba(145,70,239,.12),inset 0 0 0 1px rgba(255,255,255,.06);isolation:isolate}
+.hero::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse 46% 52% at 50% 26%,rgba(6,10,28,.62),transparent 72%),linear-gradient(90deg,rgba(12,18,37,.45),transparent 22%,transparent 78%,rgba(12,18,37,.45))}
+.hero::before{content:"";position:absolute;right:3%;top:5%;width:min(230px,24vw);aspect-ratio:542/203;background:url(art/orb.webp) center/contain no-repeat;animation:orbfloat 7s ease-in-out infinite;pointer-events:none;z-index:0;opacity:.95}
+@keyframes orbfloat{50%{transform:translate(-10px,8px) rotate(-3deg)}}
+.hero>div:not(.hero-fan){position:relative;z-index:1}
+.hero .wordmark{color:var(--gold);text-shadow:-3px -3px 0 #4a2a8a,3px -3px 0 #4a2a8a,-3px 3px 0 #4a2a8a,3px 3px 0 #4a2a8a,0 -3px 0 #4a2a8a,0 3px 0 #4a2a8a,-3px 0 0 #4a2a8a,3px 0 0 #4a2a8a,0 7px 0 #2a1658,0 12px 28px rgba(5,8,21,.8)}
+.hero p{margin-inline:auto}
+.hero .slogan{text-shadow:0 2px 0 rgba(0,0,0,.45),0 0 18px rgba(8,12,30,.9)}
+.hero .slogan::after{content:"";display:block;width:min(400px,82%);height:44px;margin:4px auto -6px;background:url(art/ornate-bar.webp) center/contain no-repeat}
+.hero .hstats{justify-content:center;margin-top:8px}
+.hero .hstats span{background:rgba(10,14,32,.6);border-color:rgba(255,200,61,.35);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.hero-fan{width:100%;height:190px;margin-top:4px;z-index:1}
+.hero-fan::before{opacity:.45}
+.hero-fan .fan .cd{box-shadow:0 14px 26px rgba(0,0,0,.6),0 0 22px rgba(255,200,61,.18)}
+@media (max-width:760px){
+  .hero{min-height:0;padding:18px 12px 10px;background-position:center bottom}
+  .hero::before{width:120px;top:2%;right:1%;opacity:.7}
+  .hero-fan{height:150px}
+}
+
+/* ---- scenery strips: the castle, the moonlit garden, the sunset peaks ---- */
+.scene{height:92px;margin:-14px -16px 12px;border-radius:11px 11px 0 0;background:center/cover no-repeat;position:relative}
+.scene::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,transparent 45%,var(--pg1))}
+.scene.castle{background-image:url(art/scene-castle.webp)}
+.scene.moon{background-image:url(art/scene-moonlit.webp)}
+.scene.sunset{background-image:url(art/scene-sunset.webp)}
+.scene.tall{height:130px}
+.scene .scene-cap{position:absolute;left:14px;bottom:8px;z-index:1;font-family:var(--display);font-size:18px;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.5),0 0 12px rgba(0,0,0,.7)}
+
+/* ---- league banner ---- */
+.lghead{position:relative;isolation:isolate;align-items:center;gap:16px;min-height:150px;padding:18px 22px;margin-bottom:14px;border-radius:16px;overflow:hidden;color:#fff;background:#0a1228 url(art/arena.webp) center 70%/cover no-repeat;border:1px solid rgba(220,159,76,.5);box-shadow:0 10px 40px rgba(0,0,0,.45),0 0 26px rgba(145,70,239,.12)}
+.lghead::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,10,28,.82),rgba(6,10,28,.45) 45%,rgba(6,10,28,.15))}
+.lghead .lgcrest{width:clamp(96px,12vw,150px);height:auto;flex:none;filter:drop-shadow(0 6px 14px rgba(0,0,0,.6))}
+.lghead h1{color:var(--gold);text-shadow:-2px -2px 0 #4a2a8a,2px -2px 0 #4a2a8a,-2px 2px 0 #4a2a8a,2px 2px 0 #4a2a8a,0 -2px 0 #4a2a8a,0 2px 0 #4a2a8a,-2px 0 0 #4a2a8a,2px 0 0 #4a2a8a,0 5px 0 #2a1658,0 10px 24px rgba(0,0,0,.6)}
+.lghead .small.muted{color:#d6dbea}
+.lghead .chip{background:rgba(10,14,32,.6);color:#fff;border-color:rgba(255,255,255,.25)}
+.lghead .cbadge{width:18px;height:18px;vertical-align:-4px;margin-right:2px}
+@media (max-width:600px){.lghead{min-height:0;padding:14px}.lghead .lgcrest{width:80px}}
+
+/* ---- standings: rank badges, the season glance tiles, champions ---- */
+.rankb{width:28px;height:28px;vertical-align:middle;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))}
+tr.lead .rankb{width:34px;height:34px;animation:crown 2.6s ease-in-out infinite}
+.glance{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.gtile{position:relative;min-height:104px;padding:14px 18px;border:18px solid transparent;border-image:url(art/panel-purple.webp) 34 fill / 18px / 0 stretch;display:flex;flex-direction:column;justify-content:center;color:#eef0f7}
+.gtile.gold{border-image-source:url(art/panel-gold.webp)}
+.gtile .gl{font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#c9b8ff}
+.gtile.gold .gl{color:#ffd774}
+.gtile .gv{font-family:var(--display);font-size:24px;line-height:1.15;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.4)}
+.gtile .gs{font-size:12px;color:#c3c9da}
+.gtile img{position:absolute;right:-6px;top:50%;transform:translateY(-50%);width:54px;height:auto;opacity:.95;filter:drop-shadow(0 3px 6px rgba(0,0,0,.5))}
+.champs{display:flex;flex-direction:column;gap:8px}
+.champ{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:12px;background:linear-gradient(90deg,rgba(255,130,76,.18),transparent);border:1px solid rgba(255,200,61,.3)}
+.champ img{width:44px;height:auto}
+.champ b{font-family:var(--display);font-weight:400;font-size:18px}
+
+/* ---- league bits that used the old yellow ---- */
+.clock.mine{background:var(--hype);color:var(--ink);border-color:transparent}
+.clock.mine button{background:rgba(16,20,30,.85);color:#ffd774;border-color:transparent}
+table.dboard td.now{background:var(--hype);color:var(--ink)}
+.lgrid .ltile.mine .cd{outline-color:var(--gold)}
+#nav-league.drafting::after{background:linear-gradient(105deg,#ff4d4d,#d154dc)}
+
+/* ---- footer silhouette ---- */
+#ftr{margin-top:28px;padding:34px 16px 14px;text-align:center;font-size:12px;letter-spacing:.06em;color:#e6e9f2;text-shadow:0 1px 3px rgba(0,0,0,.6);background:linear-gradient(180deg,transparent,rgba(13,17,32,.6) 60%),url(art/footer.webp) bottom center/max(100%,1100px) auto no-repeat}
+#ftr b{font-family:var(--display);font-weight:400;letter-spacing:.02em;color:var(--gold);font-size:14px}
+#main.wide~#ftr{display:none}
+
+@media (prefers-reduced-motion:reduce){.hero::before{animation:none}}
+
+/* keep the footer at the bottom on short pages */
+body{display:flex;flex-direction:column;min-height:100%}
+#main{width:100%;flex:1 0 auto}

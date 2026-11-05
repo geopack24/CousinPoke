@@ -512,12 +512,12 @@ table.lgt tr.me td{background:var(--panel-2)}
 .ltile .cd .own{position:absolute;left:4px;right:4px;bottom:6px;background:rgba(0,0,0,.75);color:#fff;font-size:11px;font-weight:800;text-align:center;border-radius:4px;padding:2px}
 .tydot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:0}
 .boardwrap{max-height:70vh;overflow:auto}
-table.board td{font-size:12px;text-align:left;white-space:nowrap}
-table.board td a{color:inherit;text-decoration:none;font-weight:700}
-table.board td.now{background:var(--accent);color:var(--accent-fg);font-weight:800}
-table.board td.kp{background:var(--panel-2)}
-table.board .k{font-size:10px;font-weight:900;background:var(--accent-2);color:var(--accent-2-fg);border-radius:3px;padding:0 3px}
-table.board th.me{color:var(--fg)}
+table.dboard td{font-size:12px;text-align:left;white-space:nowrap}
+table.dboard td a{color:inherit;text-decoration:none;font-weight:700}
+table.dboard td.now{background:var(--accent);color:var(--accent-fg);font-weight:800}
+table.dboard td.kp{background:var(--panel-2)}
+table.dboard .k{font-size:10px;font-weight:900;background:var(--accent-2);color:var(--accent-2-fg);border-radius:3px;padding:0 3px}
+table.dboard th.me{color:var(--fg)}
 .lgorder{padding-left:22px;display:flex;flex-direction:column;gap:6px}
 .lgorder li>span.grow{display:inline-block;min-width:140px}
 .rostgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;align-items:start}
@@ -532,10 +532,14 @@ table.board th.me{color:var(--fg)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 <link rel="stylesheet" href="hype.css">
+<link rel="stylesheet" href="theme.css">
+<link rel="icon" type="image/png" href="art/favicon-64.png">
+<link rel="apple-touch-icon" href="art/icon-180.png">
+<link rel="preload" as="image" href="art/arena.webp">
 </head>
 <body>
 <header id="hdr">
-  <a class="logo" href="#lobby" id="logo" title="Cousin Pokémon League"><i></i><span class="lg-full">Cousin Pokémon League</span><span class="lg-short">CPL</span></a>
+  <a class="logo" href="#lobby" id="logo" title="Cousin Pokémon League"><i></i><img class="crest" src="art/crest.webp" alt="" width="301" height="194"><span class="lg-full">Cousin Pokémon League</span><span class="lg-short">CPL</span></a>
   <nav>
     <button data-nav="lobby" id="nav-lobby">Lobby</button>
     <button data-nav="builder" id="nav-builder">Deck builder</button>
@@ -549,6 +553,7 @@ table.board th.me{color:var(--fg)}
   </div>
 </header>
 <main id="main"></main>
+<footer id="ftr"><b>Cousin Pokémon League</b><br>There's only one right way to play</footer>
 <div id="hover"></div>
 
 <script>
@@ -823,7 +828,7 @@ function renderLobby(main){
           return `<div class="item${mine?' mine':''}"><div class="grow"><div class="t">${esc(g.name)}${g.ranked?'<span class="rkchip">Ranked</span>':''}</div><div class="small muted">${g.status==='lobby'?'Setting up':g.status==='playing'?`<span class="live">LIVE</span> turn ${g.state?.turnNo||1}`:'Finished'} · ${g.mode==='auto'?'auto rules':'tabletop'} · host ${esc(nameOf(g.host))}</div>
             <div class="row" style="margin-top:6px"><span class="seat ${a.uid?'full':''}">${esc(nameOf(a.uid))}</span><span class="vs">VS</span><span class="seat ${b.uid?'full':''}">${esc(nameOf(b.uid))}</span></div></div>
             <div class="row">${mine?`<button class="sec" data-open="${g.id}" type="button">Open</button>`:open?`<button class="pri" data-join="${g.id}" type="button">Take a seat</button>`:`<button data-open="${g.id}" type="button">Watch</button>`}${g.host===uid||(g.status==='done'&&mine)?`<button class="sm dng ghost" data-del="${g.id}" type="button" title="Close table">✕</button>`:''}</div></div>`}).join('')}</div>`
-          :`<p class="muted">No tables yet. ${online?'Start one and your cousins can take the other seat from their own device.':''}</p>`}
+          :`<div class="scene moon"></div><p class="muted">No tables yet. ${online?'Start one and your cousins can take the other seat from their own device.':''}</p>`}
       </div>
     </div>
     <div class="stack">

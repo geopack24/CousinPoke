@@ -476,13 +476,13 @@ const typeDot = (t) => `<i class="tydot" style="background:${TCOL[t] || '#999'}"
 function lobbyPanel() {
   const l = L();
   { const nav = document.querySelector('#nav-league'); if (nav) nav.classList.toggle('drafting', liveDraft()); }
-  if (!l) return `<div class="panel lgpanel"><div class="row"><h2 class="grow">Ranked league</h2><button class="sec" type="button" data-league="1">Open</button></div><p class="small muted" style="margin:6px 0 0">Yearly draft, keepers, trades and standings. Not set up yet.</p></div>`;
+  if (!l) return `<div class="panel lgpanel"><div class="scene castle"></div><div class="row"><h2 class="grow">Ranked league</h2><button class="sec" type="button" data-league="1">Open</button></div><p class="small muted" style="margin:6px 0 0">Yearly draft, keepers, trades and standings. Not set up yet.</p></div>`;
   const s = season(l);
   const clock = s && s.status === 'drafting' ? onClock(s) : null;
   const mine = clock && clock === me();
   const pend = (l.trades || []).filter((t) => (t.status === 'proposed' && t.to === me()) || (t.status === 'approval' && l.commish === me())).length;
   const line = !s ? '' : s.status === 'setup' ? `${s.year} draft hasn't started` : s.status === 'drafting' ? (mine ? "<b>You're on the clock!</b>" : `Draft live · ${esc(nm(clock))} is picking`) : (() => { const st = standings(l, l.current).rows[0]; return st && st.g ? `${s.year} leader: <b>${esc(nm(st.uid))}</b> (${st.w}–${st.l})` : `${s.year} season · draft done`; })();
-  return `<div class="panel lgpanel${mine ? ' hot' : ''}"><div class="row"><h2 class="grow">Ranked league</h2><button class="${mine ? 'pri' : 'sec'}" type="button" data-league="1">${mine ? 'Pick now' : 'Open'}</button></div>
+  return `<div class="panel lgpanel${mine ? ' hot' : ''}"><div class="scene castle"></div><div class="row"><h2 class="grow">Ranked league</h2><button class="${mine ? 'pri' : 'sec'}" type="button" data-league="1">${mine ? 'Pick now' : 'Open'}</button></div>
     <p class="small" style="margin:6px 0 0">${line}${pend ? ` · <b>${pend} trade${pend === 1 ? '' : 's'} waiting on you</b>` : ''}</p></div>`;
 }
 function gameChip(g) { return g && g.ranked ? '<span class="rkchip" title="Ranked league game">Ranked</span>' : ''; }
@@ -508,7 +508,7 @@ function render(main) {
   const keepFocus = document.activeElement && document.activeElement.id === 'lq';
   const body = V.tab === 'draft' ? draftTab(l, s) : V.tab === 'rosters' ? rostersTab(l) : V.tab === 'trades' ? tradesTab(l, s) : V.tab === 'commish' ? commishTab(l, s) : overviewTab(l, s);
   main.innerHTML = `<div class="lg">
-    <div class="lghead"><div class="grow"><h1>${esc(l.name || 'Ranked league')}</h1><div class="small muted">${esc(s ? s.year : '')} season · commissioner ${esc(nm(l.commish))} · ${l.members.map((u) => esc(nm(u))).join(', ')}</div></div>
+    <div class="lghead"><img class="lgcrest" src="art/crest.webp" alt="" width="301" height="194"><div class="grow"><h1>${esc(l.name || 'Ranked league')}</h1><div class="small muted">${esc(s ? s.year : '')} season · <img class="cbadge" src="art/badge-purple.webp" alt="">commissioner ${esc(nm(l.commish))} · ${l.members.map((u) => esc(nm(u))).join(', ')}</div></div>
       ${!isMember(me(), l) ? '<span class="chip">Watching (not in the league)</span>' : ''}</div>
     <div class="lgtabs" role="tablist">${tabs.map(([k, t]) => `<button type="button" role="tab" class="tag ${V.tab === k ? 'on' : ''}" data-tab="${k}">${t}</button>`).join('')}</div>
     ${body}</div>`;
@@ -525,9 +525,18 @@ function overviewTab(l, s) {
   const clock = onClock(s);
   const status = s.status === 'setup' ? `The ${s.year} draft hasn't started yet.` : s.status === 'drafting' ? `The ${s.year} draft is live. ${clock === me() ? "<b>You're on the clock.</b>" : `${esc(nm(clock))} is picking.`}` : `Draft finished: ${s.picks.length} picks. Ranked games count toward these standings.`;
   const table = (rs) => `<table class="lgt"><thead><tr><th>#</th><th class="l">Player</th><th>W</th><th>L</th><th>Win %</th><th>Streak</th><th class="l">Last 5</th></tr></thead><tbody>
-    ${rs.map((r, i) => `<tr class="${r.uid === me() ? 'me' : ''}${i === 0 && r.g ? ' lead' : ''}"><td>${i + 1}</td><td class="l">${i === 0 && r.g ? '<span class="crown" aria-label="Leader">👑</span>' : ''}<b>${esc(nm(r.uid))}</b>${r.uid === l.commish ? ' <span class="small muted">(commish)</span>' : ''}</td><td>${r.w}</td><td>${r.l}</td><td>${r.g ? Math.round(r.pct * 100) + '%' : '–'}</td><td>${r.streak}${r.streak[0] === 'W' && parseInt(r.streak.slice(1), 10) >= 3 ? ' <span class="fire">🔥</span>' : ''}</td><td class="l">${r.last5.map((x) => `<span class="wl ${x}">${x}</span>`).join('') || '<span class="muted small">no games</span>'}</td></tr>`).join('')}</tbody></table>`;
-  return `<div class="grid2">
+    ${rs.map((r, i) => `<tr class="${r.uid === me() ? 'me' : ''}${i === 0 && r.g ? ' lead' : ''}"><td>${r.g && i < 3 ? `<img class="rankb" src="art/badge-${['champion', 'silver', 'bronze'][i]}.webp" alt="${i + 1}" title="${['1st', '2nd', '3rd'][i]} place">` : i + 1}</td><td class="l"><b>${esc(nm(r.uid))}</b>${r.uid === l.commish ? ' <span class="small muted">(commish)</span>' : ''}</td><td>${r.w}</td><td>${r.l}</td><td>${r.g ? Math.round(r.pct * 100) + '%' : '–'}</td><td>${r.streak}${r.streak[0] === 'W' && parseInt(r.streak.slice(1), 10) >= 3 ? ' <span class="fire">🔥</span>' : ''}</td><td class="l">${r.last5.map((x) => `<span class="wl ${x}">${x}</span>`).join('') || '<span class="muted small">no games</span>'}</td></tr>`).join('')}</tbody></table>`;
+  const leader = rows.find((r) => r.g);
+  const done = (l.trades || []).filter((t) => t.status === 'done' && t.s === l.current).length;
+  const champs = seasonKeys(l).filter((k) => +k < +l.current).reverse().map((k) => { const top = standings(l, k).rows.find((r) => r.g); return top ? { k, top } : null; }).filter(Boolean);
+  const glance = `<div class="glance">
+    <div class="gtile gold"><span class="gl">${esc(s.year)} leader</span><span class="gv">${leader ? esc(nm(leader.uid)) : '—'}</span><span class="gs">${leader ? `${leader.w}–${leader.l}` : 'no ranked games yet'}</span><img src="art/badge-champion.webp" alt=""></div>
+    <div class="gtile"><span class="gl">Draft</span><span class="gv">${s.status === 'setup' ? 'Not started' : s.status === 'drafting' ? 'Live' : `${s.picks.length} picks`}</span><span class="gs">${s.status === 'drafting' ? `${esc(nm(clock))} is picking` : s.status === 'done' ? 'free agents open' : `${order(s).length} players`}</span><img src="art/badge-purple.webp" alt=""></div>
+    <div class="gtile"><span class="gl">Ranked games</span><span class="gv">${res.length}</span><span class="gs">this season</span><img src="art/badge-blue.webp" alt=""></div>
+    <div class="gtile"><span class="gl">Trades</span><span class="gv">${done}</span><span class="gs">completed this season</span><img src="art/badge-silver.webp" alt=""></div></div>`;
+  return `${glance}<div class="grid2">
     <div class="stack">
+      ${champs.length ? `<div class="panel"><h2>Champions</h2><div class="champs">${champs.map((c) => `<div class="champ"><img src="art/badge-red.webp" alt=""><div><b>${esc(nm(c.top.uid))}</b><div class="small muted">${esc(c.k)} champion · ${c.top.w}–${c.top.l}</div></div></div>`).join('')}</div></div>` : ''}
       <div class="panel"><div class="row"><h2 class="grow">${esc(s.year)} standings</h2>${s.status !== 'setup' ? `<button class="sm" type="button" data-tab="draft">${s.status === 'drafting' ? 'Go to the draft' : 'Draft board'}</button>` : ''}</div><p class="small muted">${status}</p>${table(rows)}
         <p class="small muted" style="margin:8px 0 0">Start a ranked game from the lobby: New table → Ranked league game. Decks may only use Pokémon on your roster and anything they evolve from.</p></div>
       ${members.length > 1 ? `<div class="panel"><h3>Head to head</h3><table class="lgt hh"><thead><tr><th></th>${members.map((u) => `<th>${esc(nm(u))}</th>`).join('')}</tr></thead><tbody>${members.map((a) => `<tr><th class="l">${esc(nm(a))}</th>${members.map((b) => (a === b ? '<td class="muted">–</td>' : `<td>${hh[a][b][0]}–${hh[a][b][1]}</td>`)).join('')}</tr>`).join('')}</tbody></table><p class="small muted" style="margin:6px 0 0">Row player's record against the column player this season.</p></div>` : ''}
@@ -594,7 +603,7 @@ function boardHTML(l, s) {
   for (let r = rounds - 1; r >= 0; r--) {
     rows += `<tr><th>R${r + 1}</th>${o.map((u, c) => { const i = indexFor(s, r, c); const p = byI.get(i); const cls = i === next ? 'now' : p && p.keeper ? 'kp' : ''; return `<td class="${cls}">${p ? `<a href="#" data-view="${(BYNAME.get(p.name) || {}).rep || ''}">${esc(p.name)}</a>${p.keeper ? ' <span class="k" title="Keeper">K</span>' : ''}` : i === next ? 'on the clock' : ''}</td>`; }).join('')}</tr>`;
   }
-  return `<div class="boardwrap"><table class="lgt board"><thead><tr><th></th>${o.map((u) => `<th class="${u === me() ? 'me' : ''}">${esc(nm(u))}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="boardwrap"><table class="lgt dboard"><thead><tr><th></th>${o.map((u) => `<th class="${u === me() ? 'me' : ''}">${esc(nm(u))}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function draftTab(l, s) {
@@ -607,7 +616,7 @@ function draftTab(l, s) {
       const can = u === me() || comm;
       return `<div class="small">Keeper: ${can && opts.length ? `<select data-keeper="${u}"><option value="">None</option>${opts.map((n) => `<option ${s.keepers[u] === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>` : `<b>${esc(s.keepers[u] || (opts.length ? 'not chosen' : 'none (no roster last season)'))}</b>`}</div>`;
     };
-    return `<div class="panel" style="max-width:760px">
+    return `<div class="panel" style="max-width:760px"><div class="scene sunset tall"><span class="scene-cap">The ${esc(s.year)} draft</span></div>
       <h2>${esc(s.year)} draft: getting ready</h2>
       <p class="small muted">Each Pokémon name is its own pick. ${s.snake !== false ? 'Snake order: the order reverses every round.' : 'Same order every round.'} ${s.keepersOn ? 'Keepers are on: your keeper takes your round 1 pick.' : 'No keepers this season.'} The draft keeps going until every player presses “I'm done drafting”.</p>
       <ol class="lgorder">${order(s).map((u) => `<li><b>${esc(nm(u))}</b>${keeperRow(u)}</li>`).join('')}</ol>
@@ -625,7 +634,7 @@ function draftTab(l, s) {
         ${isMember(me(), l) ? `<button type="button" class="${voted ? '' : 'sec'}" data-a="voteStop">${voted ? 'Keep drafting' : "I'm done drafting"}</button>` : ''}</div>
       <div class="lgsplit"><div class="panel">${poolGrid(l, s, 'draft')}</div><div class="panel"><h3>Draft board</h3>${boardHTML(l, s)}</div></div>`;
   }
-  return `<div class="lgsplit"><div class="panel"><h2>Free agents</h2><p class="small muted">The draft is over. Anything nobody drafted can be claimed by any player, first come first served.</p>${poolGrid(l, s, 'fa')}</div>
+  return `<div class="lgsplit"><div class="panel"><div class="scene moon"></div><h2>Free agents</h2><p class="small muted">The draft is over. Anything nobody drafted can be claimed by any player, first come first served.</p>${poolGrid(l, s, 'fa')}</div>
     <div class="panel"><h3>${esc(s.year)} draft board</h3><p class="small muted">${s.picks.length} picks${s.endedAt ? ', finished ' + when(s.endedAt) : ''}.</p>${boardHTML(l, s)}</div></div>`;
 }
 
