@@ -22,7 +22,9 @@ const STAGES = ['Basic', 'Stage 1', 'Stage 2'];
 
 let PT = null;
 const V = { tab: 'overview', q: '', type: '', stage: '', avail: 'open', sort: 'name', season: null, tradeWith: '', give: new Set(), get: new Set(), note: '', busy: false, moveName: '' };
-let POOL = null, BYNAME = null, PRE = null, FREE = null; // FREE: Colorless Pokémon, usable by everyone and never drafted
+let POOL = null, BYNAME = null, PRE = null, FREE = null, BASE = null;
+// FREE: Colorless Pokémon, usable by everyone and never drafted.
+// BASE: Basic Pokémon that evolve into something; never drafted, playable through whatever they evolve into.
 let clockKey = null;
 let pickSeen = null; // 'season:count' of picks already shown, so only new picks get the reveal
 const recording = new Set();
@@ -70,7 +72,8 @@ function pool() {
   BYNAME = by;
   const isFree = (e) => e.types.size > 0 && [...e.types].every((t) => t === 'Colorless');
   FREE = new Set([...by.values()].filter(isFree).map((e) => e.name));
-  POOL = [...by.values()].filter((e) => !FREE.has(e.name)).sort((a, b) => a.name.localeCompare(b.name));
+  BASE = new Set([...by.values()].filter((e) => !FREE.has(e.name) && e.stage === 'Basic' && e.next.length).map((e) => e.name));
+  POOL = [...by.values()].filter((e) => !FREE.has(e.name) && !BASE.has(e.name)).sort((a, b) => a.name.localeCompare(b.name));
   return POOL;
 }
 
@@ -271,6 +274,7 @@ const A = {
     if (s.status !== 'drafting') fail('The draft is not running');
     if (!BYNAME.has(name)) fail('Unknown Pokémon');
     if (FREE.has(name)) fail(`${name} is Colorless, so it's free for everyone and can't be drafted`);
+    if (BASE.has(name)) fail(`${name} evolves, so it isn't drafted. Own one of its evolutions to play it`);
     if (s.own[name]) fail(`${name} is already taken`);
     const i = nextIndex(s), who = pickerAt(s, i);
     if (who !== me() && doc.commish !== me()) fail(`It's ${nm(who)}'s pick`);
@@ -327,6 +331,7 @@ const A = {
     if (!doc.members.includes(me())) fail('Only league players can claim');
     if (!BYNAME.has(name)) fail('Unknown Pokémon');
     if (FREE.has(name)) fail(`${name} is Colorless, so it's free for everyone and can't be drafted`);
+    if (BASE.has(name)) fail(`${name} evolves, so it isn't drafted. Own one of its evolutions to play it`);
     if (s.own[name]) fail(`${nm(s.own[name])} already has ${name}`);
     s.own[name] = me(); s.how[name] = 'FA';
     logTx(doc, `${nm(me())} claimed ${name} from free agents`);
@@ -345,6 +350,7 @@ const A = {
     pool();
     if (!BYNAME.has(name)) fail('Unknown Pokémon');
     if (FREE.has(name)) fail(`${name} is Colorless, so it's free for everyone and can't be drafted`);
+    if (BASE.has(name)) fail(`${name} evolves, so it isn't drafted. Own one of its evolutions to play it`);
     const s = season(doc), from = s.own[name] || null;
     if (from === (to || null)) return false;
     if (to) { s.own[name] = to; s.how[name] = 'comm'; } else { delete s.own[name]; delete s.how[name]; }
@@ -522,7 +528,7 @@ function render(main) {
   if (!l) {
     main.innerHTML = `<div class="lg"><div class="panel" style="max-width:640px;margin:0 auto"><h2>Ranked league</h2>
       <p>A yearly draft where each Pokémon name is its own pick (Charizard, Dark Charizard and Blaine's Charizard are three different picks), one keeper per player, trades, and standings from ranked games.</p>
-      <ul class="small"><li>Pre-evolutions are free: if you own Charizard you can play Charmander and Charmeleon.</li><li>Colorless Pokémon (Chansey, Snorlax, Dragonite…) are free for everyone and aren't in the draft.</li><li>Trainers and Energy are free for everyone.</li><li>The draft ends when everyone agrees to stop; whatever is left becomes a free agent anyone can claim.</li></ul>
+      <ul class="small"><li>Pre-evolutions are free: if you own Charizard you can play Charmander and Charmeleon.</li><li>Colorless Pokémon (Chansey, Snorlax, Dragonite…) are free for everyone and aren't in the draft.</li><li>Basic Pokémon that evolve (Charmander, Pikachu, Abra…) aren't in the draft either: own one of their evolutions to play them.</li><li>Trainers and Energy are free for everyone.</li><li>The draft ends when everyone agrees to stop; whatever is left becomes a free agent anyone can claim.</li></ul>
       <p class="small muted">Whoever sets up the league becomes its commissioner.</p>
       <button class="pri" type="button" data-a="create">Set up the league</button></div></div>`;
     bind(main);
@@ -648,7 +654,7 @@ function draftTab(l, s) {
     };
     return `<div class="panel" style="max-width:760px"><div class="scene sunset tall"><span class="scene-cap">The ${esc(s.year)} draft</span></div>
       <h2>${esc(s.year)} draft: getting ready</h2>
-      <p class="small muted">Each Pokémon name is its own pick; Colorless Pokémon are free for everyone and aren't drafted. ${s.snake !== false ? 'Snake order: the order reverses every round.' : 'Same order every round.'} ${s.keepersOn ? 'Keepers are on: your keeper takes your round 1 pick.' : 'No keepers this season.'} The draft keeps going until every player presses “I'm done drafting”.</p>
+      <p class="small muted">Each Pokémon name is its own pick; Colorless Pokémon are free for everyone, and Basics that evolve come free with their evolutions, so neither is drafted. ${s.snake !== false ? 'Snake order: the order reverses every round.' : 'Same order every round.'} ${s.keepersOn ? 'Keepers are on: your keeper takes your round 1 pick.' : 'No keepers this season.'} The draft keeps going until every player presses “I'm done drafting”.</p>
       <ol class="lgorder">${order(s).map((u) => `<li><b>${esc(nm(u))}</b>${keeperRow(u)}</li>`).join('')}</ol>
       ${comm ? `<div class="row"><button class="pri" type="button" data-a="startDraft" ${order(s).length < 2 ? 'disabled' : ''}>Start the draft</button><button type="button" data-tab="commish">Order, players &amp; keepers</button></div>${order(s).length < 2 ? '<p class="small muted">Add at least one more player on the Commissioner tab.</p>' : ''}` : `<p class="small muted">Waiting for ${esc(nm(l.commish))} to start the draft.</p>`}
     </div>`;
