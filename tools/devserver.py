@@ -59,7 +59,8 @@ class H(SimpleHTTPRequestHandler):
                     r = db.execute("SELECT id,data,version FROM docs WHERE col='games' AND id=?", (b['game'],)).fetchone()
                     out['game'] = {'missing': True} if not r else ({'unchanged': True, 'version': r[2]} if r[2] == b.get('gv') else row_to_doc(r))
                 if b.get('league'):
-                    r = db.execute("SELECT id,data,version FROM docs WHERE col='leagues' AND id='main'").fetchone()
+                    lid = b.get('lid') if isinstance(b.get('lid'), str) and ID.match(b.get('lid')) else 'main'
+                    r = db.execute("SELECT id,data,version FROM docs WHERE col='leagues' AND id=?", (lid,)).fetchone()
                     out['league'] = {'missing': True} if not r else ({'unchanged': True} if r[2] == b.get('lv') else row_to_doc(r))
             return self.send_json(out)
         return self.send_json({'error': 'not_found'}, 404)

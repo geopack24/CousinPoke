@@ -582,6 +582,7 @@ let DATA=null,CARDS={},SETS=[],SETIDX={};
 let uid=null;
 const S={screen:'lobby',gameId:null,games:[],decks:[],players:{},game:null,league:null,name:'',ready:false,online:false};
 const LG=()=>window.LEAGUE||null;
+const LEAGUE_ID=(()=>{try{const v=new URLSearchParams(location.search).get('league');return v&&/^[a-z0-9-]{1,24}$/.test(v)?v:'main'}catch(e){return 'main'}})();
 
 /* ---------- data ---------- */
 async function loadData(){
@@ -660,7 +661,7 @@ async function sync(){
   if(document.hidden&&S.screen!=='game'&&!(LG()&&LG().liveDraft())){syncSoon(15000);return}
   syncing=true;let changed=false;
   try{
-    const d=await api('POST','sync',{pid:uid,lobby:S.screen!=='game',game:S.screen==='game'?S.gameId:null,gv:S.game?S.game.version:null,league:1,lv:S.league?S.league.version:null});
+    const d=await api('POST','sync',{pid:uid,lobby:S.screen!=='game',game:S.screen==='game'?S.gameId:null,gv:S.game?S.game.version:null,league:1,lid:LEAGUE_ID,lv:S.league?S.league.version:null});
     if(!S.online){S.online=true;changed=true;setOnline(true)}
     const sig=k=>JSON.stringify(d[k]);
     if(d.players&&sig('players')!==lastSig.players){lastSig.players=sig('players');S.players=d.players;changed=true}

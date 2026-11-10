@@ -59,7 +59,8 @@ async function handleSync(db, body) {
     out.game = !r ? { missing: true } : r.version === body.gv ? { unchanged: true, version: r.version } : rowToDoc(r);
   }
   if (body.league) {
-    const r = await db.prepare("SELECT id, data, version FROM docs WHERE col = 'leagues' AND id = 'main'").first();
+    const lid = typeof body.lid === 'string' && ID.test(body.lid) ? body.lid : 'main';
+    const r = await db.prepare("SELECT id, data, version FROM docs WHERE col = 'leagues' AND id = ?").bind(lid).first();
     out.league = !r ? { missing: true } : r.version === body.lv ? { unchanged: true } : rowToDoc(r);
   }
   // Occasionally forget tables nobody has touched in 45 days.

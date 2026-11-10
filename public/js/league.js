@@ -13,14 +13,16 @@
 import { playTurnChime } from './fx.js';
 import * as sfx from './sfx.js';
 
-const LID = 'main';
+// ?league=test (any short lowercase name) opens a separate practice league; the real one is 'main'.
+const LID = (() => { try { const v = new URLSearchParams(location.search).get('league'); return v && /^[a-z0-9-]{1,24}$/.test(v) ? v : 'main'; } catch (e) { return 'main'; } })();
+const testBanner = () => (LID === 'main' ? '' : `<div class="notice testlg"><b>Practice league "${LID}"</b>: separate from the real league. Picks, trades and results here don't count. <a href="${location.pathname}">Back to the real league</a></div>`);
 const SETS_OK = new Set(['base1', 'base2', 'base3', 'base5', 'gym1', 'gym2']); // no promos
 const RAR = { 'Rare Holo': 0, Rare: 1, Uncommon: 2, Common: 3 };
 const STAGES = ['Basic', 'Stage 1', 'Stage 2'];
 
 let PT = null;
 const V = { tab: 'overview', q: '', type: '', stage: '', avail: 'open', sort: 'name', season: null, tradeWith: '', give: new Set(), get: new Set(), note: '', busy: false, moveName: '' };
-let POOL = null, BYNAME = null, PRE = null;
+let POOL = null, BYNAME = null, PRE = null, FREE = null; // FREE: Colorless Pokémon, usable by everyone and never drafted
 let clockKey = null;
 let pickSeen = null; // 'season:count' of picks already shown, so only new picks get the reveal
 const recording = new Set();
@@ -66,14 +68,17 @@ function pool() {
   const walk = (n, seen) => { const e = by.get(n); if (e) for (const f of e.ev) if (!seen.has(f) && by.has(f)) { seen.add(f); walk(f, seen); } return seen; };
   for (const n of by.keys()) PRE.set(n, walk(n, new Set()));
   BYNAME = by;
-  POOL = [...by.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const isFree = (e) => e.types.size > 0 && [...e.types].every((t) => t === 'Colorless');
+  FREE = new Set([...by.values()].filter(isFree).map((e) => e.name));
+  POOL = [...by.values()].filter((e) => !FREE.has(e.name)).sort((a, b) => a.name.localeCompare(b.name));
   return POOL;
 }
 
-/** Names a player may put in a ranked deck: their roster plus everything those Pokémon evolve from. */
+/** Names a player may put in a ranked deck: their roster plus everything those Pokémon evolve from, plus every Colorless Pokémon. */
 function legalNames(uid, l = L()) {
   pool();
   const s = season(l), out = new Set();
+  for (const n of FREE) { out.add(n); for (const p of PRE.get(n) || []) out.add(p); }
   if (!s) return out;
   for (const [n, o] of Object.entries(s.own || {})) if (o === uid) { out.add(n); for (const p of PRE.get(n) || []) out.add(p); }
   return out;
@@ -265,6 +270,7 @@ const A = {
     const s = season(doc);
     if (s.status !== 'drafting') fail('The draft is not running');
     if (!BYNAME.has(name)) fail('Unknown Pokémon');
+    if (FREE.has(name)) fail(`${name} is Colorless, so it's free for everyone and can't be drafted`);
     if (s.own[name]) fail(`${name} is already taken`);
     const i = nextIndex(s), who = pickerAt(s, i);
     if (who !== me() && doc.commish !== me()) fail(`It's ${nm(who)}'s pick`);
@@ -320,6 +326,7 @@ const A = {
     if (s.status !== 'done') fail('Free agents open up after the draft');
     if (!doc.members.includes(me())) fail('Only league players can claim');
     if (!BYNAME.has(name)) fail('Unknown Pokémon');
+    if (FREE.has(name)) fail(`${name} is Colorless, so it's free for everyone and can't be drafted`);
     if (s.own[name]) fail(`${nm(s.own[name])} already has ${name}`);
     s.own[name] = me(); s.how[name] = 'FA';
     logTx(doc, `${nm(me())} claimed ${name} from free agents`);
@@ -337,6 +344,7 @@ const A = {
     if (doc.commish !== me()) fail('Only the commissioner can move Pokémon');
     pool();
     if (!BYNAME.has(name)) fail('Unknown Pokémon');
+    if (FREE.has(name)) fail(`${name} is Colorless, so it's free for everyone and can't be drafted`);
     const s = season(doc), from = s.own[name] || null;
     if (from === (to || null)) return false;
     if (to) { s.own[name] = to; s.how[name] = 'comm'; } else { delete s.own[name]; delete s.how[name]; }
@@ -499,7 +507,7 @@ function lobbyFeature() {
   const played = rows.some((r) => r.g);
   const status = !s ? '' : s.status === 'setup' ? `The ${esc(s.year)} draft hasn't started` : s.status === 'drafting' ? (mine ? "<b>You're on the clock!</b>" : `Draft live · <b>${esc(nm(clock))}</b> is picking`) : `Draft complete · ${s.picks.length} picks`;
   const top = rows.slice(0, 3).map((r, i) => `<div class="lp-row${r.uid === me() ? ' me' : ''}"><span class="lp-rank">${r.g ? `<img src="art/badge-${['champion', 'silver', 'bronze'][i]}.webp" alt="${i + 1}" title="${['1st', '2nd', '3rd'][i]} place">` : `<i>${i + 1}</i>`}</span><span class="lp-name">${esc(nm(r.uid))}</span><span class="lp-rec">${r.g ? `${r.w}–${r.l}` : 'no games'}</span></div>`).join('');
-  return `<section class="realm realm-league${mine ? ' hot' : ''}">${head(`<button class="pri" type="button" data-league="1">${mine ? 'Pick now' : 'View the League'}</button>`)}<div class="realm-body">
+  return `<section class="realm realm-league${mine ? ' hot' : ''}">${LID !== 'main' ? `<div class="testtag">Practice league: ${LID}</div>` : ''}${head(`<button class="pri" type="button" data-league="1">${mine ? 'Pick now' : 'View the League'}</button>`)}<div class="realm-body">
     <div class="season-plate"><span class="kicker">${esc(s ? s.year : '')} season</span><div class="sp-status">${status}</div><div class="sp-meta">${l.members.length} players · commissioner ${esc(nm(l.commish))}</div></div>
     <div class="lp"><div class="lp-title">Standings</div>${top}</div>
     ${!played ? '<p class="small muted lp-note">Rank badges appear once ranked games are played.</p>' : ''}
@@ -514,7 +522,7 @@ function render(main) {
   if (!l) {
     main.innerHTML = `<div class="lg"><div class="panel" style="max-width:640px;margin:0 auto"><h2>Ranked league</h2>
       <p>A yearly draft where each Pokémon name is its own pick (Charizard, Dark Charizard and Blaine's Charizard are three different picks), one keeper per player, trades, and standings from ranked games.</p>
-      <ul class="small"><li>Pre-evolutions are free: if you own Charizard you can play Charmander and Charmeleon.</li><li>Trainers and Energy are free for everyone.</li><li>The draft ends when everyone agrees to stop; whatever is left becomes a free agent anyone can claim.</li></ul>
+      <ul class="small"><li>Pre-evolutions are free: if you own Charizard you can play Charmander and Charmeleon.</li><li>Colorless Pokémon (Chansey, Snorlax, Dragonite…) are free for everyone and aren't in the draft.</li><li>Trainers and Energy are free for everyone.</li><li>The draft ends when everyone agrees to stop; whatever is left becomes a free agent anyone can claim.</li></ul>
       <p class="small muted">Whoever sets up the league becomes its commissioner.</p>
       <button class="pri" type="button" data-a="create">Set up the league</button></div></div>`;
     bind(main);
@@ -528,7 +536,7 @@ function render(main) {
   const keepFocus = document.activeElement && document.activeElement.id === 'lq';
   const body = V.tab === 'draft' ? draftTab(l, s) : V.tab === 'rosters' ? rostersTab(l) : V.tab === 'trades' ? tradesTab(l, s) : V.tab === 'commish' ? commishTab(l, s) : overviewTab(l, s);
   main.innerHTML = `<div class="lg">
-    <div class="lghead"><img class="lgcrest" src="art/crest.webp" alt="" width="301" height="194"><div class="grow"><h1>${esc(l.name || 'Ranked league')}</h1><div class="ornate" aria-hidden="true"></div><div class="small muted">${esc(s ? s.year : '')} season · <img class="cbadge" src="art/badge-purple.webp" alt="">commissioner ${esc(nm(l.commish))} · ${l.members.map((u) => esc(nm(u))).join(', ')}</div></div>
+    ${testBanner()}<div class="lghead"><img class="lgcrest" src="art/crest.webp" alt="" width="301" height="194"><div class="grow"><h1>${esc(l.name || 'Ranked league')}</h1><div class="ornate" aria-hidden="true"></div><div class="small muted">${esc(s ? s.year : '')} season · <img class="cbadge" src="art/badge-purple.webp" alt="">commissioner ${esc(nm(l.commish))} · ${l.members.map((u) => esc(nm(u))).join(', ')}</div></div>
       ${!isMember(me(), l) ? '<span class="chip">Watching (not in the league)</span>' : ''}</div>
     <div class="lgtabs" role="tablist">${tabs.map(([k, t]) => `<button type="button" role="tab" class="tag ${V.tab === k ? 'on' : ''}" data-tab="${k}">${t}</button>`).join('')}</div>
     ${body}</div>`;
@@ -588,7 +596,7 @@ function filteredPool(s) {
 function poolGrid(l, s, mode) {
   const list = filteredPool(s);
   const clock = onClock(s), mine = clock === me(), comm = isCommish(l), member = isMember(me(), l);
-  const TYPES = Object.keys(TCOL);
+  const TYPES = Object.keys(TCOL).filter((t) => t !== 'Colorless');
   const filters = `<div class="filters">
       <input type="text" id="lq" placeholder="Search name, attack or power" value="${esc(V.q)}" style="flex:1;min-width:160px">
       <select id="lavail"><option value="open" ${V.avail === 'open' ? 'selected' : ''}>${mode === 'fa' ? 'Free agents' : 'Still available'}</option><option value="taken" ${V.avail === 'taken' ? 'selected' : ''}>Taken</option><option value="all" ${V.avail === 'all' ? 'selected' : ''}>All Pokémon</option></select>
@@ -640,7 +648,7 @@ function draftTab(l, s) {
     };
     return `<div class="panel" style="max-width:760px"><div class="scene sunset tall"><span class="scene-cap">The ${esc(s.year)} draft</span></div>
       <h2>${esc(s.year)} draft: getting ready</h2>
-      <p class="small muted">Each Pokémon name is its own pick. ${s.snake !== false ? 'Snake order: the order reverses every round.' : 'Same order every round.'} ${s.keepersOn ? 'Keepers are on: your keeper takes your round 1 pick.' : 'No keepers this season.'} The draft keeps going until every player presses “I'm done drafting”.</p>
+      <p class="small muted">Each Pokémon name is its own pick; Colorless Pokémon are free for everyone and aren't drafted. ${s.snake !== false ? 'Snake order: the order reverses every round.' : 'Same order every round.'} ${s.keepersOn ? 'Keepers are on: your keeper takes your round 1 pick.' : 'No keepers this season.'} The draft keeps going until every player presses “I'm done drafting”.</p>
       <ol class="lgorder">${order(s).map((u) => `<li><b>${esc(nm(u))}</b>${keeperRow(u)}</li>`).join('')}</ol>
       ${comm ? `<div class="row"><button class="pri" type="button" data-a="startDraft" ${order(s).length < 2 ? 'disabled' : ''}>Start the draft</button><button type="button" data-tab="commish">Order, players &amp; keepers</button></div>${order(s).length < 2 ? '<p class="small muted">Add at least one more player on the Commissioner tab.</p>' : ''}` : `<p class="small muted">Waiting for ${esc(nm(l.commish))} to start the draft.</p>`}
     </div>`;
@@ -666,7 +674,7 @@ function rostersTab(l) {
   const s = l.seasons[key];
   const members = s.order.length ? s.order : l.members;
   const cur = key === l.current;
-  return `<div class="row" style="margin-bottom:10px"><span class="small muted">Season</span><select id="lseason">${seasonKeys(l).map((k) => `<option ${k === key ? 'selected' : ''}>${k}</option>`).join('')}</select><span class="small muted">Pre-evolutions of your Pokémon are free, so they aren't listed.</span></div>
+  return `<div class="row" style="margin-bottom:10px"><span class="small muted">Season</span><select id="lseason">${seasonKeys(l).map((k) => `<option ${k === key ? 'selected' : ''}>${k}</option>`).join('')}</select><span class="small muted">Pre-evolutions of your Pokémon and every Colorless Pokémon are free, so they aren't listed.</span></div>
     <div class="rostgrid">${members.map((u) => {
       const names = Object.entries(s.own || {}).filter(([, o]) => o === u).map(([n]) => n).sort((a, b) => { const ea = BYNAME.get(a), eb = BYNAME.get(b); return STAGES.indexOf((eb || {}).stage) - STAGES.indexOf((ea || {}).stage) || a.localeCompare(b); });
       const free = new Set(); for (const n of names) for (const p of PRE.get(n) || []) if (!names.includes(p)) free.add(p);

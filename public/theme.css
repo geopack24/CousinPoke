@@ -370,6 +370,10 @@ tr.lead .rankb{width:34px;height:34px}
 .champ img{width:44px;height:auto}
 .champ b{font-family:var(--display);font-weight:400;font-size:18px}
 
+.testlg{margin-bottom:12px;border-left-color:var(--fuchsia);background:rgba(215,75,233,.1)}
+.testlg a{color:var(--gold-2)}
+.testtag{position:absolute;top:10px;left:10px;z-index:2;font:900 10px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;background:var(--fuchsia);color:#fff;padding:5px 8px;border-radius:6px}
+
 /* ---------- footer: the mountains rise out of the page ---------- */
 #ftr{position:relative;isolation:isolate;margin-top:48px;padding:110px 16px 20px;text-align:center;font-size:12px;letter-spacing:.06em;color:#e6e9f2;text-shadow:0 1px 3px rgba(0,0,0,.7);background:none}
 #ftr::before{content:"";position:absolute;inset:0;z-index:-2;background:radial-gradient(60% 120% at 50% 100%,rgba(136,110,242,.28),transparent 70%)}
