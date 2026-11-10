@@ -925,7 +925,7 @@ function currentDeck(){
 }
 function filteredCards(){
   const q=B.q.trim().toLowerCase();const lgset=B.league&&lgBuilder()?LG().legalNames(uid):null;
-  return DATA.cards.filter(c=>{if(!B.sets.has(c.set))return false;if(B.st&&c.st!==B.st)return false;if(lgset&&c.st==='Pokémon'&&(!lgset.has(c.name)||c.set==='basep'))return false;
+  return DATA.cards.filter(c=>{if(!B.sets.has(c.set))return false;if(B.st&&c.st!==B.st)return false;if(lgset&&c.st==='Pokémon'&&((!lgset.has(c.name)&&!lgset.has(LG().keyOf(c.id)))||c.set==='basep'))return false;
     if(B.type){if(c.st==='Pokémon'){if(!(c.types||[]).includes(B.type))return false}else if(c.st==='Energy'){if(energyType(c)!==B.type)return false}else return false}
     if(B.stage&&c.sub!==B.stage)return false;
     if(q){const hay=(c.name+' '+(c.txt||'')+' '+(c.atk||[]).map(a=>a.n+' '+a.t).join(' ')+' '+(c.pw||[]).map(p=>p.n+' '+p.t).join(' ')).toLowerCase();if(!hay.includes(q))return false}

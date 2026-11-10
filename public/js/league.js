@@ -31,7 +31,7 @@ const recording = new Set();
 
 export function installLeague(pt) {
   PT = pt;
-  return { render, lobbyPanel, lobbyFeature, onLeague, noteGames, legality, legalNames, isMember, season, rankedOk, liveDraft, gameChip, tickerHTML };
+  return { render, lobbyPanel, lobbyFeature, onLeague, noteGames, legality, legalNames, keyOf, isMember, season, rankedOk, liveDraft, gameChip, tickerHTML };
 }
 
 /* ---------- helpers ---------- */
@@ -47,34 +47,62 @@ const isCommish = (l = L()) => !!(l && l.commish === me());
 const seasonKeys = (l = L()) => Object.keys((l && l.seasons) || {}).sort((a, b) => +a - +b);
 function prevSeason(l, key) { const ks = seasonKeys(l).filter((k) => +k < +key); return ks.length ? l.seasons[ks[ks.length - 1]] : null; }
 
+const SET_NAMES = { base1: 'Base Set', base2: 'Jungle', base3: 'Fossil', base5: 'Team Rocket', gym1: 'Gym Heroes', gym2: 'Gym Challenge' };
+const SET_ORDER = Object.keys(SET_NAMES);
+/** Same card = same HP, stage, type, evolution, attacks (name, cost, damage) and Pokémon Power names. Holo/non-holo prints match; Base Set and Fossil Zapdos don't. */
+const cardSig = (c) => JSON.stringify([+c.hp || 0, c.sub || '', c.types || [], c.ev || '', (c.atk || []).map((a) => [a.n, a.c, a.d]), (c.pw || []).map((x) => x.n)]);
+let KEYOF = null; // card id -> pick key
+
+/** The draft pool. A pick is one distinct card: its key is the card name, plus the set (and number, if needed) when one name covers different cards. */
 function pool() {
   if (POOL) return POOL;
-  const by = new Map();
+  // name-level facts: evolution links, Colorless, Basics that evolve
+  const names = new Map();
   for (const id of Object.keys(PT.CARDS)) {
     const c = PT.CARDS[id];
-    if (c.st !== 'Pokémon' || !SETS_OK.has(c.set)) continue;
-    let e = by.get(c.name);
-    if (!e) by.set(c.name, (e = { name: c.name, ids: [], types: new Set(), stages: new Set(), hp: 0, ev: new Set() }));
-    e.ids.push(id); (c.types || []).forEach((t) => e.types.add(t)); e.stages.add(c.sub || 'Basic'); e.hp = Math.max(e.hp, +c.hp || 0); if (c.ev) e.ev.add(c.ev);
+    if (c.st !== 'Pokémon' || !SET_NAMES[c.set]) continue;
+    let e = names.get(c.name);
+    if (!e) names.set(c.name, (e = { name: c.name, cards: [], types: new Set(), stages: new Set(), ev: new Set() }));
+    e.cards.push(c); (c.types || []).forEach((t) => e.types.add(t)); e.stages.add(c.sub || 'Basic'); if (c.ev) e.ev.add(c.ev);
   }
   const into = new Map();
-  for (const e of by.values()) for (const f of e.ev) { if (!into.has(f)) into.set(f, new Set()); into.get(f).add(e.name); }
-  for (const e of by.values()) {
-    e.ids.sort((a, b) => (RAR[PT.CARDS[a].rar] ?? 4) - (RAR[PT.CARDS[b].rar] ?? 4));
-    e.rep = e.ids[0];
-    e.stage = e.stages.has('Stage 2') ? 'Stage 2' : e.stages.has('Stage 1') ? 'Stage 1' : 'Basic';
-    e.next = [...(into.get(e.name) || [])].sort();
-    e.type = [...e.types][0] || 'Colorless';
-  }
+  for (const e of names.values()) for (const f of e.ev) { if (!into.has(f)) into.set(f, new Set()); into.get(f).add(e.name); }
   PRE = new Map();
-  const walk = (n, seen) => { const e = by.get(n); if (e) for (const f of e.ev) if (!seen.has(f) && by.has(f)) { seen.add(f); walk(f, seen); } return seen; };
-  for (const n of by.keys()) PRE.set(n, walk(n, new Set()));
-  BYNAME = by;
-  const isFree = (e) => e.types.size > 0 && [...e.types].every((t) => t === 'Colorless');
-  FREE = new Set([...by.values()].filter(isFree).map((e) => e.name));
-  BASE = new Set([...by.values()].filter((e) => !FREE.has(e.name) && e.stage === 'Basic' && e.next.length).map((e) => e.name));
-  POOL = [...by.values()].filter((e) => !FREE.has(e.name) && !BASE.has(e.name)).sort((a, b) => a.name.localeCompare(b.name));
+  const walk = (n, seen) => { const e = names.get(n); if (e) for (const f of e.ev) if (!seen.has(f) && names.has(f)) { seen.add(f); walk(f, seen); } return seen; };
+  for (const n of names.keys()) PRE.set(n, walk(n, new Set()));
+  FREE = new Set([...names.values()].filter((e) => e.types.size > 0 && [...e.types].every((t) => t === 'Colorless')).map((e) => e.name));
+  BASE = new Set([...names.values()].filter((e) => !FREE.has(e.name) && !e.stages.has('Stage 1') && !e.stages.has('Stage 2') && into.has(e.name)).map((e) => e.name));
+  // card-level entries
+  BYNAME = new Map(); KEYOF = new Map();
+  const ord = (c) => SET_ORDER.indexOf(c.set) * 1000 + (parseInt(c.n, 10) || 0);
+  for (const ne of names.values()) {
+    const groups = new Map();
+    for (const c of ne.cards.slice().sort((x, y) => ord(x) - ord(y))) { const k = cardSig(c); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(c); }
+    const gs = [...groups.values()];
+    const firstSets = gs.map((g) => g[0].set);
+    for (const g of gs) {
+      const f = g[0];
+      const key = gs.length === 1 ? ne.name : firstSets.filter((x) => x === f.set).length > 1 ? `${ne.name} (${SET_NAMES[f.set]} ${f.n})` : `${ne.name} (${SET_NAMES[f.set]})`;
+      const ids = g.map((c) => c.id).sort((x, y) => (RAR[PT.CARDS[x].rar] ?? 4) - (RAR[PT.CARDS[y].rar] ?? 4));
+      const types = new Set(f.types || []);
+      const e = { name: key, base: ne.name, ids, rep: ids[0], types, type: [...types][0] || 'Colorless', stage: f.sub || 'Basic', hp: +f.hp || 0, next: [...(into.get(ne.name) || [])].sort() };
+      BYNAME.set(key, e);
+      for (const id of ids) KEYOF.set(id, key);
+    }
+  }
+  POOL = [...BYNAME.values()].filter((e) => !FREE.has(e.base) && !BASE.has(e.base)).sort((x, y) => x.name.localeCompare(y.name));
   return POOL;
+}
+const baseOf = (key) => (BYNAME && BYNAME.get(key) ? BYNAME.get(key).base : key);
+const keyOf = (cid) => { pool(); return KEYOF.get(cid) || (PT.CARDS[cid] || {}).name; };
+/** Why a pick key can't be drafted, or null if it can. */
+function notDraftable(key) {
+  pool();
+  const e = BYNAME.get(key);
+  if (!e) return 'Unknown Pokémon';
+  if (FREE.has(e.base)) return `${e.base} is Colorless, so it's free for everyone and can't be drafted`;
+  if (BASE.has(e.base)) return `${e.base} evolves, so it isn't drafted. Own one of its evolutions to play it`;
+  return null;
 }
 
 /** Names a player may put in a ranked deck: their roster plus everything those Pokémon evolve from, plus every Colorless Pokémon. */
@@ -83,7 +111,7 @@ function legalNames(uid, l = L()) {
   const s = season(l), out = new Set();
   for (const n of FREE) { out.add(n); for (const p of PRE.get(n) || []) out.add(p); }
   if (!s) return out;
-  for (const [n, o] of Object.entries(s.own || {})) if (o === uid) { out.add(n); for (const p of PRE.get(n) || []) out.add(p); }
+  for (const [n, o] of Object.entries(s.own || {})) if (o === uid) { out.add(n); for (const p of PRE.get(baseOf(n)) || []) out.add(p); }
   return out;
 }
 /** Which Pokémon in a deck the player can't use in ranked play. */
@@ -93,7 +121,7 @@ function legality(cards, uid, l = L()) {
     const c = PT.CARDS[cid];
     if (!c || c.st !== 'Pokémon') continue;
     if (!SETS_OK.has(c.set)) bad.add(c.name + ' (promo)');
-    else if (!ok.has(c.name)) bad.add(c.name);
+    else if (!ok.has(keyOf(cid)) && !ok.has(c.name)) bad.add(keyOf(cid));
   }
   return { ok: !bad.size, bad: [...bad] };
 }
@@ -272,9 +300,7 @@ const A = {
     pool();
     const s = season(doc);
     if (s.status !== 'drafting') fail('The draft is not running');
-    if (!BYNAME.has(name)) fail('Unknown Pokémon');
-    if (FREE.has(name)) fail(`${name} is Colorless, so it's free for everyone and can't be drafted`);
-    if (BASE.has(name)) fail(`${name} evolves, so it isn't drafted. Own one of its evolutions to play it`);
+    { const why = notDraftable(name); if (why) fail(why); }
     if (s.own[name]) fail(`${name} is already taken`);
     const i = nextIndex(s), who = pickerAt(s, i);
     if (who !== me() && doc.commish !== me()) fail(`It's ${nm(who)}'s pick`);
@@ -329,9 +355,7 @@ const A = {
     const s = season(doc);
     if (s.status !== 'done') fail('Free agents open up after the draft');
     if (!doc.members.includes(me())) fail('Only league players can claim');
-    if (!BYNAME.has(name)) fail('Unknown Pokémon');
-    if (FREE.has(name)) fail(`${name} is Colorless, so it's free for everyone and can't be drafted`);
-    if (BASE.has(name)) fail(`${name} evolves, so it isn't drafted. Own one of its evolutions to play it`);
+    { const why = notDraftable(name); if (why) fail(why); }
     if (s.own[name]) fail(`${nm(s.own[name])} already has ${name}`);
     s.own[name] = me(); s.how[name] = 'FA';
     logTx(doc, `${nm(me())} claimed ${name} from free agents`);
@@ -348,9 +372,7 @@ const A = {
   move: (name, to) => mutate((doc) => {
     if (doc.commish !== me()) fail('Only the commissioner can move Pokémon');
     pool();
-    if (!BYNAME.has(name)) fail('Unknown Pokémon');
-    if (FREE.has(name)) fail(`${name} is Colorless, so it's free for everyone and can't be drafted`);
-    if (BASE.has(name)) fail(`${name} evolves, so it isn't drafted. Own one of its evolutions to play it`);
+    { const why = notDraftable(name); if (why) fail(why); }
     const s = season(doc), from = s.own[name] || null;
     if (from === (to || null)) return false;
     if (to) { s.own[name] = to; s.how[name] = 'comm'; } else { delete s.own[name]; delete s.how[name]; }
@@ -618,7 +640,7 @@ function poolGrid(l, s, mode) {
       else if (mode === 'draft' && comm && clock) btn = `<button class="sm" type="button" data-pick="${esc(e.name)}" title="Make this pick for ${esc(nm(clock))}">Draft for ${esc(nm(clock))}</button>`;
       else if (mode === 'fa' && member) btn = `<button class="sec sm" type="button" data-claim="${esc(e.name)}">Claim</button>`;
     }
-    const pre = [...(PRE.get(e.name) || [])];
+    const pre = [...(PRE.get(e.base) || [])];
     return `<div class="tile ltile${owner ? ' taken' : ''}${owner === me() ? ' mine' : ''}" style="--tc:${TCOL[e.type] || '#ffcb05'}"><div class="cd click" style="${PT.cardStyle(e.rep)}" data-view="${e.rep}" role="img" aria-label="${esc(e.name)}">${owner ? `<span class="own">${esc(nm(owner))}</span>` : ''}</div>
       <div class="nm" title="${esc(e.name)}">${esc(e.name)}</div>
       <div class="meta small muted">${typeDot(e.type)}${e.stage}${e.ids.length > 1 ? ` · <span class="vers">${e.ids.map((id, k) => `<a href="#" data-view="${id}" title="${esc(PT.CARDS[id].set)}">v${k + 1}</a>`).join(' ')}</span>` : ''}</div>
@@ -683,7 +705,7 @@ function rostersTab(l) {
   return `<div class="row" style="margin-bottom:10px"><span class="small muted">Season</span><select id="lseason">${seasonKeys(l).map((k) => `<option ${k === key ? 'selected' : ''}>${k}</option>`).join('')}</select><span class="small muted">Pre-evolutions of your Pokémon and every Colorless Pokémon are free, so they aren't listed.</span></div>
     <div class="rostgrid">${members.map((u) => {
       const names = Object.entries(s.own || {}).filter(([, o]) => o === u).map(([n]) => n).sort((a, b) => { const ea = BYNAME.get(a), eb = BYNAME.get(b); return STAGES.indexOf((eb || {}).stage) - STAGES.indexOf((ea || {}).stage) || a.localeCompare(b); });
-      const free = new Set(); for (const n of names) for (const p of PRE.get(n) || []) if (!names.includes(p)) free.add(p);
+      const free = new Set(); for (const n of names) for (const p of PRE.get(baseOf(n)) || []) if (!names.includes(p)) free.add(p);
       return `<div class="panel"><div class="row"><h3 class="grow">${esc(nm(u))}${u === me() ? ' (you)' : ''}</h3><span class="chip">${names.length}</span></div>
         ${names.length ? `<div class="rlist">${names.map((n) => { const e = BYNAME.get(n) || {}; const h = (s.how || {})[n] || ''; return `<div class="ritem"><div class="cd click" style="${PT.cardStyle(e.rep)}" data-view="${e.rep}"></div><div class="grow"><b>${esc(n)}</b><div class="small muted">${typeDot(e.type)}${e.stage || ''}${h ? ' · ' + esc(HOW[h] || (h[0] === 'R' ? 'Round ' + h.slice(1) : h)) : ''}</div></div>${cur && u === me() && s.status === 'done' ? `<button class="sm ghost" type="button" data-release="${esc(n)}" title="Release to free agents">Release</button>` : ''}</div>`; }).join('')}</div>` : '<p class="muted small">No Pokémon yet.</p>'}
         ${free.size ? `<p class="small muted" style="margin:8px 0 0">Also playable (pre-evolutions): ${esc([...free].sort().join(', '))}</p>` : ''}</div>`;
