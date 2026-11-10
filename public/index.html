@@ -1301,7 +1301,7 @@ async function saveGame(doc){
     if(r&&r.version!=null&&S.game&&S.game.id===id){S.game.version=r.version}return true}
   catch(e){toast('Could not save ('+(e.code||'error')+')');return false}
 }
-window.PT={esc,api,syncSoon,confirmDeleteGame,report:reportModal,get CARDS(){return CARDS},cardHTML,backHTML,cardStyle,showModal,closeModal,showMenu,toast,nameOf,uid:()=>uid,S,saveGame,render,go,viewCard,rulesSummary};
+window.PT={esc,api,syncSoon,rules:()=>DEFAULT_RULES,confirmDeleteGame,report:reportModal,get CARDS(){return CARDS},cardHTML,backHTML,cardStyle,showModal,closeModal,showMenu,toast,nameOf,uid:()=>uid,S,saveGame,render,go,viewCard,rulesSummary};
 start();
 })();
 </script>

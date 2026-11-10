@@ -379,6 +379,12 @@ const A = {
     logTx(doc, `Commissioner moved ${name}: ${nm(from)} → ${nm(to)}`);
   }, 'Moved'),
 
+  setHouseRules: (text) => mutate((doc) => {
+    if (doc.commish !== me()) fail('Only the commissioner can edit the house rules');
+    doc.houseRules = String(text || '').slice(0, 4000);
+    logTx(doc, 'Commissioner updated the house rules');
+  }, 'House rules saved'),
+
   nextSeason: () => mutate((doc) => {
     if (doc.commish !== me()) fail('Only the commissioner can start a new season');
     const s = season(doc);
@@ -559,10 +565,10 @@ function render(main) {
   const s = season(l);
   const comm = isCommish(l);
   const pend = (l.trades || []).filter((t) => (t.status === 'proposed' && t.to === me()) || (t.status === 'approval' && comm)).length;
-  const tabs = [['overview', 'Standings'], ['draft', s && s.status === 'done' ? 'Draft & free agents' : 'Draft'], ['rosters', 'Rosters'], ['trades', 'Trades' + (pend ? ` <b class="badge">${pend}</b>` : '')], ...(comm ? [['commish', 'Commissioner']] : [])];
+  const tabs = [['overview', 'Standings'], ['draft', s && s.status === 'done' ? 'Draft & free agents' : 'Draft'], ['rosters', 'Rosters'], ['trades', 'Trades' + (pend ? ` <b class="badge">${pend}</b>` : '')], ['rules', 'Rules'], ...(comm ? [['commish', 'Commissioner']] : [])];
   if (!tabs.some((t) => t[0] === V.tab)) V.tab = 'overview';
   const keepFocus = document.activeElement && document.activeElement.id === 'lq';
-  const body = V.tab === 'draft' ? draftTab(l, s) : V.tab === 'rosters' ? rostersTab(l) : V.tab === 'trades' ? tradesTab(l, s) : V.tab === 'commish' ? commishTab(l, s) : overviewTab(l, s);
+  const body = V.tab === 'draft' ? draftTab(l, s) : V.tab === 'rosters' ? rostersTab(l) : V.tab === 'trades' ? tradesTab(l, s) : V.tab === 'commish' ? commishTab(l, s) : V.tab === 'rules' ? rulesTab(l, s) : overviewTab(l, s);
   main.innerHTML = `<div class="lg">
     ${testBanner()}<div class="lghead"><img class="lgcrest" src="art/crest.webp" alt="" width="301" height="194"><div class="grow"><h1>${esc(l.name || 'Ranked league')}</h1><div class="ornate" aria-hidden="true"></div><div class="small muted">${esc(s ? s.year : '')} season · <img class="cbadge" src="art/badge-purple.webp" alt="">commissioner ${esc(nm(l.commish))} · ${l.members.map((u) => esc(nm(u))).join(', ')}</div></div>
       ${!isMember(me(), l) ? '<span class="chip">Watching (not in the league)</span>' : ''}</div>
@@ -777,6 +783,89 @@ function commishTab(l, s) {
     </div></div>`;
 }
 
+/* ---------- the league rulebook (built from the live settings so it can't drift) ---------- */
+const HOUSE_FLAGS = [
+  ['firstTurnAttack', 'The first player may attack on turn 1', 'The player who goes first can\'t attack on their first turn'],
+  ['autoDraw', 'Ending your turn draws the next player\'s card for them'],
+  ['evolveSameTurn', 'Pokémon may evolve on the turn they\'re played'],
+  ['multiEvolve', 'A Pokémon may evolve more than once in the same turn'],
+  ['anyVersionEvolves', 'Evolutions work on any version of the Pokémon (Blaine\'s, Dark, Rocket\'s or plain)'],
+  ['colorlessCosts', 'Energy types don\'t matter: any Energy pays any attack cost'],
+  ['basicEnergyAnyType', 'Any basic Energy counts as any type for card text (search, attach, discard, move)'],
+  ['energyPickup', 'Instead of attaching, you may pick up a basic Energy from one of your Pokémon'],
+  ['dceNoReturn', 'An attached Double Colorless never goes back to your hand; it\'s discarded instead'],
+  ['dceCountsAsWater', 'Hydro Pump and Water Gun count a Double Colorless as 2 Water'],
+  ['charizardDoubleDiscard', 'Charizard\'s Fire Spin may discard one Double Colorless instead of 2 cards'],
+  ['noAttackAfterRetreat', 'No attacking on a turn you retreat'],
+  ['unlimitedTrainers', 'No limit on Trainer cards per turn'],
+  ['conditionsPersist', 'Special Conditions stay on a Pokémon when it goes to the bench (benched sleepers still flip to wake up)'],
+  ['conditionsStack', 'Asleep, Confused and Paralyzed stack instead of replacing each other'],
+  ['deckOutDamage', 'Running out of cards doesn\'t lose: your Active takes 10 damage each turn instead'],
+  ['mulliganRescue', 'House mulligan: your opponent may mulligan too (no extra draw); a second miss draws one card at a time (up to 5, opponent draws as many); 5 misses loses'],
+  ['benchRescue', 'No Pokémon left in play: draw until you find a Basic (up to 7) instead of losing; your opponent draws as many'],
+  ['askEveryChoice', 'The table always asks you, even when there\'s only one choice'],
+];
+function rulesTab(l, s) {
+  pool();
+  const R = Object.assign({}, (PT.rules && PT.rules()) || {});
+  const comm = isCommish(l);
+  const li = (x) => `<li>${x}</li>`;
+  const house = HOUSE_FLAGS.map(([k, on, off]) => (R[k] === undefined ? '' : R[k] !== false && R[k] !== 0 ? li(esc(on)) : off ? li(esc(off)) : '')).join('');
+  const splitPicks = POOL.filter((e) => e.name !== e.base);
+  const split = splitPicks.length, splitNames = new Set(splitPicks.map((e) => e.base)).size;
+  const notes = (l.houseRules || '').trim();
+  const sec = (icon, title, body) => `<section class="panel rule"><h2>${title}</h2>${body}</section>`;
+  return `<div class="rulebook">
+    <div class="rb-intro"><div class="frame-head"><h2>League Rules</h2></div>
+      <p>The ranked league runs one season per year: a draft, a season of ranked games, and a champion. ${esc(nm(l.commish))} is the commissioner. These rules come straight from how the site works, so they're always current.</p></div>
+    ${notes || comm ? `<section class="panel rule house"><h2>House Rules</h2>${notes ? `<div class="hr-text">${esc(notes).replace(/\n/g, '<br>')}</div>` : '<p class="muted small">No house rules yet.</p>'}
+      ${comm ? `<details class="hr-edit"${notes ? '' : ' open'}><summary>Edit house rules (commissioner)</summary><textarea id="lhouse" maxlength="4000" rows="6" placeholder="Anything else the league has agreed on: trade deadlines, tiebreakers, bragging rights...">${esc(notes)}</textarea><div class="row" style="margin-top:8px"><button class="pri" type="button" data-a="saveHouse">Save house rules</button></div></details>` : ''}</section>` : ''}
+    <div class="rb-grid">
+    ${sec('', 'The Draft', `<ul>
+      ${li(`Snake order, set by the commissioner: the order reverses every round.`)}
+      ${li(`Every distinct card is its own pick. Charizard, Dark Charizard and Blaine's Charizard are three picks, and so are cards that share a name but play differently, like <b>Zapdos (Base Set)</b> and <b>Zapdos (Fossil)</b> (${splitNames} names are split into ${split} picks this way). Holo and non-holo prints of the same card are one pick.`)}
+      ${li(`Not in the draft: Colorless Pokémon (free for everyone), Basic Pokémon that evolve (they come with their evolutions), and promos. That leaves <b>${POOL.length}</b> picks.`)}
+      ${li(`The draft keeps going until every player presses <b>I'm done drafting</b>. Changing your mind is allowed until everyone has.`)}
+      ${li(`The commissioner can make a pick for the player on the clock, undo the last pick, or end or reopen the draft.`)}
+    </ul>`)}
+    ${sec('', 'Your Roster: What You Can Play', `<ul>
+      ${li(`The Pokémon you draft, trade for or claim.`)}
+      ${li(`<b>Pre-evolutions are free:</b> owning a Pokémon lets you play everything it evolves from. Own Charizard, play Charmander and Charmeleon. Own Gengar, play either Haunter and either Gastly.`)}
+      ${li(`<b>Colorless Pokémon are free for everyone:</b> Chansey, Snorlax, Dragonite, Wigglytuff and the rest.`)}
+      ${li(`<b>Trainers and Energy are free for everyone.</b>`)}
+      ${li(`Owning one version of a split card doesn't cover the other: Zapdos (Base Set) doesn't let you play Zapdos (Fossil).`)}
+      ${li(`Promo printings aren't allowed in ranked decks.`)}
+    </ul>`)}
+    ${sec('', 'Keepers', `<ul>
+      ${li(`Starting with the second season, each player may keep <b>one</b> Pokémon from last season's roster.`)}
+      ${li(`Your keeper uses your <b>round 1 pick</b>. Choose it on the Draft tab before the commissioner starts the draft.`)}
+      ${li(`The commissioner can switch keepers off for a season: that's a keeper reset.`)}
+      ${li(`This season: ${s && s.keepersOn ? 'keepers are <b>on</b>' : '<b>no keepers</b>'}.`)}
+    </ul>`)}
+    ${sec('', 'Trades & Free Agents', `<ul>
+      ${li(`Offer any of your Pokémon for any of another player's on the Trades tab, once the draft has started.`)}
+      ${li(`When the other player accepts, the commissioner approves it. Trades involving the commissioner go through as soon as the other player accepts.`)}
+      ${li(`The commissioner can veto a trade.`)}
+      ${li(`After the draft, anything nobody drafted is a <b>free agent</b>: any player can claim it, first come first served.`)}
+      ${li(`You can release a Pokémon back to the free agents after the draft.`)}
+    </ul>`)}
+    ${sec('', 'Ranked Games & Standings', `<ul>
+      ${li(`Start one from the lobby: <b>Create Table → Ranked league game</b>. Only league players can sit, and the table runs the automated rules with the standard league rules below.`)}
+      ${li(`Each deck is checked against its player's roster before the game starts.`)}
+      ${li(`The winner is recorded automatically. A concession counts as a loss.`)}
+      ${li(`Standings rank by wins, then win percentage; players who haven't played yet sit below everyone who has. Rank badges only go to players with ranked games.`)}
+      ${li(`The season ends when the commissioner sets up the next one; whoever leads the standings then is the champion.`)}
+    </ul>`)}
+    ${sec('', 'Standard Game Rules', `<ul>
+      ${li(`${R.deckSize || 60}-card decks, ${R.prizes || 6} prizes, ${R.handSize || 7}-card opening hand, bench of ${R.benchSize || 5}, up to ${R.maxCopies || 4} copies of a card (basic Energy unlimited).`)}
+      ${li(`Weakness ${R.weaknessBonus ? `adds +${R.weaknessBonus} damage` : 'doubles damage'}; Resistance takes away ${R.resistanceAmount == null ? 20 : R.resistanceAmount}. Confusion self-damage is ${R.confusionSelfDamage == null ? 20 : R.confusionSelfDamage}.`)}
+      ${(R.banned || []).length ? li(`<b>Banned:</b> ${esc(R.banned.join(', '))}.`) : ''}
+      ${Object.keys(R.limits || {}).length ? li(`<b>Limited:</b> ${esc(Object.entries(R.limits).map(([k, v]) => `${k} (max ${v})`).join(', '))}.`) : ''}
+    </ul>
+    <h3>House rules built into every table</h3><ul class="tight">${house}</ul>`)}
+    </div></div>`;
+}
+
 /* ---------- events ---------- */
 function bind(main) {
   const rer = () => PT.render();
@@ -818,6 +907,7 @@ function bind(main) {
     else if (a === 'voteStop') A.voteStop();
     else if (a === 'endDraft') PT.showModal('End the draft now?', '<p>Everything not drafted becomes a free agent. You can reopen it later.</p>', '<button class="dng" id="lok" type="button">End draft</button>', (m) => { m.querySelector('#lok').onclick = () => { PT.closeModal(); A.endDraft(); }; });
     else if (a === 'reopenDraft') A.reopenDraft();
+    else if (a === 'saveHouse') A.setHouseRules((main.querySelector('#lhouse') || {}).value || '');
     else if (a === 'nextSeason') PT.showModal('Set up the next season?', '<p>Rosters start empty for a new draft. Everyone can pick one keeper from this season first.</p>', '<button class="pri" id="lok" type="button">Set it up</button>', (m) => { m.querySelector('#lok').onclick = () => { PT.closeModal(); A.nextSeason(); }; });
     else if (a === 'move') { const n = (main.querySelector('#lmove').value || '').trim(); const to = main.querySelector('#lmoveto').value || null; pool(); const hit = POOL.find((x) => x.name.toLowerCase() === n.toLowerCase()); if (!hit) { PT.toast('Type a Pokémon name from the list'); return; } V.moveName = hit.name; A.move(hit.name, to); }
     else if (a === 'propose') A.propose(V.tradeWith, [...V.give], [...V.get], V.note.trim()).then((ok) => { if (ok) { V.give.clear(); V.get.clear(); V.note = ''; PT.render(); } });
