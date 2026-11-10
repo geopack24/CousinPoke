@@ -27,11 +27,12 @@ let POOL = null, BYNAME = null, PRE = null, FREE = null, BASE = null;
 // BASE: Basic Pokémon that evolve into something; never drafted, playable through whatever they evolve into.
 let clockKey = null;
 let pickSeen = null; // 'season:count' of picks already shown, so only new picks get the reveal
+let champSeen = null; // majors already won when we last looked, so only new winners get the trophy reveal
 const recording = new Set();
 
 export function installLeague(pt) {
   PT = pt;
-  return { render, lobbyPanel, lobbyFeature, onLeague, noteGames, legality, legalNames, keyOf, isMember, season, rankedOk, liveDraft, gameChip, tickerHTML };
+  return { render, lobbyPanel, lobbyFeature, onLeague, noteGames, legality, legalNames, keyOf, majorMatch, canSit, majorName, isMember, season, rankedOk, liveDraft, gameChip, tickerHTML };
 }
 
 /* ---------- helpers ---------- */
@@ -132,10 +133,92 @@ function indexFor(s, round, col) { const n = order(s).length; return round * n +
 function nextIndex(s) { const used = new Set((s.picks || []).map((p) => p.i)); let i = 0; while (used.has(i)) i++; return i; }
 function onClock(s) { return s && s.status === 'drafting' ? pickerAt(s, nextIndex(s)) : null; }
 function liveDraft() { const s = season(); return !!(s && s.status === 'drafting'); }
-function rankedOk() { const l = L(), s = season(l); if (!l || !s) return 'No league yet'; if (!isMember()) return 'You are not in the league'; if (s.status !== 'done') return 'Ranked games start after the draft'; return true; }
+function rankedOk() { const r = majorMatch(); return r && r.ok ? true : r; }
 function logTx(doc, t) { doc.log = doc.log || []; doc.log.push({ at: Date.now(), s: doc.current, t }); if (doc.log.length > 400) doc.log = doc.log.slice(-400); }
 function newSeason(year, members, keepersOn) { return { year, status: 'setup', order: members.slice(), snake: true, keepersOn: !!keepersOn, keepers: {}, picks: [], own: {}, how: {}, stopVotes: [], createdAt: Date.now() }; }
 function fail(m) { throw new Error(m); }
+
+/* ---------- major championships ----------
+   Four majors a year, each a double-elimination bracket for three players:
+   Game 1: two players (the third waits). Game 2: Game 1's loser vs the player who waited. Game 3: the pair that hasn't met.
+   Two losses and you're out; when two players remain, their next game is the final. If all three are 1-1 after three games,
+   the previous major's winner gets a bye and the other two play a semifinal for the other spot in the final. */
+const MAJORS = [
+  { key: 'winter', name: 'Winter Opener', ball: 'art/ball-winter.svg' },
+  { key: 'spring', name: 'Spring Invitational', ball: 'art/ball-spring.svg' },
+  { key: 'summer', name: 'Summer Championship', ball: 'art/ball-summer.svg' },
+  { key: 'fall', name: 'Fall Classic', ball: 'art/ball-fall.svg' },
+];
+const MAJOR = Object.fromEntries(MAJORS.map((m) => [m.key, m]));
+const majorsOf = (s) => (s && s.majors) || {};
+function liveMajor(s) { const ms = majorsOf(s); const d = MAJORS.find((x) => ms[x.key] && ms[x.key].status === 'live'); return d ? { def: d, m: ms[d.key] } : null; }
+function nextUpcoming(s) { const ms = majorsOf(s); return MAJORS.find((x) => !ms[x.key]) || null; }
+const ballImg = (mk, cls = '', title = '') => `<img class="ball ${cls}" src="${MAJOR[mk].ball}" alt="${esc(title || MAJOR[mk].name)}" title="${esc(title || MAJOR[mk].name)}" width="200" height="200">`;
+/** Winner of the major completed most recently before (season, major). */
+function prevChampion(l, sk, mk) {
+  let last = null;
+  for (const k of seasonKeys(l)) for (const d of MAJORS) {
+    if (+k === +sk && d.key === mk) return last;
+    const m = majorsOf(l.seasons[k])[d.key];
+    if (m && m.status === 'done' && m.champion) last = m.champion;
+  }
+  return last;
+}
+/** Records, who's out, and the next match in a major. */
+function bracket(m, prevChamp) {
+  const P = m.players || [], games = m.games || [];
+  const rec = Object.fromEntries(P.map((u) => [u, { w: 0, l: 0 }]));
+  for (const g of games) { const lo = g.a === g.w ? g.b : g.a; if (rec[g.w]) rec[g.w].w++; if (rec[lo]) rec[lo].l++; }
+  const out = { rec, games, next: null, needBye: false, bye: m.bye || null, champion: m.champion || null, manualOnly: P.length !== 3 };
+  if (m.status === 'done' || P.length !== 3) return out;
+  const alive = P.filter((u) => rec[u].l < 2);
+  const n = games.length;
+  if (alive.length < 2) return out;
+  if (alive.length === 2) { out.next = { a: alive[0], b: alive[1], final: true, label: 'Championship final' }; return out; }
+  if (n === 0) out.next = { a: m.opening[0], b: m.opening[1], label: 'Game 1' };
+  else if (n === 1) { const g = games[0]; const lo = g.a === g.w ? g.b : g.a; out.next = { a: lo, b: P.find((u) => u !== g.a && u !== g.b), label: 'Game 2' }; }
+  else if (n === 2) { const met = new Set(games.map((g) => [g.a, g.b].sort().join('|'))); const pr = [[P[0], P[1]], [P[0], P[2]], [P[1], P[2]]].find(([x, y]) => !met.has([x, y].sort().join('|'))); out.next = { a: pr[0], b: pr[1], label: 'Game 3' }; }
+  else {
+    const bye = m.bye || (P.includes(prevChamp) ? prevChamp : null);
+    out.bye = bye;
+    if (!bye) out.needBye = true; else { const o = P.filter((u) => u !== bye); out.next = { a: o[0], b: o[1], label: 'Semifinal' }; }
+  }
+  return out;
+}
+/** Record a major game's result (already validated against the bracket's next match). */
+function applyResult(doc, sk, mk, br, w, extra) {
+  const m = doc.seasons[sk].majors[mk];
+  const nx = br.next, lo = nx.a === w ? nx.b : nx.a;
+  m.games = m.games || [];
+  m.games.push({ a: nx.a, b: nx.b, w, label: nx.label, at: Date.now(), ...(extra || {}) });
+  logTx(doc, `${MAJOR[mk].name} · ${nx.label}: ${nm(w)} beat ${nm(lo)}`);
+  if (nx.final) { m.champion = w; m.status = 'done'; m.endedAt = Date.now(); logTx(doc, `🏆 ${nm(w)} wins the ${MAJOR[mk].name}!`); }
+}
+/** Per-season race: majors won, then major-game wins. */
+function yearRace(l, sk) {
+  const s = l.seasons[sk]; if (!s) return [];
+  const members = s.order && s.order.length ? s.order : l.members;
+  const rows = new Map(members.map((u) => [u, { uid: u, balls: [], w: 0, l: 0 }]));
+  const row = (u) => { if (!rows.has(u)) rows.set(u, { uid: u, balls: [], w: 0, l: 0 }); return rows.get(u); };
+  for (const d of MAJORS) { const m = majorsOf(s)[d.key]; if (!m) continue; for (const g of m.games || []) { const lo = g.a === g.w ? g.b : g.a; row(g.w).w++; row(lo).l++; } if (m.status === 'done' && m.champion) row(m.champion).balls.push(d.key); }
+  return [...rows.values()].sort((a, b) => b.balls.length - a.balls.length || b.w - a.w || a.l - b.l);
+}
+const seasonDone = (s) => MAJORS.every((d) => (majorsOf(s)[d.key] || {}).status === 'done');
+/** The major match a player can start right now, or why not. */
+function majorMatch(uid = me()) {
+  const l = L(), s = season(l);
+  if (!l || !s) return 'No league yet';
+  if (!isMember(uid, l)) return 'You are not in the league';
+  const lm = liveMajor(s);
+  if (!lm) return s.status !== 'done' ? 'Majors start after the draft' : 'No major is being played right now';
+  const br = bracket(lm.m, prevChampion(l, l.current, lm.def.key));
+  if (!br.next) return br.needBye ? `The ${lm.def.name} is waiting for the commissioner to set the bye` : `The ${lm.def.name} has no match to play`;
+  if (br.next.a !== uid && br.next.b !== uid) return `Next ${lm.def.name} match: ${nm(br.next.a)} vs ${nm(br.next.b)}`;
+  return { ok: true, season: l.current, major: lm.def.key, name: lm.def.name, game: (lm.m.games || []).length, label: br.next.label, a: br.next.a, b: br.next.b, opp: br.next.a === uid ? br.next.b : br.next.a, final: !!br.next.final };
+}
+/** Only the two players in a major match may sit at its table. */
+function canSit(g, uid = me()) { if (!g || !g.ranked) return true; if (g.ranked.a && g.ranked.b) return uid === g.ranked.a || uid === g.ranked.b; return isMember(uid); }
+const majorName = (mk) => (MAJOR[mk] ? MAJOR[mk].name : 'Major');
 
 /* ---------- saving: every change re-reads the latest league and retries on a conflict ---------- */
 async function mutate(fn, okMsg, quiet) {
@@ -184,6 +267,9 @@ function onLeague() {
     }
     pickSeen = sig;
   }
+  { const won = []; for (const k of seasonKeys(L())) for (const d of MAJORS) { const m = majorsOf(L().seasons[k])[d.key]; if (m && m.status === 'done' && m.champion) won.push(`${k}:${d.key}:${m.champion}`); }
+    if (champSeen) { const fresh = won.filter((x) => !champSeen.includes(x)); if (fresh.length && PT.S.screen !== 'game') { const [k, mk, uid] = fresh[fresh.length - 1].split(':'); revealMajor(k, mk, uid); } }
+    champSeen = won; }
   const key = s && s.status === 'drafting' && onClock(s) === me() ? L().current + ':' + nextIndex(s) : null;
   if (key && key !== clockKey) {
     try { playTurnChime(); } catch (e) { /* audio locked */ }
@@ -197,12 +283,12 @@ function onLeague() {
   }
   clockKey = key;
 }
-/** Finished ranked tables I played at get their result written to the league (once per game). */
+/** Finished major-match tables I played at get their result written into the bracket (once per game). */
 function noteGames(games) {
   const l = L();
   if (!l) return;
   for (const g of games || []) {
-    if (!g || !g.ranked || g.status !== 'done' || !g.winner || !g.seats) continue;
+    if (!g || !g.ranked || !g.ranked.major || g.status !== 'done' || !g.winner || !g.seats) continue;
     const a = g.seats.a || {}, b = g.seats.b || {};
     if (a.uid !== me() && b.uid !== me()) continue;
     const key = g.id + '_' + (g.startedAt || 0);
@@ -212,9 +298,13 @@ function noteGames(games) {
     mutate((doc) => {
       doc.results = doc.results || {};
       if (doc.results[key]) return false;
-      if (!(doc.members || []).includes(w.uid) || !(doc.members || []).includes(lo.uid)) return false;
-      doc.results[key] = { s: (g.ranked && g.ranked.season) || doc.current, at: Date.now(), w: w.uid, l: lo.uid, wd: w.deckName || '', ld: lo.deckName || '', turns: (g.state && g.state.turnNo) || null, name: g.name || '' };
-      logTx(doc, `${nm(w.uid)} beat ${nm(lo.uid)} in a ranked game`);
+      const sk = g.ranked.season, mk = g.ranked.major;
+      const m = majorsOf(doc.seasons[sk])[mk];
+      if (!m || m.status !== 'live' || (m.games || []).length !== g.ranked.game) return false;
+      const br = bracket(m, prevChampion(doc, sk, mk));
+      if (!br.next || ![br.next.a, br.next.b].includes(w.uid) || ![br.next.a, br.next.b].includes(lo.uid)) return false;
+      doc.results[key] = { s: sk, major: mk, at: Date.now(), w: w.uid, l: lo.uid, wd: w.deckName || '', ld: lo.deckName || '', turns: (g.state && g.state.turnNo) || null, name: g.name || '' };
+      applyResult(doc, sk, mk, br, w.uid, { table: g.id, rk: key });
     }, null, true).finally(() => recording.delete(key));
   }
 }
@@ -379,6 +469,65 @@ const A = {
     logTx(doc, `Commissioner moved ${name}: ${nm(from)} → ${nm(to)}`);
   }, 'Moved'),
 
+  startMajor: (mk, a, b) => mutate((doc) => {
+    if (doc.commish !== me()) fail('Only the commissioner can start a major');
+    const s = season(doc);
+    if (s.status !== 'done') fail('Finish the draft first');
+    if (liveMajor(s)) fail(`The ${liveMajor(s).def.name} is still being played`);
+    const up = nextUpcoming(s);
+    if (!up || up.key !== mk) fail('Majors are played in order');
+    const players = (s.order && s.order.length ? s.order : doc.members).filter((u) => doc.members.includes(u));
+    if (players.length === 3 && (!a || !b || a === b || !players.includes(a) || !players.includes(b))) fail('Choose the two players for Game 1');
+    s.majors = s.majors || {};
+    s.majors[mk] = { status: 'live', players, opening: players.length === 3 ? [a, b] : [], games: [], bye: null, champion: null, startedAt: Date.now() };
+    logTx(doc, `The ${MAJOR[mk].name} is underway!${players.length === 3 ? ` Game 1: ${nm(a)} vs ${nm(b)}` : ''}`);
+  }, 'The major is on!'),
+
+  recordResult: (mk, w) => mutate((doc) => {
+    if (doc.commish !== me()) fail('Only the commissioner can enter results');
+    const m = majorsOf(season(doc))[mk];
+    if (!m || m.status !== 'live') fail('That major isn\'t being played');
+    const br = bracket(m, prevChampion(doc, doc.current, mk));
+    if (!br.next || ![br.next.a, br.next.b].includes(w)) fail('That player isn\'t in the next match');
+    applyResult(doc, doc.current, mk, br, w, { manual: true });
+  }, 'Result saved'),
+
+  setBye: (mk, uid) => mutate((doc) => {
+    if (doc.commish !== me()) fail('Only the commissioner can set the bye');
+    const m = majorsOf(season(doc))[mk];
+    if (!m || m.status !== 'live' || !m.players.includes(uid)) fail('Pick a player in this major');
+    m.bye = uid;
+    logTx(doc, `${MAJOR[mk].name}: ${nm(uid)} gets the bye into the final`);
+  }, 'Bye set'),
+
+  undoResult: (mk) => mutate((doc) => {
+    if (doc.commish !== me()) fail('Only the commissioner can undo results');
+    const m = majorsOf(season(doc))[mk];
+    if (!m || !(m.games || []).length) fail('No result to undo');
+    const g = m.games.pop();
+    if (g.rk && doc.results) delete doc.results[g.rk];
+    if (m.status === 'done') { m.status = 'live'; m.champion = null; m.endedAt = null; }
+    if ((m.games || []).length < 3) m.bye = null;
+    logTx(doc, `Commissioner undid ${MAJOR[mk].name} ${g.label}: ${nm(g.w)} over ${nm(g.a === g.w ? g.b : g.a)}`);
+  }, 'Result undone'),
+
+  awardMajor: (mk, uid) => mutate((doc) => {
+    if (doc.commish !== me()) fail('Only the commissioner can award a major');
+    const m = majorsOf(season(doc))[mk];
+    if (!m || !doc.members.includes(uid)) fail('Pick a league player');
+    m.status = 'done'; m.champion = uid; m.endedAt = Date.now();
+    logTx(doc, `🏆 ${nm(uid)} wins the ${MAJOR[mk].name}! (awarded by the commissioner)`);
+  }, 'Major awarded'),
+
+  cancelMajor: (mk) => mutate((doc) => {
+    if (doc.commish !== me()) fail('Only the commissioner can cancel a major');
+    const s = season(doc), m = majorsOf(s)[mk];
+    if (!m) return false;
+    for (const g of m.games || []) if (g.rk && doc.results) delete doc.results[g.rk];
+    delete s.majors[mk];
+    logTx(doc, `Commissioner reset the ${MAJOR[mk].name}`);
+  }, 'Major reset'),
+
   setHouseRules: (text) => mutate((doc) => {
     if (doc.commish !== me()) fail('Only the commissioner can edit the house rules');
     doc.houseRules = String(text || '').slice(0, 4000);
@@ -389,6 +538,7 @@ const A = {
     if (doc.commish !== me()) fail('Only the commissioner can start a new season');
     const s = season(doc);
     if (s.status !== 'done') fail('Finish this season\'s draft first');
+    if (liveMajor(s)) fail(`Finish the ${liveMajor(s).def.name} first`);
     const y = String(Math.max(+doc.current + 1, +thisYear()));
     if (doc.seasons[y]) fail(`The ${y} season already exists`);
     doc.seasons[y] = newSeason(y, doc.members, true);
@@ -464,6 +614,22 @@ function revealPick(s, p) {
   el.addEventListener('click', close);
   setTimeout(close, 3600);
 }
+function revealMajor(sk, mk, uid) {
+  document.querySelectorAll('.reveal').forEach((x) => x.remove());
+  const el = document.createElement('div');
+  el.className = 'reveal major ' + mk;
+  el.setAttribute('role', 'status');
+  el.innerHTML = `<div class="rv-in"><div class="rv-top">${esc(sk)} ${esc(MAJOR[mk].name)}</div>
+    <div class="rv-who">${uid === me() ? 'You are the champion!' : `${esc(nm(uid))} is the champion!`}</div>
+    <div class="rv-ball">${ballImg(mk, 'won big')}</div>
+    <div class="rv-name">${esc(nm(uid))}</div><div class="rv-sub">wins the resplendent ${esc(MAJOR[mk].name)} Poké Ball · tap to continue</div></div>`;
+  document.body.appendChild(el);
+  try { sfx.play('win'); sfx.play('coin', 500); sfx.play('win', 900); } catch (err) { /* audio locked */ }
+  let gone = false;
+  const close = () => { if (gone) return; gone = true; el.classList.add('out'); setTimeout(() => el.remove(), 380); };
+  el.addEventListener('click', close);
+  setTimeout(close, 6000);
+}
 /** A sports-style ticker of league news for the lobby (empty when there's nothing to say). */
 function tickerHTML() {
   const l = L(), s = season(l);
@@ -471,11 +637,14 @@ function tickerHTML() {
   const items = [];
   if (s.status === 'drafting') { const c = onClock(s); items.push(`<b>DRAFT LIVE</b> · ${c === me() ? "<b>you're</b>" : esc(nm(c))} on the clock`); }
   if (s.status === 'setup') items.push(`The <b>${esc(s.year)}</b> draft is coming. ${s.order.length} players: ${s.order.map((u) => esc(nm(u))).join(', ')}`);
-  const st = standings(l, l.current).rows.filter((r) => r.g);
-  if (st[0]) items.push(`👑 <b>${esc(nm(st[0].uid))}</b> leads ${esc(s.year)} at ${st[0].w}–${st[0].l}`);
-  for (const r of st) { const k = parseInt(String(r.streak).slice(1), 10); if (r.streak[0] === 'W' && k >= 2) items.push(`🔥 <b>${esc(nm(r.uid))}</b> has won ${k} straight`); }
+  const lm = liveMajor(s);
+  if (lm) { const br = bracket(lm.m, prevChampion(l, l.current, lm.def.key)); items.push(`🏟️ <b>${esc(lm.def.name.toUpperCase())} LIVE</b>${br.next ? ` · ${esc(br.next.label)}: ${esc(nm(br.next.a))} vs ${esc(nm(br.next.b))}` : ''}`); }
+  else if (s.status === 'done' && nextUpcoming(s)) items.push(`Next up: the <b>${esc(nextUpcoming(s).name)}</b>`);
+  for (const d of MAJORS) { const m = majorsOf(s)[d.key]; if (m && m.status === 'done' && m.champion) items.push(`🏆 <b>${esc(nm(m.champion))}</b> won the ${esc(d.name)}`); }
+  const race = yearRace(l, l.current).filter((r) => r.balls.length);
+  if (race[0]) items.push(`👑 <b>${esc(nm(race[0].uid))}</b> leads ${esc(s.year)} with ${race[0].balls.length} major${race[0].balls.length === 1 ? '' : 's'}`);
   const res = Object.values(l.results || {}).sort((a, b) => b.at - a.at).slice(0, 4);
-  for (const r of res) items.push(`<b>${esc(nm(r.w))}</b> def. ${esc(nm(r.l))}${r.wd ? ` with ${esc(r.wd)}` : ''}`);
+  for (const r of res) items.push(`<b>${esc(nm(r.w))}</b> def. ${esc(nm(r.l))}${r.major ? ` (${esc(majorName(r.major))})` : ''}`);
   const picks = (s.picks || []).slice().sort((a, b) => b.at - a.at).slice(0, 5);
   for (const p of picks) items.push(`${esc(nm(p.uid))} ${p.keeper ? 'kept' : 'drafted'} <b>${esc(p.name)}</b>`);
   const trades = (l.trades || []).filter((t) => t.status === 'done').sort((a, b) => b.doneAt - a.doneAt).slice(0, 2);
@@ -537,17 +706,22 @@ function lobbyFeature() {
   const clock = s && s.status === 'drafting' ? onClock(s) : null;
   const mine = clock && clock === me();
   const pend = (l.trades || []).filter((t) => (t.status === 'proposed' && t.to === me()) || (t.status === 'approval' && l.commish === me())).length;
-  const rows = s ? standings(l, l.current).rows : [];
-  const played = rows.some((r) => r.g);
-  const status = !s ? '' : s.status === 'setup' ? `The ${esc(s.year)} draft hasn't started` : s.status === 'drafting' ? (mine ? "<b>You're on the clock!</b>" : `Draft live · <b>${esc(nm(clock))}</b> is picking`) : `Draft complete · ${s.picks.length} picks`;
-  const top = rows.slice(0, 3).map((r, i) => `<div class="lp-row${r.uid === me() ? ' me' : ''}"><span class="lp-rank">${r.g ? `<img src="art/badge-${['champion', 'silver', 'bronze'][i]}.webp" alt="${i + 1}" title="${['1st', '2nd', '3rd'][i]} place">` : `<i>${i + 1}</i>`}</span><span class="lp-name">${esc(nm(r.uid))}</span><span class="lp-rec">${r.g ? `${r.w}–${r.l}` : 'no games'}</span></div>`).join('');
-  return `<section class="realm realm-league${mine ? ' hot' : ''}">${LID !== 'main' ? `<div class="testtag">Practice league: ${LID}</div>` : ''}${head(`<button class="pri" type="button" data-league="1">${mine ? 'Pick now' : 'View the League'}</button>`)}<div class="realm-body">
+  const lm = s ? liveMajor(s) : null;
+  const br = lm ? bracket(lm.m, prevChampion(l, l.current, lm.def.key)) : null;
+  const myMatch = br && br.next && (br.next.a === me() || br.next.b === me());
+  const status = !s ? '' : s.status === 'setup' ? `The ${esc(s.year)} draft hasn't started` : s.status === 'drafting' ? (mine ? "<b>You're on the clock!</b>" : `Draft live · <b>${esc(nm(clock))}</b> is picking`)
+    : lm ? `<b>${esc(lm.def.name)}</b> live${br.next ? ` · ${esc(br.next.label)}: ${esc(nm(br.next.a))} vs ${esc(nm(br.next.b))}` : ''}` : nextUpcoming(s) ? `Next up: the <b>${esc(nextUpcoming(s).name)}</b>` : `All four majors are done`;
+  const race = s ? yearRace(l, l.current) : [];
+  const shelf = s ? `<div class="mj-shelf">${MAJORS.map((d) => { const m = majorsOf(s)[d.key]; const won = m && m.status === 'done' && m.champion; return `<div class="mj-mini${won ? ' won' : m && m.status === 'live' ? ' live' : ''}">${ballImg(d.key, won ? 'won' : 'dim', won ? `${d.name}: ${nm(m.champion)}` : d.name)}<span>${won ? esc(nm(m.champion)) : m && m.status === 'live' ? 'Live' : 'Up for grabs'}</span></div>`; }).join('')}</div>` : '';
+  const top = race.slice(0, 3).map((r) => `<div class="lp-row${r.uid === me() ? ' me' : ''}"><span class="lp-name">${esc(nm(r.uid))}</span><span class="lp-balls">${r.balls.map((k) => ballImg(k, 'tiny won')).join('') || '<i class="muted small">no majors yet</i>'}</span><span class="lp-rec">${r.w}–${r.l}</span></div>`).join('');
+  return `<section class="realm realm-league${mine || myMatch ? ' hot' : ''}">${LID !== 'main' ? `<div class="testtag">Practice league: ${LID}</div>` : ''}${head(`<button class="pri" type="button" data-league="1">${mine ? 'Pick now' : lm ? 'View the bracket' : 'View the League'}</button>`)}<div class="realm-body">
     <div class="season-plate"><span class="kicker">${esc(s ? s.year : '')} season</span><div class="sp-status">${status}</div><div class="sp-meta">${l.members.length} players · commissioner ${esc(nm(l.commish))}</div></div>
-    <div class="lp"><div class="lp-title">Standings</div>${top}</div>
-    ${!played ? '<p class="small muted lp-note">Rank badges appear once ranked games are played.</p>' : ''}
+    ${shelf}
+    <div class="lp"><div class="lp-title">${esc(s ? s.year : '')} race · majors won</div>${top}</div>
+    ${myMatch ? `<p class="small lp-note"><b>Your ${esc(lm.def.name)} match is up: ${esc(br.next.label)}.</b> Create Table → Major match.</p>` : ''}
     ${pend ? `<p class="small lp-note"><b>${pend} trade${pend === 1 ? '' : 's'} waiting on you</b></p>` : ''}</div></section>`;
 }
-function gameChip(g) { return g && g.ranked ? '<span class="rkchip" title="Ranked league game">Ranked</span>' : ''; }
+function gameChip(g) { return g && g.ranked ? `<span class="rkchip">${g.ranked.major ? esc(majorName(g.ranked.major)) : 'Ranked'}</span>` : ''; }
 
 function render(main) {
   const l = L();
@@ -565,7 +739,7 @@ function render(main) {
   const s = season(l);
   const comm = isCommish(l);
   const pend = (l.trades || []).filter((t) => (t.status === 'proposed' && t.to === me()) || (t.status === 'approval' && comm)).length;
-  const tabs = [['overview', 'Standings'], ['draft', s && s.status === 'done' ? 'Draft & free agents' : 'Draft'], ['rosters', 'Rosters'], ['trades', 'Trades' + (pend ? ` <b class="badge">${pend}</b>` : '')], ['rules', 'Rules'], ...(comm ? [['commish', 'Commissioner']] : [])];
+  const tabs = [['overview', 'Majors'], ['draft', s && s.status === 'done' ? 'Draft & free agents' : 'Draft'], ['rosters', 'Rosters'], ['trades', 'Trades' + (pend ? ` <b class="badge">${pend}</b>` : '')], ['rules', 'Rules'], ...(comm ? [['commish', 'Commissioner']] : [])];
   if (!tabs.some((t) => t[0] === V.tab)) V.tab = 'overview';
   const keepFocus = document.activeElement && document.activeElement.id === 'lq';
   const body = V.tab === 'draft' ? draftTab(l, s) : V.tab === 'rosters' ? rostersTab(l) : V.tab === 'trades' ? tradesTab(l, s) : V.tab === 'commish' ? commishTab(l, s) : V.tab === 'rules' ? rulesTab(l, s) : overviewTab(l, s);
@@ -579,37 +753,61 @@ function render(main) {
 }
 
 function overviewTab(l, s) {
-  const { rows, res } = standings(l, l.current);
-  const all = seasonKeys(l).length > 1 ? standings(l, null) : null;
+  const { res } = standings(l, l.current);
   const members = s.order.length ? s.order : l.members;
   const hh = h2h(res, members);
   const recent = Object.values(l.results || {}).sort((a, b) => b.at - a.at).slice(0, 12);
-  const clock = onClock(s);
-  const status = s.status === 'setup' ? `The ${s.year} draft hasn't started yet.` : s.status === 'drafting' ? `The ${s.year} draft is live. ${clock === me() ? "<b>You're on the clock.</b>" : `${esc(nm(clock))} is picking.`}` : `Draft finished: ${s.picks.length} picks. Ranked games count toward these standings.`;
-  const table = (rs) => `<table class="lgt"><thead><tr><th>#</th><th class="l">Player</th><th>W</th><th>L</th><th>Win %</th><th>Streak</th><th class="l">Last 5</th></tr></thead><tbody>
-    ${rs.map((r, i) => `<tr class="${r.uid === me() ? 'me' : ''}${i === 0 && r.g ? ' lead' : ''}"><td>${r.g && i < 3 ? `<img class="rankb" src="art/badge-${['champion', 'silver', 'bronze'][i]}.webp" alt="${i + 1}" title="${['1st', '2nd', '3rd'][i]} place">` : i + 1}</td><td class="l"><b>${esc(nm(r.uid))}</b>${r.uid === l.commish ? ' <span class="small muted">(commish)</span>' : ''}</td><td>${r.w}</td><td>${r.l}</td><td>${r.g ? Math.round(r.pct * 100) + '%' : '–'}</td><td>${r.streak}${r.streak[0] === 'W' && parseInt(r.streak.slice(1), 10) >= 3 ? ' <span class="fire">🔥</span>' : ''}</td><td class="l">${r.last5.map((x) => `<span class="wl ${x}">${x}</span>`).join('') || '<span class="muted small">no games</span>'}</td></tr>`).join('')}</tbody></table>`;
-  const leader = rows.find((r) => r.g);
+  const race = yearRace(l, l.current);
+  const leader = race.find((r) => r.balls.length);
+  const lm = liveMajor(s);
   const done = (l.trades || []).filter((t) => t.status === 'done' && t.s === l.current).length;
-  const champs = seasonKeys(l).filter((k) => +k < +l.current).reverse().map((k) => { const top = standings(l, k).rows.find((r) => r.g); return top ? { k, top } : null; }).filter(Boolean);
+  const allDone = seasonDone(s);
   const glance = `<div class="glance">
-    <div class="gtile gold"><span class="gl">${esc(s.year)} leader</span><span class="gv">${leader ? esc(nm(leader.uid)) : '—'}</span><span class="gs">${leader ? `${leader.w}–${leader.l}` : 'no ranked games yet'}</span><img src="art/badge-champion.webp" alt=""></div>
-    <div class="gtile"><span class="gl">Draft</span><span class="gv">${s.status === 'setup' ? 'Not started' : s.status === 'drafting' ? 'Live' : `${s.picks.length} picks`}</span><span class="gs">${s.status === 'drafting' ? `${esc(nm(clock))} is picking` : s.status === 'done' ? 'free agents open' : `${order(s).length} players`}</span><img src="art/badge-purple.webp" alt=""></div>
-    <div class="gtile"><span class="gl">Ranked games</span><span class="gv">${res.length}</span><span class="gs">this season</span><img src="art/badge-blue.webp" alt=""></div>
-    <div class="gtile"><span class="gl">Trades</span><span class="gv">${done}</span><span class="gs">completed this season</span><img src="art/badge-silver.webp" alt=""></div></div>`;
-  const podium = `<div class="podium">${[1, 0, 2].map((i) => { const r = rows[i]; const earned = !!(r && r.g); const badge = ['champion', 'silver', 'bronze'][i];
-    return `<div class="pod p${i + 1}${earned ? '' : ' preview'}"><img src="art/badge-${badge}.webp" alt="" width="109" height="109"><div class="pod-place">${['1st place', '2nd place', '3rd place'][i]}</div>${earned ? `<div class="pod-name">${esc(nm(r.uid))}</div><div class="pod-rec">${r.w}–${r.l} · ${Math.round(r.pct * 100)}%</div>` : `<div class="pod-name">Unclaimed</div><div class="pod-rec">${r ? 'play ranked games to claim it' : 'needs more players'}</div>`}</div>`; }).join('')}</div>`;
+    <div class="gtile gold"><span class="gl">${esc(s.year)} ${allDone ? 'champion' : 'leader'}</span><span class="gv">${leader ? esc(nm(leader.uid)) : '—'}</span><span class="gs">${leader ? `${leader.balls.length} major${leader.balls.length === 1 ? '' : 's'} won` : 'no majors won yet'}</span><img src="art/badge-champion.webp" alt=""></div>
+    <div class="gtile"><span class="gl">Now playing</span><span class="gv">${lm ? esc(lm.def.name) : s.status !== 'done' ? 'The draft' : nextUpcoming(s) ? 'Between majors' : 'Season over'}</span><span class="gs">${lm ? 'live now' : s.status !== 'done' ? 'majors start after it' : nextUpcoming(s) ? `next: ${esc(nextUpcoming(s).name)}` : 'all four majors done'}</span><img src="art/badge-purple.webp" alt=""></div>
+    <div class="gtile"><span class="gl">Major games</span><span class="gv">${res.length}</span><span class="gs">played this year</span><img src="art/badge-blue.webp" alt=""></div>
+    <div class="gtile"><span class="gl">Trades</span><span class="gv">${done}</span><span class="gs">completed this year</span><img src="art/badge-silver.webp" alt=""></div></div>`;
+  const cards = MAJORS.map((d) => {
+    const m = majorsOf(s)[d.key]; const won = m && m.status === 'done' && m.champion; const live = m && m.status === 'live';
+    return `<div class="mj ${d.key}${won ? ' won' : live ? ' live' : ' upcoming'}">${ballImg(d.key, won ? 'won' : live ? 'live' : 'dim')}<div class="mj-name">${esc(d.name)}</div>
+      <div class="mj-st">${won ? `<b>${esc(nm(m.champion))}</b>` : live ? '<span class="live">LIVE</span>' : 'Up for grabs'}</div></div>`;
+  }).join('');
+  const show = lm || [...MAJORS].reverse().map((d) => ({ def: d, m: majorsOf(s)[d.key] })).find((x) => x.m);
+  const bk = show ? bracketHTML(l, s, show.def, show.m) : `<div class="panel bk"><h2>${s.status !== 'done' ? 'Majors start after the draft' : 'Waiting for the Winter Opener'}</h2><p class="muted small">${s.status !== 'done' ? 'Once the draft is finished, the commissioner starts the Winter Opener from the Commissioner tab.' : `${esc(nm(l.commish))} starts each major from the Commissioner tab.`}</p></div>`;
+  const raceTable = `<table class="lgt"><thead><tr><th>#</th><th class="l">Player</th><th class="l">Majors won</th><th>Major W</th><th>Major L</th></tr></thead><tbody>
+    ${race.map((r, i) => `<tr class="${r.uid === me() ? 'me' : ''}${i === 0 && r.balls.length ? ' lead' : ''}"><td>${i + 1}</td><td class="l"><b>${esc(nm(r.uid))}</b>${r.uid === l.commish ? ' <span class="small muted">(commish)</span>' : ''}</td><td class="l"><span class="balls">${r.balls.map((k) => ballImg(k, 'tiny won')).join('') || '<span class="muted small">none yet</span>'}</span></td><td>${r.w}</td><td>${r.l}</td></tr>`).join('')}</tbody></table>`;
+  const cabinet = {};
+  for (const k of seasonKeys(l)) for (const d of MAJORS) { const m = majorsOf(l.seasons[k])[d.key]; if (m && m.status === 'done' && m.champion) (cabinet[m.champion] = cabinet[m.champion] || []).push({ k, d }); }
+  const cabUsers = Object.keys(cabinet).sort((a, b) => cabinet[b].length - cabinet[a].length);
+  const pastChamps = seasonKeys(l).filter((k) => +k < +l.current).reverse().map((k) => { const top = yearRace(l, k).find((r) => r.balls.length); return top ? { k, top } : null; }).filter(Boolean);
   return `${glance}
-    <section class="hall"><div class="frame-head"><h2>${esc(s.year)} Standings</h2></div>
-      ${podium}
-      <div class="panel lb"><div class="row lb-top"><p class="small muted grow">${status}</p>${s.status !== 'setup' ? `<button class="sm" type="button" data-tab="draft">${s.status === 'drafting' ? 'Go to the draft' : 'Draft board'}</button>` : ''}</div>${table(rows)}
-        <p class="small muted" style="margin:10px 0 0">Start a ranked game from the lobby: Create Table → Ranked league game. Decks may only use Pokémon on your roster and anything they evolve from.</p></div></section>
-    ${champs.length ? `<div class="panel"><h2>Champions</h2><div class="champs">${champs.map((c) => `<div class="champ"><img src="art/badge-red.webp" alt=""><div><b>${esc(nm(c.top.uid))}</b><div class="small muted">${esc(c.k)} champion · ${c.top.w}–${c.top.l}</div></div></div>`).join('')}</div></div>` : ''}
+    <section class="hall"><div class="frame-head"><h2>${esc(s.year)} Majors</h2></div>
+      <div class="mjrow">${cards}</div>
+      ${bk}
+      <div class="panel lb"><h2>${esc(s.year)} Race</h2><p class="small muted" style="margin:6px 0 0">Most majors won takes the year; total major-game wins break ties.</p>${raceTable}</div></section>
+    ${cabUsers.length ? `<div class="panel"><h2>Trophy Cabinet</h2><div class="cabinet">${cabUsers.map((u) => `<div class="cab"><b>${esc(nm(u))}</b><div class="cab-balls">${cabinet[u].map((x) => `<figure>${ballImg(x.d.key, 'won')}<figcaption>${esc(x.k)} ${esc(x.d.name)}</figcaption></figure>`).join('')}</div></div>`).join('')}</div></div>` : ''}
+    ${pastChamps.length ? `<div class="panel"><h2>League Champions</h2><div class="champs">${pastChamps.map((c) => `<div class="champ"><img src="art/badge-red.webp" alt=""><div><b>${esc(nm(c.top.uid))}</b><div class="small muted">${esc(c.k)} champion · ${c.top.balls.length} major${c.top.balls.length === 1 ? '' : 's'}</div></div></div>`).join('')}</div></div>` : ''}
     <div class="grid2 lg-mid">
-      ${members.length > 1 ? `<div class="panel"><h2>Head to Head</h2><table class="lgt hh"><thead><tr><th></th>${members.map((u) => `<th>${esc(nm(u))}</th>`).join('')}</tr></thead><tbody>${members.map((a) => `<tr><th class="l">${esc(nm(a))}</th>${members.map((b) => (a === b ? '<td class="muted">–</td>' : `<td>${hh[a][b][0]}–${hh[a][b][1]}</td>`)).join('')}</tr>`).join('')}</tbody></table><p class="small muted" style="margin:8px 0 0">Row player's record against the column player this season.</p></div>` : ''}
-      <div class="panel"><h2>Recent Ranked Matches</h2>${recent.length ? `<div class="list">${recent.map((r) => `<div class="item match"><img src="art/badge-champion.webp" alt="" class="mw"><div class="grow"><b>${esc(nm(r.w))}</b> beat ${esc(nm(r.l))}<div class="small muted">${esc(r.wd || 'deck')} vs ${esc(r.ld || 'deck')}${r.turns ? ` · ${r.turns} turns` : ''} · ${when(r.at)}</div></div></div>`).join('')}</div>` : '<p class="muted small">No ranked games yet.</p>'}</div>
+      ${members.length > 1 ? `<div class="panel"><h2>Head to Head</h2><table class="lgt hh"><thead><tr><th></th>${members.map((u) => `<th>${esc(nm(u))}</th>`).join('')}</tr></thead><tbody>${members.map((a) => `<tr><th class="l">${esc(nm(a))}</th>${members.map((b) => (a === b ? '<td class="muted">–</td>' : `<td>${hh[a][b][0]}–${hh[a][b][1]}</td>`)).join('')}</tr>`).join('')}</tbody></table><p class="small muted" style="margin:8px 0 0">Row player's record against the column player in major games this year.</p></div>` : ''}
+      <div class="panel"><h2>Recent Major Matches</h2>${recent.length ? `<div class="list">${recent.map((r) => `<div class="item match">${r.major ? ballImg(r.major, 'tiny won') : ''}<div class="grow"><b>${esc(nm(r.w))}</b> beat ${esc(nm(r.l))}<div class="small muted">${r.major ? esc(majorName(r.major)) + ' · ' : ''}${esc(r.wd || 'deck')} vs ${esc(r.ld || 'deck')}${r.turns ? ` · ${r.turns} turns` : ''} · ${when(r.at)}</div></div></div>`).join('')}</div>` : '<p class="muted small">No major games yet.</p>'}</div>
     </div>
-    ${all ? `<div class="panel"><h2>All-time</h2>${table(all.rows)}</div>` : ''}
     <div class="panel"><h2>League Activity</h2><div class="lglog">${(l.log || []).slice(-40).reverse().map((e) => `<div><span class="t">${when(e.at)}</span> ${esc(e.t)}</div>`).join('') || '<span class="muted small">Nothing yet.</span>'}</div></div>`;
+}
+/** One major's bracket: records, loss pips, the next match and the games so far. */
+function bracketHTML(l, s, def, m) {
+  const br = bracket(m, prevChampion(l, l.current, def.key));
+  const P = m.players || [];
+  const mine = br.next && (br.next.a === me() || br.next.b === me());
+  const players = P.map((u) => { const r = br.rec[u] || { w: 0, l: 0 }; const out = r.l >= 2 && !br.manualOnly; const champ = br.champion === u;
+    return `<div class="bk-p${out ? ' out' : ''}${champ ? ' champ' : ''}${u === me() ? ' me' : ''}"><span class="bk-name">${champ ? ballImg(def.key, 'tiny won') : ''}${esc(nm(u))}</span><span class="bk-rec">${r.w}–${r.l}</span><span class="bk-pips" title="${r.l} loss${r.l === 1 ? '' : 'es'}"><i class="${r.l >= 1 ? 'x' : ''}"></i><i class="${r.l >= 2 ? 'x' : ''}"></i></span><span class="bk-tag">${champ ? 'Champion' : out ? 'Eliminated' : br.bye === u && (m.games || []).length >= 3 ? 'Bye to the final' : ''}</span></div>`; }).join('');
+  const next = br.champion ? `<div class="bk-next done">${ballImg(def.key, 'won')}<div><span class="kicker">Champion</span><b class="bk-big">${esc(nm(br.champion))}</b><div class="small muted">wins the resplendent ${esc(def.name)} Poké Ball</div></div></div>`
+    : br.next ? `<div class="bk-next${mine ? ' mine' : ''}${br.next.final ? ' final' : ''}"><div><span class="kicker">${esc(br.next.label)}${br.next.final ? ' · winner takes the ball' : ''}</span><b class="bk-big">${esc(nm(br.next.a))} <span class="vs">VS</span> ${esc(nm(br.next.b))}</b>${mine ? '<div class="small">Your match: Create Table → Major match. The result goes into the bracket automatically.</div>' : ''}</div>${mine ? '<button class="pri" type="button" data-a="playMajor">Start this match</button>' : ''}</div>`
+    : br.needBye ? `<div class="bk-next"><div><span class="kicker">Everyone is 1–1</span><b>Waiting for ${esc(nm(l.commish))} to choose who gets the bye</b><div class="small muted">There's no previous major winner yet, so the commissioner picks.</div></div></div>`
+    : br.manualOnly ? `<div class="bk-next"><div><b>The bracket is built for three players.</b><div class="small muted">With ${P.length} players, the commissioner awards this major.</div></div></div>` : '';
+  const games = (m.games || []).map((g) => `<li><span class="bk-gl">${esc(g.label)}</span> <b>${esc(nm(g.w))}</b> beat ${esc(nm(g.a === g.w ? g.b : g.a))}${g.manual ? ' <span class="muted small">(entered by the commissioner)</span>' : ''}</li>`).join('');
+  return `<div class="panel bk ${def.key}"><div class="row"><h2 class="grow">${esc(def.name)}</h2><span class="pill">${m.status === 'live' ? 'Live' : 'Final'}</span></div>
+    <div class="bk-players">${players}</div>${next}
+    ${games ? `<ol class="bk-games">${games}</ol>` : '<p class="small muted" style="margin:10px 0 0">No games yet.</p>'}</div>`;
 }
 
 function filteredPool(s) {
@@ -778,9 +976,36 @@ function commishTab(l, s) {
         <div class="row"><input type="text" id="lmove" list="lnames" placeholder="Pokémon name" value="${esc(V.moveName)}" style="flex:1;min-width:140px"><datalist id="lnames">${allNames.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
         <select id="lmoveto"><option value="">→ Free agent</option>${l.members.map((u) => `<option value="${u}">→ ${esc(nm(u))}</option>`).join('')}</select><button class="sm" type="button" data-a="move">Move</button></div>
         ${V.moveName && s.own ? `<p class="small muted">${esc(V.moveName)} is ${s.own[V.moveName] ? 'owned by ' + esc(nm(s.own[V.moveName])) : 'a free agent'}.</p>` : ''}</div>
+      ${majorsAdmin(l, s)}
       <div class="panel"><h2>Seasons</h2><p class="small">Current: <b>${esc(l.current)}</b>. Seasons so far: ${seasonKeys(l).join(', ')}.</p>
         ${s.status === 'done' ? `<button type="button" data-a="nextSeason">Set up the next season</button><p class="small muted">Starts a fresh draft with empty rosters. Keepers are on by default; each player keeps one Pokémon from this season's roster.</p>` : '<p class="small muted">You can set up the next season once this draft is finished.</p>'}</div>
     </div></div>`;
+}
+
+function majorsAdmin(l, s) {
+  const lm = liveMajor(s);
+  const players = (s.order && s.order.length ? s.order : l.members).filter((u) => l.members.includes(u));
+  const opt = (sel) => players.map((u) => `<option value="${u}" ${u === sel ? 'selected' : ''}>${esc(nm(u))}</option>`).join('');
+  if (s.status !== 'done') return '<div class="panel"><h2>Majors</h2><p class="small muted">Majors start once the draft is finished.</p></div>';
+  if (lm) {
+    const br = bracket(lm.m, prevChampion(l, l.current, lm.def.key));
+    return `<div class="panel"><h2>${esc(lm.def.name)}</h2>
+      ${br.next ? `<p class="small">${esc(br.next.label)}: <b>${esc(nm(br.next.a))}</b> vs <b>${esc(nm(br.next.b))}</b>. Results from Major match tables are recorded automatically; enter one here if a game was played another way.</p>
+        <div class="row"><button type="button" data-result="${br.next.a}">${esc(nm(br.next.a))} won</button><button type="button" data-result="${br.next.b}">${esc(nm(br.next.b))} won</button></div>` : ''}
+      ${br.needBye ? `<p class="small">Everyone is 1–1. Choose who gets the bye into the final:</p><div class="row"><select id="lbye">${opt(null)}</select><button class="pri" type="button" data-a="setBye">Set bye</button></div>` : ''}
+      ${br.manualOnly ? `<p class="small">With ${players.length} players the bracket can't run; award the winner:</p><div class="row"><select id="laward">${opt(null)}</select><button class="pri" type="button" data-a="awardMajor">Award the ball</button></div>` : ''}
+      <div class="row" style="margin-top:10px"><button type="button" data-a="undoResult" ${(lm.m.games || []).length ? '' : 'disabled'}>Undo last result</button><button class="dng" type="button" data-a="cancelMajor">Reset this major</button></div></div>`;
+  }
+  const up = nextUpcoming(s);
+  if (!up) return `<div class="panel"><h2>Majors</h2><p class="small">All four ${esc(s.year)} majors are complete.${seasonDone(s) ? ' Set up the next season when you\'re ready.' : ''}</p></div>`;
+  const prev = prevChampion(l, l.current, up.key);
+  const sitOut = players.includes(prev) ? prev : players[2];
+  const first = players.filter((u) => u !== sitOut);
+  return `<div class="panel"><h2>Next up: ${esc(up.name)}</h2>
+    ${players.length === 3 ? `<p class="small muted">Game 1 is two players; the third waits for Game 2.${prev ? ` ${esc(nm(prev))} won the last major, so they wait by default.` : ''}</p>
+      <div class="row"><select id="lmaj-a">${opt(first[0])}</select><span class="vs">VS</span><select id="lmaj-b">${opt(first[1])}</select></div>`
+      : `<p class="small muted">The bracket is built for three players; with ${players.length}, you'll award the winner yourself.</p>`}
+    <div class="row" style="margin-top:10px"><button class="pri" type="button" data-a="startMajor" data-major="${up.key}">Start the ${esc(up.name)}</button></div></div>`;
 }
 
 /* ---------- the league rulebook (built from the live settings so it can't drift) ---------- */
@@ -817,7 +1042,7 @@ function rulesTab(l, s) {
   const sec = (icon, title, body) => `<section class="panel rule"><h2>${title}</h2>${body}</section>`;
   return `<div class="rulebook">
     <div class="rb-intro"><div class="frame-head"><h2>League Rules</h2></div>
-      <p>The ranked league runs one season per year: a draft, a season of ranked games, and a champion. ${esc(nm(l.commish))} is the commissioner. These rules come straight from how the site works, so they're always current.</p></div>
+      <p>The league runs one season per year: a draft, four Major Championships, and a champion. ${esc(nm(l.commish))} is the commissioner. These rules come straight from how the site works, so they're always current.</p></div>
     ${notes || comm ? `<section class="panel rule house"><h2>House Rules</h2>${notes ? `<div class="hr-text">${esc(notes).replace(/\n/g, '<br>')}</div>` : '<p class="muted small">No house rules yet.</p>'}
       ${comm ? `<details class="hr-edit"${notes ? '' : ' open'}><summary>Edit house rules (commissioner)</summary><textarea id="lhouse" maxlength="4000" rows="6" placeholder="Anything else the league has agreed on: trade deadlines, tiebreakers, bragging rights...">${esc(notes)}</textarea><div class="row" style="margin-top:8px"><button class="pri" type="button" data-a="saveHouse">Save house rules</button></div></details>` : ''}</section>` : ''}
     <div class="rb-grid">
@@ -834,7 +1059,7 @@ function rulesTab(l, s) {
       ${li(`<b>Colorless Pokémon are free for everyone:</b> Chansey, Snorlax, Dragonite, Wigglytuff and the rest.`)}
       ${li(`<b>Trainers and Energy are free for everyone.</b>`)}
       ${li(`Owning one version of a split card doesn't cover the other: Zapdos (Base Set) doesn't let you play Zapdos (Fossil).`)}
-      ${li(`Promo printings aren't allowed in ranked decks.`)}
+      ${li(`Promo printings aren't allowed in major-match decks.`)}
     </ul>`)}
     ${sec('', 'Keepers', `<ul>
       ${li(`Starting with the second season, each player may keep <b>one</b> Pokémon from last season's roster.`)}
@@ -849,12 +1074,15 @@ function rulesTab(l, s) {
       ${li(`After the draft, anything nobody drafted is a <b>free agent</b>: any player can claim it, first come first served.`)}
       ${li(`You can release a Pokémon back to the free agents after the draft.`)}
     </ul>`)}
-    ${sec('', 'Ranked Games & Standings', `<ul>
-      ${li(`Start one from the lobby: <b>Create Table → Ranked league game</b>. Only league players can sit, and the table runs the automated rules with the standard league rules below.`)}
-      ${li(`Each deck is checked against its player's roster before the game starts.`)}
-      ${li(`The winner is recorded automatically. A concession counts as a loss.`)}
-      ${li(`Standings rank by wins, then win percentage; players who haven't played yet sit below everyone who has. Rank badges only go to players with ranked games.`)}
-      ${li(`The season ends when the commissioner sets up the next one; whoever leads the standings then is the champion.`)}
+    ${sec('', 'Major Championships', `<div class="rb-balls">${MAJORS.map((d) => `<figure>${ballImg(d.key, 'won')}<figcaption>${esc(d.name)}</figcaption></figure>`).join('')}</div><ul>
+      ${li(`Four majors a year, in order: the <b>Winter Opener</b>, the <b>Spring Invitational</b>, the <b>Summer Championship</b> and the <b>Fall Classic</b>. The winner of each gets that tournament's resplendent Poké Ball.`)}
+      ${li(`Each major is double elimination: <b>two losses and you're out</b>.`)}
+      ${li(`Game 1: two players, while the third waits. Game 2: Game 1's loser plays the player who waited. Game 3: the two who haven't met yet.`)}
+      ${li(`When only two players are left, their next game is the <b>championship final</b>, and its winner takes the major.`)}
+      ${li(`If all three players are 1–1 after three games, the winner of the previous major gets a <b>bye into the final</b> and the other two play a semifinal for the other spot. (Before anyone has won a major, the commissioner chooses the bye.)`)}
+      ${li(`Major games are played at <b>Major match</b> tables (Create Table → Major match). Only the two players in the scheduled match can sit, each deck is checked against its player's roster, the table uses the standard league rules, and the winner goes into the bracket automatically. A concession counts as a loss.`)}
+      ${li(`The commissioner starts each major and can enter a result by hand, undo a result, or reset a major.`)}
+      ${li(`<b>League champion:</b> whoever wins the most majors in the year; total major-game wins break ties.`)}
     </ul>`)}
     ${sec('', 'Standard Game Rules', `<ul>
       ${li(`${R.deckSize || 60}-card decks, ${R.prizes || 6} prizes, ${R.handSize || 7}-card opening hand, bench of ${R.benchSize || 5}, up to ${R.maxCopies || 4} copies of a card (basic Energy unlimited).`)}
@@ -884,7 +1112,7 @@ function bind(main) {
   main.querySelectorAll('select[data-keeper]').forEach((el) => { el.onchange = () => A.setKeeper(el.dataset.keeper, el.value); });
   main.querySelectorAll('input[data-give],input[data-get]').forEach((el) => { el.onchange = () => { const set = el.dataset.give != null ? V.give : V.get; const n = el.dataset.give != null ? el.dataset.give : el.dataset.get; if (el.checked) set.add(n); else set.delete(n); rer(); }; });
   main.onclick = (e) => {
-    const t = e.target.closest('[data-tab],[data-a],[data-pick],[data-claim],[data-release],[data-trade],[data-remove],[data-up],[data-down],[data-ltype],[data-view]');
+    const t = e.target.closest('[data-tab],[data-a],[data-result],[data-pick],[data-claim],[data-release],[data-trade],[data-remove],[data-up],[data-down],[data-ltype],[data-view]');
     if (!t) return;
     if (t.tagName === 'A') e.preventDefault();
     const d = t.dataset;
@@ -894,6 +1122,7 @@ function bind(main) {
     if (d.claim) { A.claim(d.claim); return; }
     if (d.release) { PT.showModal('Release ' + d.release + '?', '<p>It becomes a free agent that anyone can claim.</p>', '<button class="dng" id="lok" type="button">Release</button>', (m) => { m.querySelector('#lok').onclick = () => { PT.closeModal(); A.release(d.release); }; }); return; }
     if (d.trade) { A.answerTrade(d.trade, d.how); return; }
+    if (d.result) { const lm = liveMajor(season()); if (lm) PT.showModal(`${nm(d.result)} won?`, `<p>Record <b>${esc(nm(d.result))}</b> as the winner of this ${esc(lm.def.name)} match.</p>`, '<button class="pri" id="lok" type="button">Record it</button>', (m) => { m.querySelector('#lok').onclick = () => { PT.closeModal(); A.recordResult(lm.def.key, d.result); }; }); return; }
     if (d.remove) { PT.showModal('Remove ' + nm(d.remove) + '?', '<p>Their Pokémon this season become free agents. Past results stay.</p>', '<button class="dng" id="lok" type="button">Remove</button>', (m) => { m.querySelector('#lok').onclick = () => { PT.closeModal(); A.removeMember(d.remove); }; }); return; }
     if (d.up) { A.moveOrder(d.up, -1); return; }
     if (d.down) { A.moveOrder(d.down, 1); return; }
@@ -907,6 +1136,12 @@ function bind(main) {
     else if (a === 'voteStop') A.voteStop();
     else if (a === 'endDraft') PT.showModal('End the draft now?', '<p>Everything not drafted becomes a free agent. You can reopen it later.</p>', '<button class="dng" id="lok" type="button">End draft</button>', (m) => { m.querySelector('#lok').onclick = () => { PT.closeModal(); A.endDraft(); }; });
     else if (a === 'reopenDraft') A.reopenDraft();
+    else if (a === 'startMajor') { const x = main.querySelector('#lmaj-a'), y = main.querySelector('#lmaj-b'); A.startMajor(t.dataset.major, x ? x.value : null, y ? y.value : null); }
+    else if (a === 'setBye') { const lm = liveMajor(season()); if (lm) A.setBye(lm.def.key, main.querySelector('#lbye').value); }
+    else if (a === 'awardMajor') { const lm = liveMajor(season()); if (lm) A.awardMajor(lm.def.key, main.querySelector('#laward').value); }
+    else if (a === 'undoResult') { const lm = liveMajor(season()) || (() => { const ss = season(); const d = [...MAJORS].reverse().find((x) => majorsOf(ss)[x.key] && (majorsOf(ss)[x.key].games || []).length); return d ? { def: d } : null; })(); if (lm) A.undoResult(lm.def.key); }
+    else if (a === 'cancelMajor') { const lm = liveMajor(season()); if (lm) PT.showModal(`Reset the ${lm.def.name}?`, '<p>All of its games come off the bracket and it goes back to "up next". Decks and rosters aren\'t affected.</p>', '<button class="dng" id="lok" type="button">Reset it</button>', (m) => { m.querySelector('#lok').onclick = () => { PT.closeModal(); A.cancelMajor(lm.def.key); }; }); }
+    else if (a === 'playMajor') { PT.go('lobby'); setTimeout(() => PT.newGame && PT.newGame('ranked'), 50); }
     else if (a === 'saveHouse') A.setHouseRules((main.querySelector('#lhouse') || {}).value || '');
     else if (a === 'nextSeason') PT.showModal('Set up the next season?', '<p>Rosters start empty for a new draft. Everyone can pick one keeper from this season first.</p>', '<button class="pri" id="lok" type="button">Set it up</button>', (m) => { m.querySelector('#lok').onclick = () => { PT.closeModal(); A.nextSeason(); }; });
     else if (a === 'move') { const n = (main.querySelector('#lmove').value || '').trim(); const to = main.querySelector('#lmoveto').value || null; pool(); const hit = POOL.find((x) => x.name.toLowerCase() === n.toLowerCase()); if (!hit) { PT.toast('Type a Pokémon name from the list'); return; } V.moveName = hit.name; A.move(hit.name, to); }

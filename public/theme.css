@@ -374,6 +374,65 @@ tr.lead .rankb{width:34px;height:34px}
 .testlg a{color:var(--gold-2)}
 .testtag{position:absolute;top:10px;left:10px;z-index:2;font:900 10px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;background:var(--fuchsia);color:#fff;padding:5px 8px;border-radius:6px}
 
+/* ---------- major championships ---------- */
+.ball{display:inline-block;height:auto;filter:drop-shadow(0 6px 12px rgba(0,0,0,.5))}
+.ball.dim{filter:grayscale(.85) brightness(.55) drop-shadow(0 4px 8px rgba(0,0,0,.4));opacity:.85}
+.ball.won{animation:ballglow 3.2s ease-in-out infinite}
+.ball.live{animation:ballpulse 1.6s ease-in-out infinite}
+.ball.tiny{width:22px;margin-right:2px;vertical-align:-6px;animation:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+@keyframes ballglow{50%{filter:drop-shadow(0 6px 12px rgba(0,0,0,.5)) drop-shadow(0 0 16px rgba(255,224,138,.65))}}
+@keyframes ballpulse{50%{transform:scale(1.05);filter:drop-shadow(0 0 18px rgba(255,255,255,.45))}}
+.mjrow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:0 auto 18px;max-width:1100px}
+.mj{position:relative;text-align:center;padding:16px 10px 14px;border-radius:18px;border:1px solid transparent;background:linear-gradient(180deg,#262e4c,#181e34) padding-box,linear-gradient(180deg,var(--mjc,rgba(190,200,230,.45)),rgba(58,66,104,.35)) border-box;box-shadow:0 12px 28px rgba(0,0,0,.38)}
+.mj.winter{--mjc:#9fdcff}.mj.spring{--mjc:#ffb8dc}.mj.summer{--mjc:#ffd36b}.mj.fall{--mjc:#ff9f55}
+.mj .ball{width:min(120px,70%)}
+.mj.won{background:radial-gradient(110% 70% at 50% 0%,color-mix(in srgb,var(--mjc) 22%,transparent),transparent 65%),linear-gradient(180deg,#2a2c4e,#1a1d36) padding-box,linear-gradient(180deg,var(--mjc),rgba(58,66,104,.35)) border-box;box-shadow:0 12px 30px rgba(0,0,0,.4),0 0 26px color-mix(in srgb,var(--mjc) 30%,transparent)}
+.mj.live{box-shadow:0 0 0 2px var(--mjc),0 0 26px color-mix(in srgb,var(--mjc) 40%,transparent),0 12px 28px rgba(0,0,0,.4)}
+.mj-name{font-family:var(--display);font-size:clamp(15px,1.5vw,19px);color:#fff;margin-top:6px}
+.mj-st{font-size:13px;color:#cfd5e6;margin-top:2px}.mj-st b{color:var(--gold-2)}
+@media (max-width:760px){.mjrow{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.bk{max-width:1100px;margin:0 auto 18px}
+.bk-players{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:12px}
+.bk-p{display:grid;grid-template-columns:1fr auto;grid-template-areas:"name rec" "pips tag";gap:4px 10px;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09)}
+.bk-p.me{border-color:rgba(111,168,255,.45)}
+.bk-p.out{opacity:.55}.bk-p.out .bk-name{text-decoration:line-through;text-decoration-color:rgba(255,100,100,.7)}
+.bk-p.champ{border-color:var(--gold);background:linear-gradient(90deg,rgba(255,200,61,.16),transparent);box-shadow:0 0 18px rgba(255,200,61,.2)}
+.bk-name{grid-area:name;font-weight:900;font-size:15px}
+.bk-rec{grid-area:rec;font-variant-numeric:tabular-nums;font-weight:800;color:#cfd5e6}
+.bk-pips{grid-area:pips;display:flex;gap:5px;align-items:center}
+.bk-pips i{width:12px;height:12px;border-radius:50%;border:2px solid rgba(255,255,255,.3)}
+.bk-pips i.x{background:#ff6464;border-color:#ff6464;box-shadow:0 0 6px rgba(255,100,100,.6)}
+.bk-tag{grid-area:tag;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-2);text-align:right}
+.bk-next{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:14px;padding:14px 18px;border-radius:14px;background:rgba(10,14,32,.55);border:1px solid var(--well-line)}
+.bk-next>div{flex:1;min-width:200px}
+.bk-next.mine{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 0 22px rgba(255,200,61,.25)}
+.bk-next.final{background:radial-gradient(120% 120% at 0% 0%,rgba(255,200,61,.16),transparent 60%),rgba(10,14,32,.55)}
+.bk-next.done .ball{width:92px}
+.bk-big{display:block;font-family:var(--display);font-weight:400;font-size:clamp(18px,2vw,24px);color:#fff;margin-top:2px}
+.bk-games{margin:12px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:14px;color:#dfe3f0}
+.bk-gl{display:inline-block;min-width:118px;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.balls{display:inline-flex;gap:2px;align-items:center}
+.cabinet{display:flex;flex-direction:column;gap:14px;margin-top:10px}
+.cab b{font-family:var(--display);font-weight:400;font-size:18px;color:#fff}
+.cab-balls{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px}
+.cab-balls figure,.rb-balls figure{margin:0;text-align:center;width:96px}
+.cab-balls .ball,.rb-balls .ball{width:72px}
+.cab-balls figcaption,.rb-balls figcaption{font-size:11px;font-weight:800;color:#cfd5e6;line-height:1.25;margin-top:4px}
+.rb-balls{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0 4px}
+.mj-shelf{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:14px 0 2px}
+.mj-mini{text-align:center;font-size:11px;font-weight:800;color:#cfd5e6}
+.mj-mini .ball{width:min(64px,90%)}
+.mj-mini span{display:block;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mj-mini.won span{color:var(--gold-2)}
+.lp-balls{display:inline-flex;gap:2px;flex:1;justify-content:flex-end;margin-right:8px}
+.reveal.major .rv-ball .ball{width:min(300px,60vw);animation:rvball 1s .2s cubic-bezier(.2,1.4,.35,1) both,ballglow 3s 1.2s ease-in-out infinite}
+@keyframes rvball{0%{opacity:0;transform:scale(.2) rotate(-200deg)}100%{opacity:1;transform:none}}
+.reveal.major.winter::before{background:repeating-conic-gradient(rgba(159,220,255,.18) 0 6deg,transparent 6deg 18deg)}
+.reveal.major.spring::before{background:repeating-conic-gradient(rgba(255,184,220,.18) 0 6deg,transparent 6deg 18deg)}
+.reveal.major.summer::before{background:repeating-conic-gradient(rgba(255,211,107,.2) 0 6deg,transparent 6deg 18deg)}
+.reveal.major.fall::before{background:repeating-conic-gradient(rgba(255,159,85,.18) 0 6deg,transparent 6deg 18deg)}
+@media (prefers-reduced-motion:reduce){.ball.won,.ball.live,.reveal.major .rv-ball .ball{animation:none}}
+
 /* ---------- the league rulebook ---------- */
 .rulebook{max-width:1200px;margin:0 auto}
 .rb-intro{text-align:center;margin-bottom:18px}
@@ -422,4 +481,10 @@ table.lgt tr.lead td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
   #hdr .who{gap:5px}
   #hdr .chip{white-space:normal;max-width:76px;text-align:center;font-size:12px;line-height:1.1;padding:3px 8px}
   #hdr .bugbtn{padding:4px}
+}
+@media (max-width:480px){
+  #hdr{gap:4px;padding-inline:6px}
+  #hdr nav button{padding:5px 6px;font-size:12px}
+  #hdr .who .dot{display:none}
+  #hdr .chip{max-width:62px;font-size:11px;padding:3px 6px}
 }
