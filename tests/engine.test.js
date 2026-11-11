@@ -311,7 +311,8 @@ test('Gym sets: stadiums, Blaine, Fortitude, Rebellion, Psylink, Swift, Transpar
   let g = setup({ a: { hand: ['gym1-115'], active: { c: 'gym1-40', en: [N['Fighting Energy'], N['Fighting Energy']] }, deck: [N['Bill']] }, b: { active: 'base1-1' /* Alakazam? no: use a Fighting-resistant Pokémon */, deck: [N['Bill']] } });
   assert.ok(true);
   // Narrow Gym: bench limited to 4
-  let n = setup({ a: { hand: ['gym1-124', N['Pikachu']], active: N['Chansey'], bench: [N['Pikachu'], N['Pikachu'], N['Pikachu'], N['Pikachu']], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  // (Stadiums are banned in the league; this table unbans them to test the card script)
+  let n = setup({ a: { hand: ['gym1-124', N['Pikachu']], active: N['Chansey'], bench: [N['Pikachu'], N['Pikachu'], N['Pikachu'], N['Pikachu']], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] }, rules: { banned: [] } });
   n = act(n, { type: 'playTrainer', card: n.p.a.hand[0].id });
   assert.ok(n.stadium && n.stadium.c === 'gym1-124', 'stadium in play');
   assert.ok(!has(legalActions(n, 'a', DB), 'playBasic'), 'bench capped at 4');
@@ -620,4 +621,11 @@ test("Rocket's Mewtwo's Juxtapose swaps damage counters and can Knock Out the De
   const miss = act(mk(), { type: 'attack', index: 0 }, { seed: TAILS });
   assert.equal(miss.p.a.active.dmg, 60);
   assert.equal(miss.p.b.active.dmg, 0);
+});
+
+test('Stadium cards are banned by default: they fail deck checks and cannot be played', () => {
+  const d = { cards: { 'gym1-124': 1, [N['Pikachu']]: 59 } };
+  assert.ok(validateDeck(d, {}, DB).some((x) => x.bad && /Narrow Gym is banned/.test(x.m)));
+  const g = setup({ a: { hand: ['gym1-124'], active: N['Chansey'], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  assert.throws(() => act(g, { type: 'playTrainer', card: g.p.a.hand[0].id }), /banned/);
 });

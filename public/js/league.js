@@ -1087,7 +1087,8 @@ function rulesTab(l, s) {
     ${sec('', 'Standard Game Rules', `<ul>
       ${li(`${R.deckSize || 60}-card decks, ${R.prizes || 6} prizes, ${R.handSize || 7}-card opening hand, bench of ${R.benchSize || 5}, up to ${R.maxCopies || 4} copies of a card (basic Energy unlimited).`)}
       ${li(`Weakness ${R.weaknessBonus ? `adds +${R.weaknessBonus} damage` : 'doubles damage'}; Resistance takes away ${R.resistanceAmount == null ? 20 : R.resistanceAmount}. Confusion self-damage is ${R.confusionSelfDamage == null ? 20 : R.confusionSelfDamage}.`)}
-      ${(R.banned || []).length ? li(`<b>Banned:</b> ${esc(R.banned.join(', '))}.`) : ''}
+      ${(() => { const stad = new Set(Object.values(PT.CARDS).filter((c) => c.st === 'Trainer' && c.sub === 'Stadium').map((c) => c.name)); const ban = R.banned || []; const allStad = stad.size && [...stad].every((n) => ban.includes(n)); const rest = ban.filter((n) => !(allStad && stad.has(n)));
+        return ban.length ? li(`<b>Banned:</b> ${allStad ? '<b>every Stadium card</b> (the Gym cards, Lucky Stadium and Pokémon Tower)' + (rest.length ? ', plus ' : '') : ''}${esc(rest.join(', '))}.`) : ''; })()}
       ${Object.keys(R.limits || {}).length ? li(`<b>Limited:</b> ${esc(Object.entries(R.limits).map(([k, v]) => `${k} (max ${v})`).join(', '))}.`) : ''}
     </ul>
     <h3>House rules built into every table</h3><ul class="tight">${house}</ul>`)}
