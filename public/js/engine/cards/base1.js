@@ -14,13 +14,13 @@ const tailsSelf = (n, self) => ({ effect: (ctx) => { ctx.damage(n); if (!ctx.fli
 const flipTimes = (per, flips) => ({ effect: (ctx) => { const h = ctx.flips(flips); ctx.log(`${h} heads`); if (h) ctx.damage(per * h); } });
 const preventNext = (kind) => ({ effect: (ctx, m) => { if (ctx.flip()) { ctx.addFx(m, { k: kind, until: T(ctx) + 1 }); ctx.log(`${nameOf(ctx.db, m.c)} is protected during the opponent's next turn`); } } });
 const discardTypeThen = (type, n, damage) => ({
-  canUse: ({ g, db, m }) => (g.rules.energyTextAnyType ? m.en.length >= n : m.en.filter((e) => energyTypesOf(db, e).includes(type)).length >= n) ? null : `Needs ${n} ${type} Energy to discard`,
+  canUse: ({ g, db, m }) => (g.rules.energyTextAnyType ? m.en.length >= n : m.en.filter((e) => energyIs(db, e, type, g.rules)).length >= n) ? null : `Needs ${n} ${type} Energy to discard`,
   effect: (ctx, m) => { ctx.requireDiscardEnergy(m, n, typeFilter(ctx, type)); ctx.damage(damage); },
 });
 const extraWater = (base, cost, cap) => ({ effect: (ctx, m) => { const extra = Math.min(cap, Math.max(0, countWater(ctx, m) - cost)); ctx.damage(base + 10 * extra); } });
 const oppSwitches = (n) => ({ effect: (ctx) => { ctx.damage(n); const op = ctx.opp; if (op.bench.length) { const k = ctx.chooseMon('Choose the Pokémon to switch in', op.bench, { seat: ctx.oppSeat, id: 'whirlwind' }); ctx.switchActive(ctx.oppSeat, k[0], 'Whirlwind'); } } });
 const selfDestruct = (n, bench) => ({ effect: (ctx, m) => { ctx.damage(n); ctx.benchDamage(ctx.oppSeat, bench); ctx.benchDamage(ctx.seat, bench); ctx.selfDamage(n); } });
-const recover = (type) => ({ canUse: ({ g, db, m }) => (g.rules.energyTextAnyType ? m.en.length : m.en.filter((e) => energyTypesOf(db, e).includes(type)).length) ? null : `Needs a ${type} Energy to discard`, effect: (ctx, m) => { ctx.requireDiscardEnergy(m, 1, typeFilter(ctx, type)); ctx.heal(m); } });
+const recover = (type) => ({ canUse: ({ g, db, m }) => (g.rules.energyTextAnyType ? m.en.length : m.en.filter((e) => energyIs(db, e, type, g.rules)).length) ? null : `Needs a ${type} Energy to discard`, effect: (ctx, m) => { ctx.requireDiscardEnergy(m, 1, typeFilter(ctx, type)); ctx.heal(m); } });
 const discardDefenderEnergy = (n) => ({ effect: (ctx) => { ctx.damage(n); const d = ctx.opp.active; if (d && d.en.length) { const k = ctx.chooseCards('Choose an Energy to discard from the Defending Pokémon', d.en, { id: 'discardTheirs' }); ctx.discardEnergy(d, d.en.filter((e) => k.includes(e.id))); } } });
 const ownPokemon = (ctx) => mons(ctx.me);
 const countersOn = (m) => m.dmg / 10;

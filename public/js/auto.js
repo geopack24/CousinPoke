@@ -362,12 +362,38 @@ async function revealPlayed(items, doc) {
 }
 
 /** Animate one move's events. A Confused attacker goes: ??? swirl, its confusion coin, then the attack (heads) or the self-hit (tails). */
+/* ---------- a Colossal Pokémon's attacks ----------
+   Its name and the attack's name slam onto the table, the giant rears up and lunges, and the table shakes when it lands. */
+const bossSpec = (doc, name) => { const c = C(doc.state.boss.cid); return ((c.boss && c.boss.attacks) || []).find((x) => x.name === name) || {}; };
+async function bossWindup(board, atk, doc) {
+  const a = bossSpec(doc, atk.name); const big = (a.cost || 0) >= 3 || (a.dmg || 0) >= 60;
+  sfx.play(big ? 'boss.roar' : 'boss.growl');
+  if (!board || !fxEnabled()) return;
+  const fig = board.querySelector('.bossfig'); if (fig) { const cls = big ? 'strike-big' : 'strike'; fig.classList.add(cls); setTimeout(() => fig.classList.remove(cls), 1600); }
+  const el = document.createElement('div'); el.className = `boss-call t-${atk.type || 'Colorless'}${big ? ' big' : ''}`; el.innerHTML = `<small>${esc(C(doc.state.boss.cid).name)}</small><b>${esc(atk.name)}</b>`;
+  board.appendChild(el); setTimeout(() => el.remove(), big ? 1750 : 1350);
+  await new Promise((r) => setTimeout(r, big ? 950 : 600));
+}
+function bossImpact(board, atk, events) {
+  const dmg = Math.max(0, ...events.filter((e) => e.t === 'damage' && !e.self).map((e) => e.amount)); if (!dmg) return;
+  sfx.play('boss.slam'); if (!board || !fxEnabled()) return;
+  const cls = dmg >= 60 ? 'quake-big' : 'quake'; board.classList.add(cls); setTimeout(() => board.classList.remove(cls), 650);
+  const f = document.createElement('div'); f.className = `boss-flash t-${atk.type || 'Colorless'}`; board.appendChild(f); setTimeout(() => f.remove(), 520);
+}
+/** The smaller beats of a boss fight: an Energy arriving, the giant charging up, a Knock Out added to its count. */
+function bossBeats(events) {
+  const board = boardEl(); if (!board) return; const flash = (el, cls, ms) => { if (el && fxEnabled()) { el.classList.add(cls); setTimeout(() => el.classList.remove(cls), ms); } };
+  if (events.some((e) => e.t === 'bossenergy')) { sfx.play('boss.energy'); const all = board.querySelectorAll('.bossbench .mon'); flash(all[all.length - 1], 'epop', 900); }
+  if (events.some((e) => e.t === 'bossrest')) { sfx.play('boss.charge', 200); flash(board.querySelector('.bossfig'), 'charging', 1300); }
+  if (events.some((e) => e.t === 'bossko')) flash(board.querySelector('.bosskos'), 'kpop', 900);
+}
 async function playEvents(events, doc, scene, opts = {}) {
   const b = boardEl(); const ghosts = placeGhosts(scene);
   setTimeout(() => { for (const el of Object.values(ghosts)) if (el.isConnected) el.remove(); }, 8000); // safety net
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const rect = (id) => (scene && scene.rects && scene.rects[id]) || rectOf(id);
   setTimeout(() => animateDraws(events, doc), 20);
+  if (doc.state && doc.state.boss) setTimeout(() => bossBeats(events), 60);
   const atk = events.find((e) => e.t === 'attack');
   const confFlip = atk ? events.find((e) => e.t === 'flip' && e.label === 'confusion') : null;
   const flips = events.filter((e) => e.t === 'flip' && e !== confFlip && !isCheck(e));
@@ -394,9 +420,12 @@ async function playEvents(events, doc, scene, opts = {}) {
   }
   if (flips.length && !opts.coinsDone) { PT.toast(flips.map((e) => (e.heads ? 'Heads' : 'Tails')).join(', ')); const fb = boardEl(); if (fb) await wait(Math.round(playCoins(fb, flips.map((e) => e.heads)) * 0.7)); }
   let impact = 0; const board = boardEl();
-  if (atk && scene && board) { scene.fromEl = board.querySelector(`[data-mon="${atk.attacker}"]`); impact = playAttack(board, scene).impact; }
+  const bossAtk = !!(atk && doc.state && doc.state.boss && atk.attacker === doc.state.boss.id);
+  if (bossAtk) await bossWindup(board, atk, doc);
+  if (atk && scene && board) { scene.fromEl = board.querySelector(`[data-mon="${atk.attacker}"]`); if (bossAtk) scene.boost = 1.5; impact = playAttack(board, scene).impact; }
   else if (atk) { const el = board && board.querySelector(`[data-mon="${atk.attacker}"]`); if (el) { el.classList.add('lunge'); setTimeout(() => el.classList.remove('lunge'), 500); } }
   await wait(impact);
+  if (bossAtk) bossImpact(boardEl(), atk, events);
   landHits();
 }
 
@@ -572,6 +601,7 @@ function bossSideHTML(g, seat, compact, SC) {
   const nextHTML = !m ? '' : nx.atk
     ? `<b>${esc(nx.atk.name)}</b>${nx.atk.dmg ? `<span class="bn-d">${nx.atk.flips ? nx.atk.dmg + rage + '×' : nx.atk.dmg + rage}</span>` : ''}<span class="bn-e" title="Energy it has / Energy this attack uses up">⚡ ${nx.have} / ${nx.cost}</span><span class="bn-t">${esc(nx.card.t || '')}</span>`
     : `<b>Gathering strength</b><span class="bn-t">No attack ${turnNow ? 'this' : 'on its next'} turn.</span>`;
+  const jabHTML = m && nx.atk && !coming && nx.jab ? `<span class="bn-j">${turnNow ? 'This turn' : 'Until then'}: <b>${esc(nx.jab.atk.name)}</b> ${nx.jab.atk.flips ? nx.jab.atk.dmg + rage + '×' : (nx.jab.atk.dmg || 0) + rage}${nx.jab.atk.bench ? ` · ${nx.jab.atk.bench} to your Bench` : ''}</span>` : '';
   const pips = Array.from({ length: b.r.kos }, (_, i) => `<i class="${i < b.kos ? 'on' : ''}"></i>`).join('');
   const ticks = [1, 2, 3, 4, 5].map((i) => `<s class="${i <= b.given ? 'got' : ''}" style="left:${(100 - i / 6 * 100).toFixed(2)}%"></s>`).join('');
   const traits = [def.armor ? [`🛡 Armor ${def.armor}`, `Takes ${def.armor} less damage from each attack. Hits on a weak point ignore it.`] : null,
@@ -586,7 +616,7 @@ function bossSideHTML(g, seat, compact, SC) {
     <div class="pname"><span>${esc(g.seats[seat].name)}</span>${turnNow ? '<span class="chip">Its turn</span>' : ''}${g.winner === seat ? '<span class="chip">Winner</span>' : ''}</div>
     <div class="bossbench" title="It gains Energy every turn and its attacks use it up. Each Energy is a target on its Bench: Knock it Out or discard it to hold its attacks back."><span class="k">Energy ${p.bench.length} / ${nx.max}</span><div class="bp-row">${slots}</div></div>
     <div class="bossfield">
-      <div class="bossleft">${m ? `<div class="bossnext${coming ? '' : ' rest'}"><span class="k">${!nx.atk || coming ? (turnNow ? 'This turn' : 'Next turn') : 'Charging'}</span>${nextHTML}</div>` : ''}</div>
+      <div class="bossleft">${m ? `<div class="bossnext${coming ? '' : ' rest'}"><span class="k">${!nx.atk || coming ? (turnNow ? 'This turn' : 'Next turn') : 'Charging'}</span>${nextHTML}${jabHTML}</div>` : ''}</div>
       <div class="bossmid"><div class="bossfig" data-active-slot="${seat}">${fig}</div>
         <div class="bosshp"><div class="bossbar ${frac <= .25 ? 'crit' : frac <= .5 ? 'hurt' : ''}" title="Each mark is a Prize for you."><i style="width:${(frac * 100).toFixed(1)}%"></i>${ticks}</div><div class="bosshpn"><b>${left}</b> / ${hp} HP</div></div></div>
       <div class="bossright"><div class="bosskos" title="It wins when it has Knocked Out ${b.r.kos} of your Pokémon."><span class="k">Knock Outs</span><span class="pips">${pips}</span><b>${b.kos} / ${b.r.kos}</b></div>

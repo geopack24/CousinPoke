@@ -46,13 +46,15 @@ Arena → Start a run. Make 40 picks, each 1 of 3 cards or a basic Energy instea
 
 A Trainer whose text needs a Pokémon "with X in its name" (Brock's Training Method, Koga, The Boss's Way…) is only offered once the deck has a matching Pokémon. Every draftable card has a rarity tier (Common, Uncommon, Rare, Epic, Legendary). Each slot rolls a tier by its weight first, then a random card from that tier, so a tier's size never changes how often it comes up. Rare, Epic and Legendary cards glow blue, purple and orange when they are dealt, with a sound for each. A finished run pays Cousin Tokens by wins (`ARENA_REWARDS`: 0, 15, 30, 50, 75, 100, 150, 250), shown by opening a prize chest; a 7-win run also unlocks a gold holographic version of a random Pokémon the player doesn't have in gold yet. The balance and gold cards live in the player's `arena` document (`tokens`, `gold`). The tiers and weights come from a spreadsheet: `python tools/arena_tiers.py "Arena rarity tiers.xlsx"` rewrites `public/js/arena-tiers.js`.
 
+Boss attacks are announced on the table: the attack's name slams in, the giant rears up and lunges, and the table shakes when it lands (`bossWindup` / `bossImpact` in `public/js/auto.js`, sounds `boss.*` in `sfx.js`).
+
 ### Colossal Pokémon (the Arena's bosses)
 
 Each Arena game is against one Colossal Pokémon: a single giant with a large HP pool in seat B, no deck, hand or Prizes. `public/js/engine/boss.js` builds the game (`newBossGame`) and the boss cards; the rules live in `engine.js` behind `g.boss`.
 
 - **Reward.** After each win the player is shown 3 cards (`makeSwapOffer`) and may swap one into the deck in place of a pick of the same size: a single card for a single card, an evolution line for a line of the same length. A size the deck has none of is never offered, and what leaves the deck is gone for good.
 - **Winning and losing.** Knock it Out to win. It wins when it has Knocked Out 6 of your Pokémon (Clefairy Doll and Mysterious Fossil don't count). You take a Prize for each sixth of its HP you knock off.
-- **Energy.** It starts with none and gains 1 at the start of each of its turns (up to 5). Each attack has an Energy cost, all of which is used up. It works through its attack pattern in order: when it can pay for the next attack it uses it, otherwise it spends the turn charging. The table shows what is coming and how much Energy it has for it.
+- **Energy.** It starts with none and gains 1 at the start of each of its turns (up to 5). Each attack has an Energy cost, all of which is used up. It works through its attack pattern in order: when it can pay for the next attack it uses it. An attack that costs 0 is its basic attack, which it uses on every turn it is still charging, so it attacks every turn (a boss without one rests while it charges). The table shows what is coming and how much Energy it has for it.
 - **Its Energy is on its Bench.** Each Energy is a Bench target with 20 HP and is also attached to the boss as an Energy card. Knock one Out (attacks that hit the Bench) or discard one (Energy Removal, attacks that discard Energy) and it is gone, which holds the boss's attacks back. No Prize for it.
 - **Its attacks** get past Pokémon Powers that prevent damage (Invisible Wall).
 - **No Weakness or Resistance.** Neither counts in a boss fight, for your Pokémon or the boss.
@@ -60,7 +62,7 @@ Each Arena game is against one Colossal Pokémon: a single giant with a large HP
 - **Limits.** No single move takes more than 150 off it. Super Fang, Life Drain and Destiny Bond do a fixed 40 instead.
 - **Traits.** A boss may have armor (less damage from each attack), strike back (damage to whatever hits it) and an enrage bonus at half HP.
 
-The bosses, their attacks and the shared settings come from a spreadsheet: `python tools/arena_bosses.py "Arena bosses.xlsx"` rewrites `public/js/arena-bosses.js`. Left out of the draft: Trainers that do nothing against a boss (Sleep!, Pokémon Flute…) or that have the opponent draw cards (Erika, Blaine's Quizzes, Misty's Duel, Sabrina's Gaze), and Mr. Mime, Clefable (with its Clefairy) and Sabrina's Jynx, which are too strong against one huge Pokémon. A card effect that gives the opponent a Prize (Electrode's Buzzap) counts as a Knock Out for the boss.
+The bosses, their attacks and the shared settings come from a spreadsheet: `python tools/arena_bosses.py "Arena bosses.xlsx"` rewrites `public/js/arena-bosses.js`. Left out of the draft: Trainers that do nothing against a boss (Sleep!, Pokémon Flute…) or that have the opponent draw cards (Erika, Blaine's Quizzes, Misty's Duel, Sabrina's Gaze), Trainers that hinge on the opponent's choice (Challenge!, Lt. Surge's Treaty, Misty's Wish), and Mr. Mime, Jynx, Sabrina's Jynx, Sabrina's Hypno and Clefable (with its Clefairy), which are too strong against one huge Pokémon. A card effect that gives the opponent a Prize (Electrode's Buzzap) counts as a Knock Out for the boss.
 
 ## Ranked league
 

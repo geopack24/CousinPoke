@@ -64,6 +64,12 @@ const FX = {
   draw: (t) => noise(t, { dur: 0.09, type: 'highpass', f: 3200, to: 1400, g: 0.1, a: 0.004 }),
   win: (t) => arp(t, [523, 659, 784, 1047, 784, 1047, 1319], 0.11, { type: 'square', g: 0.14 }),
   // Arena draft: cards flip in; a chime for a Rare, a rising shimmer for an Epic, a full fanfare for a Legendary; a thunk when you take one
+  // Colossal Pokémon: a growl before a small attack, a roar before a big one, the slam when it lands, an Energy arriving, charging up
+  'boss.growl': (t) => { tone(t, { type: 'sawtooth', f: 95, to: 58, dur: 0.38, g: 0.2, a: 0.02 }); noise(t, { dur: 0.36, type: 'lowpass', f: 380, to: 160, g: 0.16, a: 0.03 }); },
+  'boss.roar': (t) => { tone(t, { type: 'sawtooth', f: 120, to: 44, dur: 0.85, g: 0.26, a: 0.05 }); tone(t + 0.04, { type: 'square', f: 61, to: 38, dur: 0.8, g: 0.12, a: 0.06 }); noise(t, { dur: 0.85, type: 'lowpass', f: 700, to: 180, g: 0.22, a: 0.08 }); },
+  'boss.slam': (t) => { noise(t, { dur: 0.34, type: 'lowpass', f: 320, to: 60, g: 0.55, a: 0.003 }); tone(t, { type: 'sine', f: 84, to: 30, dur: 0.42, g: 0.45 }); },
+  'boss.energy': (t) => { tone(t, { type: 'sine', f: 440, to: 880, dur: 0.18, g: 0.12, a: 0.005 }); tone(t + 0.12, { type: 'triangle', f: 1320, dur: 0.14, g: 0.07, a: 0.004 }); },
+  'boss.charge': (t) => { tone(t, { type: 'sine', f: 110, to: 330, dur: 0.9, g: 0.1, a: 0.1 }); tone(t, { type: 'triangle', f: 220, to: 660, dur: 0.9, g: 0.05, a: 0.1 }); },
   'arena.deal': (t) => { for (let i = 0; i < 3; i++) noise(t + i * 0.11, { dur: 0.1, type: 'highpass', f: 2600, to: 1200, g: 0.09, a: 0.004 }); },
   'arena.rare': (t) => { for (const [dt, f] of [[0, 784], [0.09, 1175]]) { tone(t + dt, { type: 'sine', f, dur: 0.6, g: 0.16, a: 0.004, hold: 0.05 }); tone(t + dt, { type: 'sine', f: f * 2, dur: 0.3, g: 0.04, a: 0.004, hold: 0.05 }); } },
   'arena.epic': (t) => {

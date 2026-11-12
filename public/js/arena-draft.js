@@ -22,7 +22,9 @@ const NOT_IN_DRAFT = new Set(['Rainbow Energy', 'Bill',
   // cards that have the opponent draw cards: a Colossal Pokémon has no deck or hand
   'Erika', "Blaine's Quiz #1", "Blaine's Quiz #2", "Blaine's Quiz #3", "Misty's Duel", "Sabrina's Gaze",
   // Pokémon George took out as too strong against one huge Pokémon (Clefable takes its Clefairy with it)
-  'Mr. Mime', 'Clefable', "Sabrina's Jynx"]);
+  'Mr. Mime', 'Clefable', "Sabrina's Jynx", 'Jynx', "Sabrina's Hypno", // (the last two: damage for every damage counter on the Defending Pokémon)
+  // Trainers that hinge on the opponent's choice, which a boss can't sensibly make
+  'Challenge!', "Lt. Surge's Treaty", "Misty's Wish"]);
 
 /** Card signature: reprints (same name, HP, attacks, powers) count as one card. */
 const sig = (c) => JSON.stringify([c.name, c.hp, c.sub, (c.atk || []).map((a) => [a.n, a.d, (a.c || []).length]), c.pw ? c.pw.n : null]);

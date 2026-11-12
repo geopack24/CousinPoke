@@ -139,8 +139,16 @@ def main():
     out.append('];')
     (ROOT / 'public' / 'js' / 'arena-bosses.js').write_text('\n'.join(out) + '\n', encoding='utf-8', newline='')
     for b in bosses:
-        cyc = sum(max(1, b['attacks'][k - 1]['cost']) if k else 1 for k in b['pattern']); dmg = sum(b['attacks'][k - 1]['dmg'] * (b['attacks'][k - 1].get('flips', 2) / 2 if b['attacks'][k - 1].get('flips') else 1) for k in b['pattern'] if k)
-        print(f"{b['n']}. Colossal {b['name']:<10} {b['hp']:>4} HP   {len(b['attacks'])} attacks   one round of its pattern takes {cyc} turns, about {dmg / cyc:.0f} damage a turn")
+        hit = lambda a: a['dmg'] * (a['flips'] / 2 if a.get('flips') else 1)
+        free = [a for a in b['attacks'] if a['cost'] == 0]; jab = max(free, key=hit) if free else None
+        en = rules['energyStart']; step = 0; total = 0; turns = 120
+        for _ in range(turns):
+            en = min(rules['energyMax'], en + rules['energyPerTurn']); k = b['pattern'][step % len(b['pattern'])]
+            if not k: step += 1; continue
+            a = b['attacks'][k - 1]
+            if en >= a['cost']: total += hit(a); en -= a['cost']; step += 1
+            elif jab: total += hit(jab)
+        print(f"{b['n']}. Colossal {b['name']:<10} {b['hp']:>4} HP   {len(b['attacks'])} attacks{'' if jab else ' (no basic attack: it rests while charging)'}   about {total / turns:.0f} damage a turn")
     print(f"wrote public/js/arena-bosses.js ({len(bosses)} bosses)")
 
 main()

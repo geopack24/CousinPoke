@@ -35,7 +35,7 @@ export function colossalText(b, r = BOSS_RULES) {
   const out = [`Knock it Out to win. It wins when it has Knocked Out ${r.kos} of your Pokémon.`];
   if (!r.wr) out.push(`Weakness and Resistance don't count in this fight, for either side.`);
   out.push(`Each time it loses a sixth of its HP you take a Prize.`);
-  out.push(`Energy: it starts with ${rule(r, 'energyStart', 0) || 'none'} and gains ${rule(r, 'energyPerTurn', 1)} at the start of each of its turns (up to ${rule(r, 'energyMax', 5)}). Its Energy sits on its Bench with ${rule(r, 'energyHP', 20)} HP each, and each attack uses up its Energy cost. Destroy or discard its Energy to hold its attacks back.`);
+  out.push(`Energy: it starts with ${rule(r, 'energyStart', 0) || 'none'} and gains ${rule(r, 'energyPerTurn', 1)} at the start of each of its turns (up to ${rule(r, 'energyMax', 5)}). Its Energy sits on its Bench with ${rule(r, 'energyHP', 20)} HP each, and each attack uses up its Energy cost. While it is charging it uses its basic attack, which costs nothing. Destroy or discard its Energy to hold its big attacks back.`);
   if (lasts.length) out.push(`${lasts.join(', ')}: wears off after ${[...new Set(Object.values(r.conditions).filter(Boolean))].join(' or ')} of its turns.`);
   if (never.length) out.push(`It can't be ${never.join(' or ')}, moved, copied, or stopped from attacking.`);
   if (b.armor) out.push(`Armor: takes ${b.armor} less damage from each attack.`);
@@ -54,7 +54,7 @@ export function bossCards(db) {
     const all = Object.values(db); const ec = all.find((c) => c.st === 'Energy' && c.set === 'base1' && c.name === type + ' Energy') || all.find((c) => c.st === 'Energy' && c.name === 'Double Colorless Energy') || {};
     db[bossId(b.n)] = {
       id: bossId(b.n), set: 'boss', art, name: 'Colossal ' + b.name, st: 'Pokémon', sub: 'Basic', hp: b.hp, types: [type], part: partId(b.n),
-      atk: b.attacks.map((a) => ({ n: a.name, c: Array(costOf(a)).fill('Colorless'), d: dmgLabel(a), t: `Uses up ${costOf(a)} Energy. ${attackText(a)}`.trim() })), pw: [{ n: 'Colossal', t: colossalText(b) }],
+      atk: b.attacks.map((a) => ({ n: a.name, c: Array(costOf(a)).fill('Colorless'), d: dmgLabel(a), t: `${costOf(a) ? `Uses up ${costOf(a)} Energy.` : 'Costs no Energy: it uses this on every turn it is still charging.'} ${attackText(a)}`.trim() })), pw: [{ n: 'Colossal', t: colossalText(b) }],
       wk: BOSS_RULES.wr && b.wk ? [b.wk] : null, rs: BOSS_RULES.wr && b.rs ? [b.rs] : null, rc: 0, rar: 'Colossal', boss: b,
     };
     db[partId(b.n)] = { id: partId(b.n), set: 'boss', art: { set: ec.set, i: ec.i }, name: `Colossal ${b.name}'s Energy`, st: 'Pokémon', sub: 'Basic', hp: rule(BOSS_RULES, 'energyHP', 20), types: ['Colorless'], atk: [], pw: null, wk: null, rs: null, rc: 0, rar: 'Colossal', bossPart: b.n, en: ec.id,
@@ -104,7 +104,11 @@ export function nextBossAttack(g, db) {
   if (!g.boss) return null; const b = db[g.boss.cid].boss; const idx = (b.pattern[g.boss.step % b.pattern.length] || 0) - 1; // 0 in the pattern is a turn it sits out
   const atk = idx >= 0 ? b.attacks[idx] : null; const have = g.p[g.boss.seat].bench.length; const cost = atk ? costOf(atk) : 0;
   const max = rule(g.boss.r, 'energyMax', 5); const gain = rule(g.boss.r, 'energyPerTurn', 1);
-  return { idx, atk, card: idx >= 0 ? db[g.boss.cid].atk[idx] : null, have, cost, max, ready: have >= cost, soon: Math.min(max, have + gain) >= cost };
+  // its basic attack: the strongest one that costs no Energy. It uses it on every turn it is still charging, so it never sits idle.
+  let ji = -1; b.attacks.forEach((a, i) => { if (costOf(a) === 0 && (ji < 0 || (a.dmg || 0) > (b.attacks[ji].dmg || 0))) ji = i; });
+  const ready = !!atk && have >= cost;
+  return { idx, atk, card: idx >= 0 ? db[g.boss.cid].atk[idx] : null, have, cost, max, ready, soon: !!atk && Math.min(max, have + gain) >= cost,
+    jab: ji >= 0 && ji !== idx ? { idx: ji, atk: b.attacks[ji], card: db[g.boss.cid].atk[ji] } : null, use: atk ? (ready ? idx : ji) : -1 };
 }
 
 /* ---------- its Energy ----------

@@ -19,6 +19,7 @@ export const DEFAULT_RULES = {
   anyVersionEvolves: true,     // an Evolution card may go on any version of its species (Blaine's Charmeleon on a plain Charmander)
   askEveryChoice: true,        // the player makes every choice, even when there's only one option (nothing is picked automatically)
   basicEnergyAnyType: true,    // any basic Energy card counts as any type for card text (search, attach, discard, move, count); Colorless doesn't
+  specialEnergyAnyType: true,  // an attached Double Colorless, Full Heal or Potion Energy counts as one Energy card of any type for card text ("discard a Fire Energy", "for each Fire Energy attached")
   energyPickup: true,          // instead of attaching an Energy this turn, you may take a basic Energy off one of your Pokémon back to hand
   dceCountsAsWater: true,      // Hydro Pump / Water Gun bonus: an attached Double Colorless counts as 2 Water
   dceNoReturn: true,           // an attached Double Colorless never returns to hand: effects that would return it discard it instead

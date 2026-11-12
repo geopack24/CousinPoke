@@ -323,7 +323,7 @@ export function playAttack(boardEl, scene) {
   const res = resolveFx(scene);
   if (!isEnabled() || !boardEl || !scene.from || !scene.targets.length) { sfx.attack(res.key, scene.type, { impact: 300 }); return { impact: 300, done: 600 }; }
   const fx = layerFor(boardEl); scene.boardEl = boardEl; scene.board = { w: fx.w, h: fx.h };
-  SZ = fx.sz = Math.max(0.9, Math.min(2.4, (scene.targets[0].w || 100) / 62)); // effects scale with the card size on screen
+  SZ = fx.sz = Math.min(3.4, Math.max(0.9, Math.min(2.4, (scene.targets[0].w || 100) / 62)) * (scene.boost || 1)); // effects scale with the card size on screen (a Colossal Pokémon's are bigger)
   const anim = res.fn;
   // wind-up: the attacker card jiggles
   if (scene.fromEl) { scene.fromEl.classList.add('windup'); setTimeout(() => scene.fromEl.classList.remove('windup'), 450); }

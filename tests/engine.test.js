@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { newGame } from '../public/js/engine/state.js';
-import { apply, legalActions, canPay, energyUnits } from '../public/js/engine/engine.js';
+import { apply, legalActions, canPay, energyUnits, energyIs as energyIsFor } from '../public/js/engine/engine.js';
 import { mulberry32 } from '../public/js/engine/rng.js';
 import { validateDeck } from '../public/js/engine/rules.js';
 import { automationReport } from '../public/js/engine/cards/index.js';
@@ -480,7 +480,9 @@ test('house rule: Double Colorless counts as 2 Water for Hydro Pump', () => {
   let g = act(mk({}), { type: 'attack', index: 0 });
   assert.equal(g.p.b.active.dmg, 60, '3 Water + DCE (2 Water) = 5: two over the cost, +20');
   g = act(mk({ dceCountsAsWater: false }), { type: 'attack', index: 0 });
-  assert.equal(g.p.b.active.dmg, 40, 'without the rule the DCE adds nothing');
+  assert.equal(g.p.b.active.dmg, 50, 'without that rule an attached DCE is one Energy card of any type, so one Water');
+  g = act(mk({ dceCountsAsWater: false, specialEnergyAnyType: false }), { type: 'attack', index: 0 });
+  assert.equal(g.p.b.active.dmg, 40, 'with both rules off the DCE adds nothing');
 });
 
 
@@ -725,11 +727,32 @@ test("Arena: a Trainer that needs \"X's\" Pokémon is only offered once the deck
   assert.equal(canOffer(DB, byName("The Boss's Way"), addPick(DB, {}, dark.key, DEFAULT_RULES), DEFAULT_RULES), true);
 });
 
+test('house rule: any Energy card pays a "discard a Fire Energy" cost, Double Colorless, Full Heal and Potion Energy included', () => {
+  const charmeleon = N['Charmeleon']; const flame = DB[charmeleon].atk.findIndex((x) => x.n === 'Flamethrower');
+  const special = { dce: N['Double Colorless Energy'], heal: cardId('Full Heal Energy', 'base5'), potion: cardId('Potion Energy', 'base5') };
+  for (const en of [[special.dce, special.dce], [N['Fighting Energy'], N['Fighting Energy'], N['Water Energy']], [special.heal, special.potion, special.dce]]) {
+    const g = setup({ a: { active: { c: charmeleon, en }, deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+    assert.ok(has(legalActions(g, 'a', DB), 'attack', { index: flame }), 'Flamethrower can be used');
+    const s2 = actAuto(g, { type: 'attack', index: flame }); assert.equal(active(s2, 'b').dmg, 50); assert.equal(active(s2, 'a').en.length, en.length - 1);
+  }
+  // with the two house rules off it is the printed rule again
+  const strict = setup({ a: { active: { c: charmeleon, en: [special.dce, special.dce] } }, b: { active: N['Chansey'] }, rules: { specialEnergyAnyType: false, basicEnergyAnyType: false } });
+  assert.ok(!has(legalActions(strict, 'a', DB), 'attack', { index: flame }));
+  // Dark Charizard's Continuous Fireball: one coin for each Energy card attached, a Double Colorless counting as one
+  const dz = cardId('Dark Charizard', 'base5'); const cf = DB[dz].atk.findIndex((x) => x.n === 'Continuous Fireball');
+  const g2 = setup({ a: { active: { c: dz, en: [special.dce, N['Fire Energy'], N['Grass Energy']] }, deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
+  const r2 = apply(g2, { type: 'attack', index: cf, seat: 'a', seed: 3, answers: [] }, DB);
+  assert.equal(r2.events.filter((e) => e.t === 'flip').length, 3);
+  // fetching Energy is unchanged: a Double Colorless in the discard pile is still not a Fire Energy
+  assert.ok(!energyIsFor(DB, { id: 'zz', c: special.dce }, 'Fire'));
+});
+
 /* ---------- Colossal Pokémon (the Arena's bosses) ---------- */
 // two bosses of the tests' own, so the tests don't depend on what the spreadsheet says
 const cardId = (name, set) => DATA.cards.find((c) => c.name === name && c.set === set).id;
 const TB = [
   { n: 98, name: 'Testzilla', card: N['Raticate'], hp: 300, type: 'Colorless', wk: 'Fighting', rs: '', armor: 0, thorns: 0, enrage: 0, pattern: [1, 2], attacks: [{ name: 'Stomp', cost: 1, dmg: 30 }, { name: 'Roar', cost: 2, dmg: 20, bench: 10, effect: 'PSN' }] },
+  { n: 97, name: 'Testjab', card: N['Raticate'], hp: 300, type: 'Colorless', wk: '', rs: '', armor: 0, thorns: 0, enrage: 0, pattern: [2], attacks: [{ name: 'Jab', cost: 0, dmg: 10 }, { name: 'Blast', cost: 3, dmg: 50 }] },
   { n: 99, name: 'Testodon', card: N['Onix'], hp: 200, type: 'Fighting', wk: '', rs: '', armor: 10, thorns: 10, enrage: 20, pattern: [1], attacks: [{ name: 'Smash', cost: 1, dmg: 40 }] },
 ];
 BOSSES.push(...TB); bossCards(DB); for (const b of TB) CARD_SCRIPTS[bossId(b.n)] = bossScript(b); BOSSES.length -= TB.length;
@@ -846,6 +869,19 @@ test('Colossal Pokémon: Super Fang, Ditto, Metronome, Hurricane and Invisible W
   g = actAuto(g, { type: 'usePower', pokemon: g.p.a.bench[0].id, power: 'Buzzap' }); assert.equal(g.boss.kos, 1); assert.ok(!g.pending.some((t) => t.seat === 'b'));
   g = bossGame(98, { active: N['Chansey'] }, { maxHit: 150 });
   g = act(g, { type: 'override', op: 'damage', target: g.boss.id, delta: 290 }); assert.equal(bossMon(g).dmg, 150, 'no more than the cap at once');
+});
+
+test('Colossal Pokémon: a basic attack that costs no Energy is used on every turn it is still charging', () => {
+  let g = bossGame(97, { active: N['Chansey'] });
+  assert.deepEqual([nextBossAttack(g, DB).atk.name, nextBossAttack(g, DB).jab.atk.name], ['Blast', 'Jab']);
+  g = act(g, { type: 'endTurn' });
+  assert.deepEqual(legalActions(g, 'b', DB).filter((a) => a.type === 'attack').map((a) => a.name), ['Jab'], '1 Energy: not enough for Blast, so it jabs');
+  g = bossTurn(g); assert.equal(active(g, 'a').dmg, 10); assert.equal(g.p.b.bench.length, 1, 'the jab used no Energy'); assert.equal(g.boss.step, 0);
+  g = act(g, { type: 'endTurn' }); g = bossTurn(g); assert.equal(active(g, 'a').dmg, 20); assert.equal(g.p.b.bench.length, 2);
+  g = act(g, { type: 'endTurn' });
+  assert.deepEqual(legalActions(g, 'b', DB).filter((a) => a.type === 'attack').map((a) => a.name), ['Blast'], '3 Energy: Blast');
+  g = bossTurn(g); assert.equal(active(g, 'a').dmg, 70); assert.equal(g.p.b.bench.length, 0); assert.equal(g.boss.step, 1);
+  g = act(g, { type: 'endTurn' }); g = bossTurn(g); assert.equal(active(g, 'a').dmg, 80, 'and back to jabbing while it charges again');
 });
 
 test('Colossal Pokémon: armor, striking back and enraging', () => {

@@ -38,12 +38,18 @@ export function energyTypesOf(db, card) {
   return ['Colorless'];
 }
 let CUR_RULES = null; // rules of the game being worked on (set by the engine's entry points) for energyIs
-/** Does this Energy card (an instance or a card) count as `type` for card text? Under the house rule any basic Energy
- *  counts as any type except Colorless; special Energy only counts as what it provides. */
+/** Does this Energy card (an instance or a card) count as `type` for card text? Under the house rules any basic Energy
+ *  counts as any type except Colorless, and so does a special Energy (Double Colorless, Full Heal, Potion Energy) while
+ *  it is attached to a Pokémon: it pays "discard a Fire Energy" and counts as one Fire Energy card, but a search of
+ *  the deck or discard pile for Fire Energy still doesn't find it. */
+let CUR_G = null; // the game being worked on, so energyIs can tell an attached Energy from one in a hand, deck or discard pile
+const isAttached = (x) => !!(CUR_G && x && x.id && allMons(CUR_G).some((m) => m.en.some((e) => e.id === x.id)));
 export function energyIs(db, x, type, rules) {
   if (!x) return false; const card = x.c && db ? db[x.c] : x; if (!card || card.st !== 'Energy') return false;
   if ((x.c && db ? energyTypesOf(db, x) : []).includes(type) || new RegExp('^' + type + ' Energy$').test(card.name)) return true;
-  return !!(R(rules || CUR_RULES).basicEnergyAnyType && card.sub === 'Basic' && type !== 'Colorless');
+  const r = R(rules || CUR_RULES); if (type === 'Colorless') return false;
+  if (r.basicEnergyAnyType && card.sub === 'Basic') return true;
+  return !!(r.specialEnergyAnyType && card.sub !== 'Basic' && isAttached(x));
 }
 export function setRulesContext(rules) { CUR_RULES = rules || null; }
 export function energyUnits(db, m) { return m.en.reduce((n, e) => n + energyTypesOf(db, e).length, 0); }
@@ -148,6 +154,7 @@ export function retreatBlocked(g, db, seat) {
   return !!(ps && ps.blockRetreat && powersActive(g, db) && !o.st.length);
 }
 export function canAttack(g, seat, idx, db, srcCid) {
+  CUR_G = g;
   const r = R(g.rules); const p = P(g, seat); const m = p.active; if (!m) return { ok: false, why: 'No Active Pokémon' };
   if (!myTurn(g, seat)) return { ok: false, why: 'Not your turn' };
   if (g.attacked) return { ok: false, why: 'Already attacked this turn' };
@@ -157,7 +164,7 @@ export function canAttack(g, seat, idx, db, srcCid) {
   if (m.st.includes('SLP')) return { ok: false, why: 'Asleep' };
   if (m.st.includes('PAR')) return { ok: false, why: 'Paralyzed' };
   const c = srcCid ? db[srcCid] : effectiveCard(g, db, m); const atk = (c.atk || [])[idx]; if (!atk) return { ok: false, why: 'No such attack' };
-  if (isBoss(g, m)) { const nb = nextBossAttack(g, db); if (nb.idx !== idx) return { ok: false, why: 'Not its next attack' }; if (!nb.ready) return { ok: false, why: 'Not enough Energy' }; }
+  if (isBoss(g, m)) { const nb = nextBossAttack(g, db); if (nb.use !== idx) return { ok: false, why: nb.idx === idx ? 'Not enough Energy' : 'Not its next attack' }; }
   if (!canPay(db, g.rules, m, atk.c)) return { ok: false, why: 'Not enough energy' };
   if (!isBoss(g, m) && fxOf(m, 'noAttack').some((f) => f.attack === atk.n || !f.attack)) return { ok: false, why: `Can't use ${atk.n} this turn` };
   if (m.flags['used:' + atk.n] && attackScript(c.id, atk.n) && attackScript(c.id, atk.n).oncePerLife) return { ok: false, why: 'Already used' };
@@ -168,7 +175,7 @@ export function canAttack(g, seat, idx, db, srcCid) {
 
 /** Everything `seat` may do right now, as action templates. */
 export function legalActions(g, seat, db) {
-  setRulesContext(g.rules);
+  setRulesContext(g.rules); CUR_G = g;
   const out = []; const r = R(g.rules); const p = P(g, seat); const op = P(g, other(seat));
   if (g.winner) return out;
   if (g.pending.length) {
@@ -238,7 +245,7 @@ export function legalActions(g, seat, db) {
 /* ---------- the action runner ---------- */
 export function apply(state, action, db) {
   setRulesContext(state && state.rules);
-  const g = clone(state); const rng = mulberry32((action.seed || 1) >>> 0);
+  const g = clone(state); CUR_G = g; const rng = mulberry32((action.seed || 1) >>> 0);
   const events = []; let ai = 0; const answers = action.answers || [];
   const seat = action.seat;
   const ctx = makeCtx(g, db, rng, events, seat, () => (ai < answers.length ? answers[ai++] : undefined), action);
@@ -494,7 +501,7 @@ function runAction(ctx, a) {
       const chk = canAttack(g, seat, a.index, db, a.src); must(chk.ok, chk.why);
       const m = p.active; const ec = a.src ? db[a.src] : effectiveCard(g, db, m); const atk = ec.atk[a.index]; ctx.attacker = m; ctx.defender = ctx.opp.active; ctx.attackName = atk.n; ctx.attackCard = ec.id;
       ctx.log(`${isBoss(g, m) ? nameOf(db, m.c) : ctx.name(seat) + "'s " + nameOf(db, m.c)} used ${atk.n}`); ctx.event({ t: 'attack', attacker: m.id, name: atk.n, type: typeOf(g, db, m) });
-      g.attacked = true; g.lastAttack = { seat, attacker: m.id, name: atk.n, turn: g.turnNo }; if (isBoss(g, m)) { g.boss.step++; bossSpend(ctx, (db[m.c].boss.attacks[a.index] || {}).cost == null ? 1 : db[m.c].boss.attacks[a.index].cost); }
+      g.attacked = true; g.lastAttack = { seat, attacker: m.id, name: atk.n, turn: g.turnNo }; if (isBoss(g, m)) { const nb = nextBossAttack(g, db); if (nb.ready && nb.idx === a.index) { g.boss.step++; bossSpend(ctx, nb.cost); } } // its basic attack uses nothing and leaves the pattern where it is
       let proceed = true;
       if (m.st.includes('CNF')) { if (!ctx.flip('confusion')) { ctx.event({ t: 'confused', attacker: m.id }); ctx.log(`${nameOf(db, m.c)} is Confused and hurt itself`); dealDamage(ctx, m, R(g.rules).confusionSelfDamage, { noWR: true, self: true }); proceed = false; } }
       if (proceed && ctx.defender && db[ctx.defender.c] && db[ctx.defender.c].sub === 'Baby' && !ctx.copying) { if (!ctx.flip('Baby Rule')) { ctx.log(`Baby Rule: tails, the attack on ${nameOf(db, ctx.defender.c)} does nothing`); proceed = false; } }
