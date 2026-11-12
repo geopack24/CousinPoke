@@ -615,6 +615,21 @@ test('an Asleep Pokémon on the bench still gets its wake-up flip between turns 
   assert.deepEqual(still.p.a.bench[0].st, ['SLP']);
 });
 
+test('a Poisoned Pokémon on the bench keeps taking poison damage, and can be Knocked Out by it (conditions stay on the bench)', () => {
+  const g = setup({ a: { active: N['Pikachu'], bench: [{ c: N['Squirtle'], st: ['PSN'] }], deck: [N['Bill'], N['Bill']] }, b: { active: N['Machop'], deck: [N['Bill'], N['Bill']] }, rules: { conditionsPersist: true } });
+  const s1 = act(g, { type: 'endTurn' });
+  assert.equal(s1.p.a.bench[0].dmg, 10);
+  assert.ok(s1.log.some((l) => /benched Squirtle takes 10 poison damage/.test(l.m)));
+  // nearly out: the next tick knocks it out on the bench and the opponent takes a prize
+  const g2 = setup({ a: { active: N['Pikachu'], bench: [{ c: N['Squirtle'], st: ['PSN'], dmg: 30 }], deck: [N['Bill'], N['Bill']] }, b: { active: N['Machop'], deck: [N['Bill'], N['Bill']] }, rules: { conditionsPersist: true } });
+  const s2 = act(g2, { type: 'endTurn' });
+  assert.equal(s2.p.a.bench.length, 0, 'the benched Squirtle was Knocked Out');
+  assert.ok(s2.pending.some((t) => t.t === 'prize' && t.seat === 'b'));
+  // with the house rule off, the bench is left alone
+  const g3 = setup({ a: { active: N['Pikachu'], bench: [{ c: N['Squirtle'], st: ['PSN'] }], deck: [N['Bill'], N['Bill']] }, b: { active: N['Machop'], deck: [N['Bill'], N['Bill']] }, rules: { conditionsPersist: false } });
+  assert.equal(act(g3, { type: 'endTurn' }).p.a.bench[0].dmg, 0);
+});
+
 test("Rocket's Mewtwo's Juxtapose swaps damage counters and can Knock Out the Defending Pokémon", () => {
   const RM = DATA.cards.find((c) => c.name === "Rocket's Mewtwo").id;
   const mk = () => setup({ a: { active: { c: RM, dmg: 60, en: [N['Psychic Energy']] }, deck: [N['Bill'], N['Bill']] }, b: { active: N['Machop'], bench: [N['Machop']], deck: [N['Bill'], N['Bill']] } });

@@ -591,15 +591,18 @@ function endTurn(ctx) {
     m.st = m.st.filter((x) => x !== 'PAR');
   }
   { const p = P(g, seat); if (p.setAside && p.setAsideUntil === T) { p.hand.push(...p.setAside); p.setAside = null; ctx.log(`${ctx.name(seat)} gets the set-aside cards back`); } }
-  // between turns: poison, sleep checks (Active only)
+  // between turns: poison, burn and sleep checks for each Active (the bench follows, under the house rule)
   for (const s of ['a', 'b']) {
     const m = P(g, s).active; if (!m) continue;
     if (m.st.includes('PSN')) { const n = m.flags.toxic ? 20 : 10; m.dmg += n; ctx.log(`${ctx.name(s)}'s ${nameOf(db, m.c)} takes ${n} poison damage (now ${m.dmg})`); ctx.event({ t: 'damage', target: m.id, amount: n, poison: true }); }
     if (m.st.includes('BRN')) { if (!ctx.flip('burn', { seat: s, mon: m.id, name: nameOf(db, m.c) })) { m.dmg += 20; ctx.log(`${ctx.name(s)}'s ${nameOf(db, m.c)} takes 20 burn damage (now ${m.dmg})`); ctx.event({ t: 'damage', target: m.id, amount: 20, burn: true }); } else ctx.log(`${nameOf(db, m.c)} shrugs off the burn this time`); }
     if (m.st.includes('SLP')) { if (ctx.flip('sleep', { seat: s, mon: m.id, name: nameOf(db, m.c) })) { m.st = m.st.filter((x) => x !== 'SLP'); ctx.log(`${ctx.name(s)}'s ${nameOf(db, m.c)} woke up`); } else ctx.log(`${ctx.name(s)}'s ${nameOf(db, m.c)} is still Asleep`); }
   }
-  // conditions stay on the bench under the house rule, so an Asleep benched Pokémon still gets its wake-up flip
+  // conditions stay on the bench under the house rule, so a benched Pokémon keeps taking poison and burn damage
+  // and an Asleep one still gets its wake-up flip
   if (r.conditionsPersist) for (const s of ['a', 'b']) for (const m of P(g, s).bench) {
+    if (m.st.includes('PSN')) { const n = m.flags.toxic ? 20 : 10; m.dmg += n; ctx.log(`${ctx.name(s)}'s benched ${nameOf(db, m.c)} takes ${n} poison damage (now ${m.dmg})`); ctx.event({ t: 'damage', target: m.id, amount: n, poison: true }); }
+    if (m.st.includes('BRN')) { if (!ctx.flip('burn', { seat: s, mon: m.id, name: nameOf(db, m.c) })) { m.dmg += 20; ctx.log(`${ctx.name(s)}'s benched ${nameOf(db, m.c)} takes 20 burn damage (now ${m.dmg})`); ctx.event({ t: 'damage', target: m.id, amount: 20, burn: true }); } else ctx.log(`Benched ${nameOf(db, m.c)} shrugs off the burn this time`); }
     if (!m.st.includes('SLP')) continue;
     if (ctx.flip('sleep', { seat: s, mon: m.id, name: nameOf(db, m.c) })) { m.st = m.st.filter((x) => x !== 'SLP'); ctx.log(`${ctx.name(s)}'s benched ${nameOf(db, m.c)} woke up`); } else ctx.log(`${ctx.name(s)}'s benched ${nameOf(db, m.c)} is still Asleep`);
   }

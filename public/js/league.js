@@ -1023,7 +1023,7 @@ const HOUSE_FLAGS = [
   ['charizardDoubleDiscard', 'Charizard\'s Fire Spin may discard one Double Colorless instead of 2 cards'],
   ['noAttackAfterRetreat', 'No attacking on a turn you retreat'],
   ['unlimitedTrainers', 'No limit on Trainer cards per turn'],
-  ['conditionsPersist', 'Special Conditions stay on a Pokémon when it goes to the bench (benched sleepers still flip to wake up)'],
+  ['conditionsPersist', 'Special Conditions stay on a Pokémon when it goes to the bench, and keep working there: Poison and Burn still do their damage, and benched sleepers still flip to wake up'],
   ['conditionsStack', 'Asleep, Confused and Paralyzed stack instead of replacing each other'],
   ['deckOutDamage', 'Running out of cards doesn\'t lose: your Active takes 10 damage each turn instead'],
   ['mulliganRescue', 'House mulligan: your opponent may mulligan too (no extra draw); a second miss draws one card at a time (up to 5, opponent draws as many); 5 misses loses'],

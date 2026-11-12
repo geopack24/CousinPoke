@@ -8,7 +8,7 @@ export const DEFAULT_RULES = {
   colorlessCosts: true,        // any energy pays any attack cost
   noAttackAfterRetreat: true,  // retreating ends your chance to attack this turn
   unlimitedTrainers: true,     // informational
-  conditionsPersist: true,     // special conditions stay when a Pokémon is benched
+  conditionsPersist: true,     // special conditions stay when a Pokémon is benched, and keep working there (poison/burn damage, wake-up flips)
   deckOutDamage: true,         // empty deck: 10 damage to your Active each turn instead of losing
   multiEvolve: true,           // a Pokémon may evolve more than once per turn
   confusedRetreatFlip: true,   // confused Pokémon flip to retreat (tails: self damage)

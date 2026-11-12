@@ -788,7 +788,7 @@ function rulesForm(r,prefix='r'){
     <label class="chk"><input type="checkbox" id="${prefix}-colorlessCosts" ${r.colorlessCosts?'checked':''}>Energy types don't matter: any energy pays any attack cost</label>
     <label class="chk"><input type="checkbox" id="${prefix}-noAttackAfterRetreat" ${r.noAttackAfterRetreat?'checked':''}>No attacking on the turn you retreat</label>
     <label class="chk"><input type="checkbox" id="${prefix}-unlimitedTrainers" ${r.unlimitedTrainers?'checked':''}>No limit on Trainer cards per turn</label>
-    <label class="chk"><input type="checkbox" id="${prefix}-conditionsPersist" ${r.conditionsPersist?'checked':''}>Special conditions stay on a Pokémon when it is benched</label>
+    <label class="chk"><input type="checkbox" id="${prefix}-conditionsPersist" ${r.conditionsPersist?'checked':''}>Special conditions stay on a Pokémon when it is benched (Poison and Burn keep doing damage there)</label>
     <label class="chk"><input type="checkbox" id="${prefix}-deckOutDamage" ${r.deckOutDamage?'checked':''}>Running out of cards doesn't lose: take 10 damage on your Active each turn instead</label>
     <label class="chk"><input type="checkbox" id="${prefix}-multiEvolve" ${r.multiEvolve?'checked':''}>A Pokémon may evolve more than once in the same turn</label>
     <label class="chk"><input type="checkbox" id="${prefix}-conditionsStack" ${r.conditionsStack?'checked':''}>Asleep, Confused and Paralyzed stack instead of replacing each other</label>
