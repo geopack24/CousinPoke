@@ -1,4 +1,4 @@
-// Arena draft: pick 1 of 3 until you have 38 cards; every deck also gets 4 Bills, and 18 basic Energy fill it to 60.
+// Arena draft: 41 picks, each 1 of 3 cards or a basic Energy instead; every deck also gets 4 Bills and 15 basic Energy (60 in all).
 // Every card has a rarity tier (arena-tiers.js, from the spreadsheet); rarer tiers are offered less often.
 // Only the top of each evolution line is offered; drafting an evolved Pokémon brings 2 copies of every card in its line.
 // Pure functions (no page state) so the page, the tests and the simulator share them.
@@ -7,7 +7,9 @@ import { R } from './engine/rules.js';
 import { baseSpecies } from './engine/engine.js';
 import { TIERS, TIER_WEIGHTS } from './arena-tiers.js';
 
-export const ARENA = { picksTo: 38, bills: 4, energy: 18, wins: 7, losses: 3, lineCopies: 2 };
+export const ARENA = { picksTo: 41, bills: 4, energy: 15, wins: 7, losses: 3, lineCopies: 2 };
+/** The pick key for "take a basic Energy instead of one of the three cards". */
+export const ENERGY_PICK = 'energy';
 /** Prize for a finished run, by wins: Cousin Tokens (index = wins). A perfect run also wins a gold card. */
 export const ARENA_REWARDS = [0, 15, 30, 50, 75, 100, 150, 250];
 const SETS = ['base1', 'base2', 'base3', 'base5', 'gym1', 'gym2']; // no promos
@@ -80,7 +82,7 @@ export function makeOffer(db, seed, round, cards, rules) {
   const mons = pool.filter((e) => e.kind === 'line' || e.kind === 'basic');
   const left = ARENA.picksTo - draftedCount(cards); const basics = basicsIn(cards, db);
   const needMons = basics < 8 && left <= (8 - basics) * 3;
-  // steer toward roughly 24 Pokémon and 14 Trainers (plus the 4 Bills): the more Pokémon cards drafted, the fewer Pokémon offered
+  // steer toward roughly 24 Pokémon, the rest Trainers and any Energy taken (plus the 4 Bills): the more Pokémon cards drafted, the fewer Pokémon offered
   const drafted = draftedCount(cards); const monCards = drafted - trainerCards(cards, db);
   const pMon = drafted ? Math.max(0.15, Math.min(0.85, 0.5 + (24 / ARENA.picksTo - monCards / drafted) * 2.5)) : 0.6;
   const out = []; const used = new Set();
@@ -116,7 +118,7 @@ export function addPick(db, cards, key, rules) {
 }
 
 /** Split the 18 basic Energy between the types the drafted Pokémon use (by the coloured symbols in their attack costs). */
-export function energySplit(db, cards) {
+export function energySplit(db, cards, total = ARENA.energy) {
   const w = {};
   for (const [cid, k] of Object.entries(cards || {})) {
     const c = db[cid]; if (!c || c.st !== 'Pokémon') continue;
@@ -127,13 +129,20 @@ export function energySplit(db, cards) {
   if (!types.length) types = [['Fighting', 1]];
   const tot = types.reduce((a, [, v]) => a + v, 0);
   const out = {}; let given = 0;
-  for (const [t, v] of types) { out[t] = Math.floor((ARENA.energy * v) / tot); given += out[t]; }
-  for (let i = 0; given < ARENA.energy; i++, given++) out[types[i % types.length][0]]++;
+  for (const [t, v] of types) { out[t] = Math.floor((total * v) / tot); given += out[t]; }
+  for (let i = 0; given < total; i++, given++) out[types[i % types.length][0]]++;
   for (const t of Object.keys(out)) if (!out[t]) delete out[t];
   return out;
 }
 /** The basic Energy card id for a type (Base Set printing). */
 export function energyId(db, type) { const c = Object.values(db).find((x) => x.st === 'Energy' && x.sub === 'Basic' && x.name === type + ' Energy' && x.set === 'base1') || Object.values(db).find((x) => x.st === 'Energy' && x.sub === 'Basic' && x.name === type + ' Energy'); return c && c.id; }
+/** How many basic Energy have been drafted on top of the ones every deck is given. */
+export function energyTaken(db, cards) { let n = 0; for (const [cid, k] of Object.entries(cards || {})) { const c = db[cid]; if (c && c.st === 'Energy' && c.sub === 'Basic') n += k; } return n; }
+/** Take a basic Energy as this pick: one more of the type the deck's Pokémon use most. */
+export function addEnergyPick(db, cards) {
+  if (draftedCount(cards) >= ARENA.picksTo) throw new Error('The draft is over');
+  const id = energyId(db, Object.keys(energySplit(db, cards))[0]); const out = { ...(cards || {}) }; out[id] = (out[id] || 0) + 1; return out;
+}
 /** Bill (Base Set): 4 come with every Arena deck. */
 export function billId(db) { const c = Object.values(db).find((x) => x.name === 'Bill' && x.set === 'base1') || Object.values(db).find((x) => x.name === 'Bill'); return c && c.id; }
 /** The finished 60-card deck: drafted cards, the 4 Bills, and the Energy (pass {} as `split` for the deck without Energy yet). */
@@ -161,6 +170,7 @@ export function botDraft(db, seed, skill, rules) {
   const rng = mulberry32((seed ^ 0x5bd1e995) >>> 0); let cards = {}; let round = 0;
   while (draftedCount(cards) < ARENA.picksTo && round < 80) {
     const offer = makeOffer(db, seed, round, cards, rules); if (!offer.length) break;
+    if (energyTaken(db, cards) < 4 && draftedCount(cards) >= 6 && rng() < 0.2) { cards = addEnergyPick(db, cards); round++; continue; }
     const es = offer.map((k) => poolEntry(db, k, rules));
     const pick = rng() < skill ? es.slice().sort((a, b) => pickValue(db, b, cards) - pickValue(db, a, cards))[0] : es[Math.floor(rng() * es.length)];
     cards = addPick(db, cards, pick.key, rules); round++;

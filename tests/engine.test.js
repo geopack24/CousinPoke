@@ -6,7 +6,7 @@ import { apply, legalActions, canPay, energyUnits } from '../public/js/engine/en
 import { mulberry32 } from '../public/js/engine/rng.js';
 import { validateDeck } from '../public/js/engine/rules.js';
 import { automationReport } from '../public/js/engine/cards/index.js';
-import { arenaPool, botDraft, ARENA, ARENA_REWARDS, goldPool, pickGold, makeOffer, tierOf } from '../public/js/arena-draft.js';
+import { arenaPool, botDraft, ARENA, ARENA_REWARDS, goldPool, pickGold, makeOffer, tierOf, addEnergyPick, energyTaken, draftedCount, finalDeck } from '../public/js/arena-draft.js';
 import { TIER_WEIGHTS } from '../public/js/arena-tiers.js';
 import { DEFAULT_RULES } from '../public/js/engine/rules.js';
 
@@ -673,4 +673,15 @@ test('Arena tiers come up as often as their weights say, whatever the size of th
   for (let seed = 1; seed <= 3000; seed++) for (const k of makeOffer(DB, seed * 97, 0, {}, DEFAULT_RULES)) { seen[tierOf(k)]++; n++; }
   const total = Object.values(TIER_WEIGHTS).reduce((a, b) => a + b, 0);
   for (const t of Object.keys(seen)) assert.ok(Math.abs(seen[t] / n - TIER_WEIGHTS[t] / total) < 0.02, `${t}: ${(seen[t] / n).toFixed(3)} vs ${(TIER_WEIGHTS[t] / total).toFixed(3)}`);
+});
+
+test('Arena: a basic Energy can be taken instead of a card, and an all-Energy draft still makes a 60-card deck', () => {
+  let cards = {};
+  cards = addEnergyPick(DB, cards);
+  assert.equal(energyTaken(DB, cards), 1); assert.equal(draftedCount(cards), 1);
+  while (draftedCount(cards) < ARENA.picksTo) cards = addEnergyPick(DB, cards);
+  assert.throws(() => addEnergyPick(DB, cards), /over/);
+  const deck = finalDeck(DB, cards);
+  assert.equal(Object.values(deck).reduce((a, b) => a + b, 0), 60);
+  assert.equal(energyTaken(DB, deck), ARENA.picksTo + ARENA.energy);
 });

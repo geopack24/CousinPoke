@@ -1,7 +1,7 @@
 // The Arena: single-player runs. Draft a deck 1-of-3, then play the computer until 7 wins or 3 losses.
 // One document per player (arena/<pid>) holds the current run and the player's record; the page syncs everyone's
 // documents for the leaderboard. Arena games are ordinary auto-rules tables with the computer in seat B.
-import { ARENA, ARENA_REWARDS, arenaPool, makeOffer, poolEntry, addPick, draftedCount, basicsIn, energySplit, finalDeck, botDraft, OPPONENTS, oppSkill, tierOf, goldPool, pickGold } from './arena-draft.js';
+import { ARENA, ARENA_REWARDS, ENERGY_PICK, addEnergyPick, energyTaken, arenaPool, makeOffer, poolEntry, addPick, draftedCount, basicsIn, energySplit, finalDeck, botDraft, OPPONENTS, oppSkill, tierOf, goldPool, pickGold } from './arena-draft.js';
 import { TIER_NAMES } from './arena-tiers.js';
 import { BOT_UID } from './bot.js';
 import { play as sfx } from './sfx.js';
@@ -56,8 +56,9 @@ const A = {
   start: () => mutate((d) => { if (d.run && d.run.status !== 'done') throw new Error('You already have a run going'); d.run = { id: rid(), seed: (Math.random() * 2 ** 31) >>> 0, status: 'draft', round: 0, cards: {}, picks: [], wins: 0, losses: 0, games: [], gameId: null, startedAt: Date.now() }; }),
   pick: (key) => mutate((d) => {
     const r = d.run; if (!r || r.status !== 'draft') throw new Error('The draft is over');
-    const offer = makeOffer(PT.CARDS, r.seed, r.round, r.cards, rules()); if (!offer.includes(key)) throw new Error('That card is no longer on offer');
-    r.cards = addPick(PT.CARDS, r.cards, key, rules()); r.picks.push(key); r.round++;
+    if (key === ENERGY_PICK) r.cards = addEnergyPick(PT.CARDS, r.cards);
+    else { const offer = makeOffer(PT.CARDS, r.seed, r.round, r.cards, rules()); if (!offer.includes(key)) throw new Error('That card is no longer on offer'); r.cards = addPick(PT.CARDS, r.cards, key, rules()); }
+    r.picks.push(key); r.round++;
     if (draftedCount(r.cards) >= ARENA.picksTo || !makeOffer(PT.CARDS, r.seed, r.round, r.cards, rules()).length) { r.status = 'play'; r.energy = energySplit(PT.CARDS, r.cards); }
   }),
   retire: () => mutate((d) => { if (!d.run || d.run.status === 'done') return false; finishRun(d, true); }),
@@ -227,11 +228,11 @@ function recordHTML(r) {
 const KIND_ORDER = { Basic: 0, Baby: 0, 'Stage 1': 1, 'Stage 2': 2 };
 function sortKey(cid) { const c = C(cid); const g = c.st === 'Pokémon' ? 0 : c.st === 'Trainer' ? 1 : 2; return [g, c.st === 'Pokémon' ? (KIND_ORDER[c.sub] ?? 0) : 0, c.name]; }
 function cmpKey(a, b) { const x = sortKey(a), y = sortKey(b); for (let i = 0; i < x.length; i++) { if (x[i] < y[i]) return -1; if (x[i] > y[i]) return 1; } return 0; }
-function curveHTML(cards) {
-  const cols = [['Basic', 0], ['Stage 1', 0], ['Stage 2', 0], ['Trainer', 0], ['Sp. Energy', 0]];
+function curveHTML(cards, baseEnergy) {
+  const cols = [['Basic', 0], ['Stage 1', 0], ['Stage 2', 0], ['Trainer', 0], ['Energy', baseEnergy || 0]];
   for (const [cid, k] of Object.entries(cards || {})) {
-    const c = C(cid); const i = c.st === 'Pokémon' ? (c.sub === 'Stage 2' ? 2 : c.sub === 'Stage 1' ? 1 : 0) : c.st === 'Trainer' ? 3 : c.sub === 'Basic' ? -1 : 4;
-    if (i >= 0) cols[i][1] += k;
+    const c = C(cid); const i = c.st === 'Pokémon' ? (c.sub === 'Stage 2' ? 2 : c.sub === 'Stage 1' ? 1 : 0) : c.st === 'Trainer' ? 3 : 4;
+    cols[i][1] += k;
   }
   const max = Math.max(4, ...cols.map((x) => x[1]));
   return `<div class="ar-curve" aria-label="Deck makeup">${cols.map(([l, n]) => `<div class="ar-cbar"><b>${n}</b><div><i style="height:${Math.round((n / max) * 100)}%"></i></div><span>${l}</span></div>`).join('')}</div>`;
@@ -248,10 +249,11 @@ function tilesHTML(cards, energy, fresh) {
 }
 function deckPanel(r, title, energy) {
   const n = draftedCount(r.cards); const basics = basicsIn(r.cards, PT.CARDS);
-  const lastE = !energy && r.picks.length && V.offer && V.offer.first ? poolEntry(PT.CARDS, r.picks[r.picks.length - 1], rules()) : null;
+  const baseEn = energy ? Object.values(energy).reduce((a, b) => a + b, 0) : ARENA.energy; const extra = energyTaken(PT.CARDS, r.cards);
+  const lastE = !energy && r.picks.length && r.picks[r.picks.length - 1] !== ENERGY_PICK && V.offer && V.offer.first ? poolEntry(PT.CARDS, r.picks[r.picks.length - 1], rules()) : null;
   const fresh = lastE ? new Set(Object.keys(lastE.cards)) : null;
-  return `<aside class="panel ar-side ar-deck"><div class="ar-dhead"><h3>${esc(title)}</h3><span class="ar-count"><b>${n + ARENA.bills + (energy ? ARENA.energy : 0)}</b>/${ARENA.picksTo + ARENA.bills + (energy ? ARENA.energy : 0)}</span></div>
-    ${curveHTML(finalDeck(PT.CARDS, r.cards, {}))}<p class="small muted ar-basics">${basics} Basic Pokémon · ${ARENA.bills} Bills included${energy ? '' : ` · ${ARENA.energy} Energy added at the end`}</p>
+  return `<aside class="panel ar-side ar-deck"><div class="ar-dhead"><h3>${esc(title)}</h3><span class="ar-count"><b>${n + ARENA.bills + (energy ? baseEn : 0)}</b>/${energy ? n + ARENA.bills + baseEn : ARENA.picksTo + ARENA.bills}</span></div>
+    ${curveHTML(finalDeck(PT.CARDS, r.cards, {}), baseEn)}<p class="small muted ar-basics">${basics} Basic Pokémon · ${ARENA.bills} Bills included${energy ? '' : ` · ${ARENA.energy} Energy added at the end${extra ? ` (+${extra} you took)` : ''}`}</p>
     <div class="ar-tiles">${tilesHTML(r.cards, energy, fresh)}</div></aside>`;
 }
 
@@ -273,7 +275,8 @@ function draftView(r) {
     <section class="ar-stage"><div class="ar-stagehead"><div><span class="kicker">Pick ${r.round + 1}</span><h2>Choose a card</h2></div>
       <div class="ar-bar" title="${n} of ${ARENA.picksTo} cards"><i style="width:${Math.round((n / ARENA.picksTo) * 100)}%"></i></div></div>
       <div class="ar-offer">${offer.map(choice).join('')}</div>
-      <p class="small muted ar-hint"><b>Click</b> a card to draft it. <b>Hold</b> it down, or press <b>Read</b>, to see it up close. Evolved Pokémon bring their whole line, 2 of each card. Your deck already has ${ARENA.bills} Bills.</p>
+      <div class="ar-or"><span>or</span><button type="button" class="ar-energybtn" data-energy="1"><span aria-hidden="true">⚡</span> Take a basic Energy instead</button><em>Your deck has <b>${ARENA.energy + energyTaken(PT.CARDS, r.cards)}</b> Energy so far</em></div>
+      <p class="small muted ar-hint"><b>Click</b> a card to draft it. <b>Hold</b> it down, or press <b>Read</b>, to see it up close. Evolved Pokémon bring their whole line, 2 of each card. Your deck already has ${ARENA.bills} Bills and ${ARENA.energy} Energy.</p>
       <button class="sm ghost ar-abandon" type="button" data-retire="1">Abandon this run</button></section>
     ${deckPanel(r, 'Your deck')}</div>`;
 }
@@ -282,7 +285,7 @@ function sizeOffer() {
   const o = document.querySelector('.ar-offer'); if (!o) return;
   const gap = parseFloat(getComputedStyle(o).columnGap) || 16;
   const w = (o.clientWidth - 2 * gap) / 3 - 6;
-  const h = Math.max(240, window.innerHeight - (o.getBoundingClientRect().top + window.scrollY) - 96); // the whole card and its labels fit on screen
+  const h = Math.max(240, window.innerHeight - (o.getBoundingClientRect().top + window.scrollY) - 176); // the whole card, its labels and the Energy button fit on screen
   o.style.setProperty('--cs', Math.max(0.3, Math.min(1.25, w / 240, h / 330)).toFixed(3));
 }
 if (typeof window !== 'undefined') window.addEventListener('resize', sizeOffer);
@@ -294,6 +297,13 @@ function afterDraft() {
   sfx('arena.deal', 0);
   const best = ['L', 'E', 'R'].find((t) => o.tiers.includes(t));
   if (best) sfx(best === 'L' ? 'arena.legendary' : best === 'E' ? 'arena.epic' : 'arena.rare', 260 + o.tiers.indexOf(best) * 140);
+}
+/** Skip the three cards and take a basic Energy. */
+function pickEnergy() {
+  if (V.picking || V.busy) return; V.picking = true;
+  document.querySelectorAll('.ar-choice').forEach((x) => { x.classList.remove('enter'); x.classList.add('passed'); });
+  sfx('arena.pick', 0);
+  setTimeout(async () => { try { await A.pick(ENERGY_PICK); } finally { V.picking = false; } }, 300);
 }
 function pickAnimated(el) {
   if (V.picking || V.busy) return; V.picking = true;
@@ -367,8 +377,8 @@ function startView(d) {
       ${last.reward ? `<p class="ar-lastprize">${COIN.icon} <b>+${last.reward.tokens}</b> ${COIN.name}${last.reward.gold ? ` · gold <b>${esc(C(last.reward.gold).name)}</b>` : ''}</p>` : ''}</section>` : '';
   return `<div class="ar-start">
     <section class="panel ar-begin"><h2>${last ? 'Ready for another run?' : 'Enter the Arena'}</h2>
-      <ol class="ar-steps"><li><b>Draft.</b> Pick 1 of 3 cards until you have drafted ${ARENA.picksTo}. Only the top of each evolution line is offered, and an evolved Pokémon brings its whole line (2 of each card).</li>
-        <li><b>Free cards.</b> Every deck gets ${ARENA.bills} Bills (so Bill is never in the draft), plus ${ARENA.energy} basic Energy for your Pokémon's types. That makes 60.</li>
+      <ol class="ar-steps"><li><b>Draft.</b> Make ${ARENA.picksTo} picks: 1 of 3 cards each time, or a basic Energy instead. Only the top of each evolution line is offered, and an evolved Pokémon brings its whole line (2 of each card).</li>
+        <li><b>Free cards.</b> Every deck starts with ${ARENA.bills} Bills (so Bill is never in the draft) and ${ARENA.energy} basic Energy for your Pokémon's types. Want more Energy? Take it with your picks. That makes 60.</li>
         <li><b>Battle.</b> Play the computer under the league's standard rules. ${ARENA.wins} wins is a perfect run; ${ARENA.losses} losses ends it.</li></ol>
       <button class="pri cta" type="button" data-start="1">✦ Start a run</button></section>
     <div class="ar-startside">${lastHTML}<section class="panel ar-prizes"><span class="kicker">Prizes</span><h2>What a run pays</h2>
@@ -409,6 +419,7 @@ export function render(main) {
     const b = e.target.closest('button');
     const v = e.target.closest('[data-view]'); if (v && (!b || b === v)) { PT.viewCard(v.dataset.view); return; }
     if (b && b.dataset.read) { showPeek(b.dataset.read, true); return; }
+    if (b && b.dataset.energy) { pickEnergy(); return; }
     const ch = e.target.closest('.ar-choice[data-pick]'); if (ch && !b && e.target.closest('.ar-card')) { pickAnimated(ch); return; }
     if (!b) return;
     if (b.dataset.start) A.start();
