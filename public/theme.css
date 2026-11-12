@@ -557,6 +557,39 @@ table.lgt tr.lead td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
   background:repeating-conic-gradient(from 0deg,rgba(255,190,90,.34) 0 7deg,transparent 7deg 20deg);-webkit-mask-image:radial-gradient(closest-side,#000 30%,transparent 78%);mask-image:radial-gradient(closest-side,#000 30%,transparent 78%);animation:arrays 14s linear infinite}
 @keyframes araura{0%,100%{transform:scale(.97);filter:blur(calc(14px*var(--cs))) brightness(1)}50%{transform:scale(1.05);filter:blur(calc(18px*var(--cs))) brightness(1.3)}}
 @keyframes arrays{to{transform:translate(-50%,-50%) rotate(360deg)}}
+/* Epic and Legendary are unmistakable: a stronger halo, a moving ring, a pillar of light, sparks, a bigger label */
+@property --ra{syntax:"<angle>";inherits:false;initial-value:0deg}
+.t-E .ar-aura{inset:-15%;opacity:1}
+.t-L .ar-aura{inset:-20%;opacity:1}
+.t-E .ar-card .cd{box-shadow:0 14px 30px rgba(0,0,0,.6),0 0 0 3px #d9a8ff,0 0 calc(34px*var(--cs)) #b45cff,0 0 calc(80px*var(--cs)) rgba(180,92,255,.7)}
+.t-L .ar-card .cd{box-shadow:0 14px 30px rgba(0,0,0,.6),0 0 0 3px #ffe2a6,0 0 calc(40px*var(--cs)) #ff9a2e,0 0 calc(100px*var(--cs)) rgba(255,154,46,.8)}
+.ar-ring{position:absolute;inset:calc(-7px*var(--cs) - 3px);z-index:1;border-radius:calc(17px*var(--cs) + 3px);padding:calc(4px*var(--cs) + 2px);pointer-events:none;
+  background:conic-gradient(from var(--ra),var(--tg) 0deg,#fff 40deg,var(--tg) 90deg,transparent 150deg,var(--tg) 210deg,#fff 250deg,var(--tg) 300deg,transparent 340deg,var(--tg) 360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
+  animation:arring 2.6s linear infinite;filter:drop-shadow(0 0 6px var(--tg))}
+.t-L .ar-ring{animation-duration:1.9s}
+@keyframes arring{to{--ra:360deg}}
+.ar-pillar{position:absolute;left:50%;top:-60px;bottom:-30px;width:86%;transform:translateX(-50%);z-index:0;pointer-events:none;border-radius:50% 50% 0 0/14% 14% 0 0;
+  background:linear-gradient(180deg,transparent 0,var(--tg2) 16%,var(--tg2) 62%,transparent 100%);filter:blur(14px);opacity:.75;animation:arpillar 2.4s ease-in-out infinite}
+.t-L .ar-pillar{width:104%;opacity:.95}
+.ar-choice .ar-card,.ar-choice .ar-under,.ar-choice .ar-tag,.ar-choice .ar-line{position:relative;z-index:1}
+@keyframes arpillar{0%,100%{opacity:.55;transform:translateX(-50%) scaleX(.94)}50%{opacity:1;transform:translateX(-50%) scaleX(1.05)}}
+.ar-sparks{position:absolute;inset:-5%;z-index:2;pointer-events:none}
+.ar-sparks i{position:absolute;width:calc(9px*var(--z));height:calc(9px*var(--z));margin:-5px 0 0 -5px;opacity:0;
+  background:radial-gradient(circle,#fff 0 28%,var(--tg) 45%,transparent 70%);clip-path:polygon(50% 0,60% 40%,100% 50%,60% 60%,50% 100%,40% 60%,0 50%,40% 40%);animation:arspark 2.2s ease-in-out var(--d) infinite}
+.t-L .ar-sparks i{width:calc(12px*var(--z));height:calc(12px*var(--z))}
+@keyframes arspark{0%,100%{opacity:0;transform:scale(.3) rotate(0)}45%{opacity:1;transform:scale(1.25) rotate(90deg)}70%{opacity:.6;transform:scale(.8) translateY(-8px) rotate(140deg)}}
+.t-E .ar-gem,.t-L .ar-gem{font-size:12.5px;padding:7px 14px;letter-spacing:.16em;background-size:220% 100%;animation:argem 2.4s linear infinite}
+.t-E .ar-gem{background-image:linear-gradient(105deg,#8a3fe0 0,#c873ff 30%,#fff 45%,#c873ff 60%,#8a3fe0 100%);box-shadow:0 0 18px rgba(180,92,255,.85)}
+.t-L .ar-gem{background-image:linear-gradient(105deg,#ffb52e 0,#ffc63d 30%,#fff7d6 45%,#ffc63d 60%,#ff8a2e 100%);box-shadow:0 0 22px rgba(255,154,46,.95)}
+@keyframes argem{from{background-position:120% 0}to{background-position:-100% 0}}
+/* the stage itself flashes when one is dealt */
+.ar-stage.flash-E::after,.ar-stage.flash-L::after{content:"";position:absolute;inset:0;z-index:5;pointer-events:none;opacity:0;animation:arstage 1.1s ease-out var(--fd,300ms) both}
+.ar-stage.flash-E::after{background:radial-gradient(70% 80% at 50% 50%,rgba(200,130,255,.55),rgba(180,92,255,.2) 55%,transparent 80%)}
+.ar-stage.flash-L::after{background:radial-gradient(70% 80% at 50% 50%,rgba(255,225,150,.8),rgba(255,154,46,.35) 55%,transparent 82%)}
+@keyframes arstage{0%{opacity:0}18%{opacity:1}100%{opacity:0}}
+@media (max-width:640px){.t-E .ar-gem,.t-L .ar-gem{font-size:9.5px;padding:5px 7px;letter-spacing:.06em}.ar-pillar{top:-30px;filter:blur(9px)}}
+@media (prefers-reduced-motion:reduce){.ar-ring,.ar-pillar,.ar-sparks i,.t-E .ar-gem,.t-L .ar-gem{animation:none}.ar-sparks i{opacity:.8}.ar-stage.flash-E::after,.ar-stage.flash-L::after{display:none}}
 /* cards flip in one after another; the rarer the card, the bigger the flash when it lands */
 .ar-choice.enter .ar-card{animation:arflip .55s cubic-bezier(.2,.8,.3,1) both;animation-delay:calc(var(--i)*140ms)}
 .ar-choice.enter .ar-under,.ar-choice.enter .ar-tag,.ar-choice.enter .ar-line{animation:arfade .4s ease both;animation-delay:calc(var(--i)*140ms + 380ms)}

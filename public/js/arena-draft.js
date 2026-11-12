@@ -1,4 +1,4 @@
-// Arena draft: 41 picks, each 1 of 3 cards or a basic Energy instead; every deck also gets 4 Bills and 15 basic Energy (60 in all).
+// Arena draft: 40 picks, each 1 of 3 cards or a basic Energy instead; every deck also gets 4 Bills, 1 Professor Oak and 15 basic Energy (60 in all).
 // Every card has a rarity tier (arena-tiers.js, from the spreadsheet); rarer tiers are offered less often.
 // Only the top of each evolution line is offered; drafting an evolved Pokémon brings 2 copies of every card in its line.
 // Pure functions (no page state) so the page, the tests and the simulator share them.
@@ -7,7 +7,7 @@ import { R } from './engine/rules.js';
 import { baseSpecies } from './engine/engine.js';
 import { TIERS, TIER_WEIGHTS } from './arena-tiers.js';
 
-export const ARENA = { picksTo: 41, bills: 4, energy: 15, wins: 7, losses: 3, lineCopies: 2 };
+export const ARENA = { picksTo: 40, bills: 4, oaks: 1, energy: 15, deck: 60, wins: 7, losses: 3, lineCopies: 2 };
 /** The pick key for "take a basic Energy instead of one of the three cards". */
 export const ENERGY_PICK = 'energy';
 /** Prize for a finished run, by wins: Cousin Tokens (index = wins). A perfect run also wins a gold card. */
@@ -65,7 +65,7 @@ function nameCounts(cards, db) { const o = {}; for (const [cid, k] of Object.ent
 export const draftedCount = (cards) => Object.values(cards || {}).reduce((a, b) => a + b, 0);
 function fits(e, cards, db, rules) {
   const r = R(rules); const left = ARENA.picksTo - draftedCount(cards); if (e.size > left) return false;
-  const have = nameCounts(cards, db);
+  const have = nameCounts(cards, db); have['Professor Oak'] = (have['Professor Oak'] || 0) + ARENA.oaks; // the free Oak counts toward the 4-copy limit
   for (const [n, k] of Object.entries(e.names)) { const max = r.limits && r.limits[n] != null ? Math.min(r.limits[n], r.maxCopies) : r.maxCopies; if ((have[n] || 0) + k > max) return false; }
   return true;
 }
@@ -145,9 +145,17 @@ export function addEnergyPick(db, cards) {
 }
 /** Bill (Base Set): 4 come with every Arena deck. */
 export function billId(db) { const c = Object.values(db).find((x) => x.name === 'Bill' && x.set === 'base1') || Object.values(db).find((x) => x.name === 'Bill'); return c && c.id; }
-/** The finished 60-card deck: drafted cards, the 4 Bills, and the Energy (pass {} as `split` for the deck without Energy yet). */
+/** Professor Oak (Base Set): 1 comes with every Arena deck. */
+export function oakId(db) { const c = Object.values(db).find((x) => x.name === 'Professor Oak' && x.set === 'base1') || Object.values(db).find((x) => x.name === 'Professor Oak'); return c && c.id; }
+/**
+ * The finished 60-card deck: drafted cards, the 4 Bills, the Energy, and the free Professor Oak
+ * (pass {} as `split` for the deck without Energy yet). The Oak only goes in while there is room, so a run
+ * drafted under an earlier, longer draft still comes to exactly 60.
+ */
 export function finalDeck(db, cards, split) {
   const out = { ...(cards || {}) }; const bill = billId(db); if (bill) out[bill] = (out[bill] || 0) + ARENA.bills;
+  const energy = Object.values(split || energySplit(db, cards)).reduce((a, b) => a + b, 0);
+  const oak = oakId(db); if (oak && draftedCount(out) + energy + ARENA.oaks <= ARENA.deck) out[oak] = (out[oak] || 0) + ARENA.oaks;
   for (const [t, k] of Object.entries(split || energySplit(db, cards))) { const id = energyId(db, t); if (id) out[id] = (out[id] || 0) + k; } return out;
 }
 

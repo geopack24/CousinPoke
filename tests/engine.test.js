@@ -648,12 +648,13 @@ test('the Arena draft never offers banned cards, Stadiums, promos, Rainbow Energ
   assert.ok(!names.has('Rainbow Energy'));
   assert.ok(!names.has('Bill'), 'Bill is given, not drafted');
   for (const e of pool.filter((x) => x.kind === 'basic')) for (const n of ["Blaine's Mankey", "Blaine's Rhyhorn", "Erika's Jigglypuff", "Erika's Paras"]) assert.notEqual(DB[e.cid].name, n, n + ' is a pre-evolution, not a pick');
-  assert.equal(ARENA.picksTo + ARENA.bills + ARENA.energy, 60);
+  assert.equal(ARENA.picksTo + ARENA.bills + ARENA.oaks + ARENA.energy, 60);
   assert.ok(!pool.some((e) => Object.keys(e.cards).some((id) => /Stadium/.test(DB[id].sub || '') || id.startsWith('basep'))));
   for (let seed = 1; seed <= 25; seed++) {
     const d = botDraft(DB, seed, 0.5, DEFAULT_RULES);
     assert.equal(Object.values(d).reduce((a, b) => a + b, 0), 60);
     assert.equal(d[N['Bill']], ARENA.bills, 'every Arena deck gets 4 Bills');
+    assert.ok(d[N['Professor Oak']] >= ARENA.oaks && d[N['Professor Oak']] <= 4, 'every Arena deck gets a Professor Oak, and never more than 4');
     assert.deepEqual(validateDeck({ cards: d }, DEFAULT_RULES, DB).filter((x) => x.bad), []);
   }
 });
@@ -684,4 +685,7 @@ test('Arena: a basic Energy can be taken instead of a card, and an all-Energy dr
   const deck = finalDeck(DB, cards);
   assert.equal(Object.values(deck).reduce((a, b) => a + b, 0), 60);
   assert.equal(energyTaken(DB, deck), ARENA.picksTo + ARENA.energy);
+  // a deck drafted under an earlier, longer draft still comes to 60 (the free Oak only goes in while there is room)
+  let old = {}; for (let i = 0; i < 41; i++) { const id = Object.keys(addEnergyPick(DB, {}))[0]; old[id] = (old[id] || 0) + 1; }
+  assert.equal(Object.values(finalDeck(DB, old)).reduce((a, b) => a + b, 0), 60);
 });

@@ -61,6 +61,8 @@ const A = {
     r.picks.push(key); r.round++;
     if (draftedCount(r.cards) >= ARENA.picksTo || !makeOffer(PT.CARDS, r.seed, r.round, r.cards, rules()).length) { r.status = 'play'; r.energy = energySplit(PT.CARDS, r.cards); }
   }),
+  /** A draft that is already full (the draft got shorter while this run was in progress) moves on to the battles. */
+  closeDraft: () => mutate((d) => { const r = d.run; if (!r || r.status !== 'draft' || draftedCount(r.cards) < ARENA.picksTo) return false; r.status = 'play'; r.energy = energySplit(PT.CARDS, r.cards); }),
   retire: () => mutate((d) => { if (!d.run || d.run.status === 'done') return false; finishRun(d, true); }),
 };
 function finishRun(d, retired) {
@@ -250,10 +252,11 @@ function tilesHTML(cards, energy, fresh) {
 function deckPanel(r, title, energy) {
   const n = draftedCount(r.cards); const basics = basicsIn(r.cards, PT.CARDS);
   const baseEn = energy ? Object.values(energy).reduce((a, b) => a + b, 0) : ARENA.energy; const extra = energyTaken(PT.CARDS, r.cards);
+  const have = draftedCount(finalDeck(PT.CARDS, r.cards, energy || {}));
   const lastE = !energy && r.picks.length && r.picks[r.picks.length - 1] !== ENERGY_PICK && V.offer && V.offer.first ? poolEntry(PT.CARDS, r.picks[r.picks.length - 1], rules()) : null;
   const fresh = lastE ? new Set(Object.keys(lastE.cards)) : null;
-  return `<aside class="panel ar-side ar-deck"><div class="ar-dhead"><h3>${esc(title)}</h3><span class="ar-count"><b>${n + ARENA.bills + (energy ? baseEn : 0)}</b>/${energy ? n + ARENA.bills + baseEn : ARENA.picksTo + ARENA.bills}</span></div>
-    ${curveHTML(finalDeck(PT.CARDS, r.cards, {}), baseEn)}<p class="small muted ar-basics">${basics} Basic Pokémon · ${ARENA.bills} Bills included${energy ? '' : ` · ${ARENA.energy} Energy added at the end${extra ? ` (+${extra} you took)` : ''}`}</p>
+  return `<aside class="panel ar-side ar-deck"><div class="ar-dhead"><h3>${esc(title)}</h3><span class="ar-count"><b>${have}</b>/${energy ? have : ARENA.picksTo + ARENA.bills + ARENA.oaks}</span></div>
+    ${curveHTML(finalDeck(PT.CARDS, r.cards, {}), baseEn)}<p class="small muted ar-basics">${basics} Basic Pokémon · ${ARENA.bills} Bills and ${ARENA.oaks} Professor Oak included${energy ? '' : ` · ${ARENA.energy} Energy added at the end${extra ? ` (+${extra} you took)` : ''}`}</p>
     <div class="ar-tiles">${tilesHTML(r.cards, energy, fresh)}</div></aside>`;
 }
 
@@ -263,12 +266,12 @@ function draftView(r) {
   const key = r.id + ':' + r.round; const first = V.revealed !== key; // the cards flip in (and sound) once per round, not on every refresh
   V.offer = { key, first, tiers: offer.map((k) => tierOf(k)) };
   const choice = (k, i) => {
-    const e = poolEntry(PT.CARDS, k, rules()); const c = C(e.cid); const t = e.tier;
+    const e = poolEntry(PT.CARDS, k, rules()); const c = C(e.cid); const t = e.tier; const big = t === 'E' || t === 'L';
     const tag = e.kind === 'line' ? `${c.sub} line · ${e.size} cards` : e.kind === 'basic' ? 'Basic Pokémon' : e.kind === 'energy' ? 'Special Energy' : (c.sub || 'Trainer');
     const line = e.kind === 'line' ? `<div class="ar-line">${e.line.map((cid) => `${ARENA.lineCopies}× ${esc(C(cid).name)}`).join(' › ')}</div>` : '';
     return `<div class="ar-choice ${e.kind} t-${t}${first ? ' enter' : ''}" style="--i:${i}" data-pick="${esc(k)}" data-tier="${t}" role="button" tabindex="0" aria-label="Draft ${esc(c.name)} (${TIER_NAMES[t]})">
-      <div class="ar-card"><span class="ar-aura" aria-hidden="true"></span>${PT.cardHTML(e.cid, 1).replace(/ data-cid="[^"]*"/, '')}${e.kind === 'line' ? `<span class="ar-stack" aria-hidden="true">×${e.size}</span>` : ''}</div>
-      <div class="ar-under"><span class="ar-gem">${TIER_NAMES[t]}</span><button type="button" class="ar-read" data-read="${esc(k)}" title="Read ${esc(c.name)} up close" aria-label="Read ${esc(c.name)}"><span aria-hidden="true">🔍</span> Read</button></div>
+      ${big ? '<span class="ar-pillar" aria-hidden="true"></span>' : ''}<div class="ar-card"><span class="ar-aura" aria-hidden="true"></span>${big ? `<span class="ar-ring" aria-hidden="true"></span><span class="ar-sparks" aria-hidden="true">${sparks(t === 'L' ? 12 : 7, i)}</span>` : ''}${PT.cardHTML(e.cid, 1).replace(/ data-cid="[^"]*"/, '')}${e.kind === 'line' ? `<span class="ar-stack" aria-hidden="true">×${e.size}</span>` : ''}</div>
+      <div class="ar-under"><span class="ar-gem">${t === 'L' ? '★ ' : ''}${TIER_NAMES[t]}${t === 'L' ? ' ★' : ''}</span><button type="button" class="ar-read" data-read="${esc(k)}" title="Read ${esc(c.name)} up close" aria-label="Read ${esc(c.name)}"><span aria-hidden="true">🔍</span> Read</button></div>
       <div class="ar-tag">${esc(tag)}</div>${line}</div>`;
   };
   return `<div class="ar-draft">
@@ -276,9 +279,16 @@ function draftView(r) {
       <div class="ar-bar" title="${n} of ${ARENA.picksTo} cards"><i style="width:${Math.round((n / ARENA.picksTo) * 100)}%"></i></div></div>
       <div class="ar-offer">${offer.map(choice).join('')}</div>
       <div class="ar-or"><span>or</span><button type="button" class="ar-energybtn" data-energy="1"><span aria-hidden="true">⚡</span> Take a basic Energy instead</button><em>Your deck has <b>${ARENA.energy + energyTaken(PT.CARDS, r.cards)}</b> Energy so far</em></div>
-      <p class="small muted ar-hint"><b>Click</b> a card to draft it. <b>Hold</b> it down, or press <b>Read</b>, to see it up close. Evolved Pokémon bring their whole line, 2 of each card. Your deck already has ${ARENA.bills} Bills and ${ARENA.energy} Energy.</p>
+      <p class="small muted ar-hint"><b>Click</b> a card to draft it. <b>Hold</b> it down, or press <b>Read</b>, to see it up close. Evolved Pokémon bring their whole line, 2 of each card. Your deck already has ${ARENA.bills} Bills, ${ARENA.oaks} Professor Oak and ${ARENA.energy} Energy.</p>
       <button class="sm ghost ar-abandon" type="button" data-retire="1">Abandon this run</button></section>
     ${deckPanel(r, 'Your deck')}</div>`;
+}
+/** Twinkling sparks around an Epic or Legendary card (placed around its edge; the same spots every redraw). */
+function sparks(n, seed) {
+  let x = 9301 * (seed + 3) + 49297; const rnd = () => { x = (x * 233280 + 49297) % 9973; return x / 9973; };
+  return Array.from({ length: n }, (_, i) => { const edge = i % 4; const p = Math.round(rnd() * 100); const off = Math.round(rnd() * 9 - 6);
+    const pos = edge === 0 ? `left:${p}%;top:${off}%` : edge === 1 ? `left:${100 - off}%;top:${p}%` : edge === 2 ? `left:${p}%;top:${100 - off}%` : `left:${off}%;top:${p}%`;
+    return `<i style="${pos};--d:${(rnd() * 2.2).toFixed(2)}s;--z:${(0.7 + rnd() * 0.9).toFixed(2)}"></i>`; }).join('');
 }
 /** Fit the three cards to the space they have (as big as the screen allows, like Hearthstone). */
 function sizeOffer() {
@@ -296,6 +306,7 @@ function afterDraft() {
   V.revealed = o.key;
   sfx('arena.deal', 0);
   const best = ['L', 'E', 'R'].find((t) => o.tiers.includes(t));
+  const stage = document.querySelector('.ar-stage'); if (stage && (best === 'L' || best === 'E')) { stage.style.setProperty('--fd', (260 + o.tiers.indexOf(best) * 140) + 'ms'); stage.classList.add('flash-' + best); }
   if (best) sfx(best === 'L' ? 'arena.legendary' : best === 'E' ? 'arena.epic' : 'arena.rare', 260 + o.tiers.indexOf(best) * 140);
 }
 /** Skip the three cards and take a basic Energy. */
@@ -378,7 +389,7 @@ function startView(d) {
   return `<div class="ar-start">
     <section class="panel ar-begin"><h2>${last ? 'Ready for another run?' : 'Enter the Arena'}</h2>
       <ol class="ar-steps"><li><b>Draft.</b> Make ${ARENA.picksTo} picks: 1 of 3 cards each time, or a basic Energy instead. Only the top of each evolution line is offered, and an evolved Pokémon brings its whole line (2 of each card).</li>
-        <li><b>Free cards.</b> Every deck starts with ${ARENA.bills} Bills (so Bill is never in the draft) and ${ARENA.energy} basic Energy for your Pokémon's types. Want more Energy? Take it with your picks. That makes 60.</li>
+        <li><b>Free cards.</b> Every deck starts with ${ARENA.bills} Bills (so Bill is never in the draft), ${ARENA.oaks} Professor Oak and ${ARENA.energy} basic Energy for your Pokémon's types. Want more Energy? Take it with your picks. That makes 60.</li>
         <li><b>Battle.</b> Play the computer under the league's standard rules. ${ARENA.wins} wins is a perfect run; ${ARENA.losses} losses ends it.</li></ol>
       <button class="pri cta" type="button" data-start="1">✦ Start a run</button></section>
     <div class="ar-startside">${lastHTML}<section class="panel ar-prizes"><span class="kicker">Prizes</span><h2>What a run pays</h2>
@@ -409,6 +420,7 @@ export function render(main) {
   arenaPool(PT.CARDS, rules());
   const d = mine(); const r = run();
   if (r && r.gameId) checkCurrent();
+  if (r && r.status === 'draft' && draftedCount(r.cards) >= ARENA.picksTo && !V.busy) { A.closeDraft(); main.innerHTML = '<div class="panel muted">Finishing your draft…</div>'; return; }
   const body = !r || r.status === 'done' ? startView(d) : r.status === 'draft' ? draftView(r) : playView(r);
   main.innerHTML = `<div class="arena">${header(r)}${body}${r && r.status === 'draft' ? '' : goldCaseHTML(d)}<div class="ar-lower">${boardHTML()}${historyHTML(d)}</div></div>`;
   if (r && r.status === 'draft') afterDraft();
