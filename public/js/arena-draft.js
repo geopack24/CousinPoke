@@ -172,12 +172,17 @@ export function swapOuts(db, cards, inKey, rules, units) {
   }
   return out;
 }
-/** The 3 cards offered after win number n. Deterministic from (seed, n). Only cards that have something of their size
- *  to replace are in the pool: no Stage 2 line is offered to a deck without one. The tier is rolled first, as in the draft. */
-export function makeSwapOffer(db, seed, n, cards, rules) {
-  const rng = mulberry32(((seed >>> 0) ^ Math.imul(n + 101, 2246822519)) >>> 0);
+/** How many swap offers follow each win, and what each one holds: Trainers and special Energy first, a Pokémon last. */
+export const SWAP_STEPS = ['other', 'other', 'mon'];
+/** The 3 cards of one swap offer after win number n (`step` is which of that win's offers). Deterministic from
+ *  (seed, n, step). `kind` limits it to Pokémon ('mon') or to Trainers and special Energy ('other'). Only cards that have
+ *  something of their size to replace are in the pool: no Stage 2 line is offered to a deck without one. The tier is
+ *  rolled first, as in the draft. */
+export function makeSwapOffer(db, seed, n, cards, rules, kind, step = 0) {
+  const rng = mulberry32(((seed >>> 0) ^ Math.imul(n * 8 + step + 101, 2246822519)) >>> 0);
   const units = deckUnits(db, cards, rules); const sizes = new Set(units.map((u) => u.size));
-  const pool = arenaPool(db, rules).filter((e) => sizes.has(e.size) && swapOuts(db, cards, e.key, rules, units).length);
+  const isMon = (e) => e.kind === 'line' || e.kind === 'basic';
+  const pool = arenaPool(db, rules).filter((e) => (!kind || (kind === 'mon') === isMon(e)) && sizes.has(e.size) && swapOuts(db, cards, e.key, rules, units).length);
   const out = []; const used = new Set();
   for (let i = 0; i < 3; i++) {
     const l = pool.filter((e) => !used.has(e.key)); if (!l.length) break;

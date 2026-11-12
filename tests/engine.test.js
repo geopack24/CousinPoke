@@ -944,6 +944,13 @@ test('Arena reward: a swap replaces a pick of the same size, and a size the deck
   assert.equal(swapOuts(DB, cards, zard).length, 0, 'no Stage 2 line to replace');
   for (let n = 1; n <= 60; n++) { const offer = makeSwapOffer(DB, 1234, n, cards); assert.equal(offer.length, 3); for (const k of offer) { const e = poolEntry(DB, k); assert.ok(e.size === 1 || e.size === 4, 'only singles and Stage 1 lines'); assert.ok(swapOuts(DB, cards, k).length); } }
   assert.deepEqual(makeSwapOffer(DB, 1234, 3, cards), makeSwapOffer(DB, 1234, 3, cards), 'reloading never rerolls');
+  // after a win: two offers of Trainers and special Energy, then one of Pokémon, each its own roll
+  for (let n = 1; n <= 30; n++) {
+    const t1 = makeSwapOffer(DB, 99, n, cards, undefined, 'other', 0), t2 = makeSwapOffer(DB, 99, n, cards, undefined, 'other', 1), m3 = makeSwapOffer(DB, 99, n, cards, undefined, 'mon', 2);
+    for (const k of [...t1, ...t2]) assert.ok(['trainer', 'energy'].includes(poolEntry(DB, k).kind)); for (const k of m3) assert.ok(['line', 'basic'].includes(poolEntry(DB, k).kind));
+    assert.equal(t1.length, 3); assert.equal(m3.length, 3);
+  }
+  assert.notDeepEqual(makeSwapOffer(DB, 99, 1, cards, undefined, 'other', 0), makeSwapOffer(DB, 99, 1, cards, undefined, 'other', 1));
   // a Stage 1 line goes in for the Stage 1 line: same number of cards, the old line gone entirely
   const dugtrio = N['Dugtrio']; assert.deepEqual(swapOuts(DB, cards, dugtrio).map((u) => u.id), [raichu]);
   const next = applySwap(DB, cards, dugtrio, raichu);

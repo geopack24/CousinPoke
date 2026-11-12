@@ -1,7 +1,7 @@
 // The Arena: single-player runs. Draft a deck 1-of-3, then fight the Colossal Pokémon (one per win) until 7 wins or a loss.
 // One document per player (arena/<pid>) holds the current run and the player's record; the page syncs everyone's
 // documents for the leaderboard. Arena games are auto-rules tables with a Colossal Pokémon (engine/boss.js) in seat B.
-import { ARENA, ARENA_REWARDS, ENERGY_PICK, addEnergyPick, energyTaken, arenaPool, makeOffer, poolEntry, addPick, draftedCount, basicsIn, energySplit, finalDeck, tierOf, makeSwapOffer, swapOuts, applySwap, deckUnits, goldPool, pickGold } from './arena-draft.js';
+import { ARENA, ARENA_REWARDS, ENERGY_PICK, addEnergyPick, energyTaken, arenaPool, makeOffer, poolEntry, addPick, draftedCount, basicsIn, energySplit, finalDeck, tierOf, makeSwapOffer, swapOuts, applySwap, deckUnits, SWAP_STEPS, goldPool, pickGold } from './arena-draft.js';
 import { TIER_NAMES } from './arena-tiers.js';
 import { BOT_UID } from './bot.js';
 import { BOSSES, BOSS_RULES, bossId, newBossGame } from './engine/boss.js';
@@ -65,14 +65,19 @@ const A = {
   /** A draft that is already full (the draft got shorter while this run was in progress) moves on to the battles. */
   closeDraft: () => mutate((d) => { const r = d.run; if (!r || r.status !== 'draft' || draftedCount(r.cards) < ARENA.picksTo) return false; r.status = 'play'; r.energy = energySplit(PT.CARDS, r.cards); }),
   retire: () => mutate((d) => { if (!d.run || d.run.status === 'done') return false; finishRun(d, true); }),
-  /** The reward for a win: one of the 3 cards on offer takes the place of a pick of the same size. */
+  /** The reward for a win: a series of swap offers. One of the 3 cards on offer takes the place of a pick of the same size. */
   swap: (inKey, outId) => mutate((d) => {
     const r = d.run; if (!r || r.status !== 'play' || !r.swap || !r.swap.keys.includes(inKey)) throw new Error('That card is no longer on offer');
     r.cards = applySwap(PT.CARDS, r.cards, inKey, outId, rules()); r.energy = energySplit(PT.CARDS, r.cards);
-    (r.swaps = r.swaps || []).push({ in: inKey, out: outId, after: r.swap.n, at: Date.now() }); r.swap = null;
+    (r.swaps = r.swaps || []).push({ in: inKey, out: outId, after: r.swap.n, at: Date.now() }); r.swap = swapStep(r, r.swap.n, r.swap.step == null ? 99 : r.swap.step + 1);
   }),
-  skipSwap: () => mutate((d) => { const r = d.run; if (!r || !r.swap) return false; r.swap = null; }),
+  skipSwap: () => mutate((d) => { const r = d.run; if (!r || !r.swap) return false; r.swap = swapStep(r, r.swap.n, r.swap.step == null ? 99 : r.swap.step + 1); }),
 };
+/** The swap offer for a win, from `step` on: the first one that has anything to offer (null when the offers are used up). */
+function swapStep(r, n, step) {
+  for (let k = step; k < SWAP_STEPS.length; k++) { const keys = makeSwapOffer(PT.CARDS, r.seed, n, r.cards, rules(), SWAP_STEPS[k], k); if (keys.length) return { n, step: k, keys }; }
+  return null;
+}
 function finishRun(d, retired) {
   const r = d.run; r.status = 'done'; r.endedAt = Date.now(); if (retired) r.retired = true;
   d.runs = (d.runs || 0) + 1; d.totalWins = (d.totalWins || 0) + r.wins; if (r.wins >= ARENA.wins) d.perfect = (d.perfect || 0) + 1;
@@ -148,7 +153,7 @@ async function record(gid, won) {
     r.games.push({ id: gid, title: bossName(r, r.wins), won, at: Date.now() });
     if (won) r.wins++; else r.losses++; r.gameId = null;
     if (r.wins >= ARENA.wins || (!won && r.losses >= ARENA.losses)) finishRun(d);
-    else if (won) { const keys = makeSwapOffer(PT.CARDS, r.seed, r.wins, r.cards, rules()); r.swap = keys.length ? { n: r.wins, keys } : null; }
+    else if (won) r.swap = swapStep(r, r.wins, 0);
     after = clone(r);
   });
   if (!ok || !after) { V.noted.delete(gid); return; }
@@ -156,7 +161,7 @@ async function record(gid, won) {
 }
 function resultModal(r, won) {
   if (r.status === 'done') { PT.closeModal(); chestReveal(r); return; }
-  const body = `<p>Arena record: <b>${r.wins}–${r.losses}</b>. ${won ? `${r.swap ? 'You earned a card swap. ' : ''}Next up: <b>${esc(bossName(r, r.wins))}</b>.` : ''}</p>`;
+  const body = `<p>Arena record: <b>${r.wins}–${r.losses}</b>. ${won ? `${r.swap ? `You earned ${SWAP_STEPS.length} card swaps. ` : ''}Next up: <b>${esc(bossName(r, r.wins))}</b>.` : ''}</p>`;
   PT.showModal(won ? 'Victory!' : 'Defeat', body, `<button class="pri" id="tarena" type="button">Back to the Arena</button>`, (m) => { m.querySelector('#tarena').onclick = () => { PT.closeModal(); PT.go('arena'); }; });
 }
 /* ---------- the prize chest ----------
@@ -426,10 +431,11 @@ const sizeLabel = (e) => (e.size === 1 ? ({ basic: 'Basic Pokémon', trainer: 'T
 function swapHTML(r) {
   const cards = r.swap.keys.map((k) => { const e = poolEntry(PT.CARDS, k, rules()); if (!e) return ''; const c = C(e.cid);
     return `<div class="ar-swapc t-${e.tier}"><button type="button" class="ar-swapbtn" data-swapin="${esc(k)}" aria-label="Swap in ${esc(c.name)}">${PT.cardHTML(e.cid, 0.5)}</button><b>${esc(c.name)}</b><span class="ar-gem">${TIER_NAMES[e.tier]}</span><small>${sizeLabel(e)}</small><button type="button" class="sm ghost" data-read="${esc(k)}">Read it</button></div>`; }).join('');
-  return `<section class="panel ar-next ar-swap"><span class="kicker">Reward for beating ${esc(bossName(r, r.swap.n - 1))}</span><h2>Swap a card into your deck</h2>
+  const step = r.swap.step == null ? null : r.swap.step; const mon = step != null && SWAP_STEPS[step] === 'mon';
+  return `<section class="panel ar-next ar-swap"><span class="kicker">${step == null ? 'Reward' : `Reward ${step + 1} of ${SWAP_STEPS.length}`} for beating ${esc(bossName(r, r.swap.n - 1))}</span><h2>${step == null ? 'Swap a card into your deck' : mon ? 'Swap in a Pokémon' : 'Swap in a Trainer or Special Energy'}</h2>
       <p class="muted">Tap one of these, then choose what it replaces. It has to take the place of the same number of cards: a single card for a single card, an evolution line for a line of the same length. What you give up is gone for good.</p>
       <div class="ar-swaprow">${cards}</div>
-      <div class="ar-actions"><button class="sec" type="button" data-skipswap="1">Keep my deck as it is</button></div></section>`;
+      <div class="ar-actions"><button class="sec" type="button" data-skipswap="1">${step != null && step < SWAP_STEPS.length - 1 ? 'Skip this one' : 'Keep my deck as it is'}</button></div></section>`;
 }
 /** Choosing what the new card replaces. */
 function swapModal(inKey) {
@@ -467,7 +473,7 @@ function startView(d) {
       <ol class="ar-steps"><li><b>Draft.</b> Make ${ARENA.picksTo} picks: 1 of 3 cards each time, or a basic Energy instead. Only the top of each evolution line is offered, and an evolved Pokémon brings its whole line (2 of each card).</li>
         <li><b>Free cards.</b> Every deck starts with ${ARENA.bills} Bills (so Bill is never in the draft), ${ARENA.oaks} Professor Oak and ${ARENA.energy} basic Energy for your Pokémon's types. Want more Energy? Take it with your picks. That makes 60.</li>
         <li><b>Battle.</b> Take on ${STAGES()} Colossal Pokémon, one after another. Which one waits at each stage changes from run to run, and you only find out when you get there. Each is a single giant with a huge HP pool: Knock it Out before it Knocks Out ${BOSS_RULES.kos} of yours. ${ARENA.wins} wins is a perfect run. There are no second chances: lose once and the run is over.</li>
-        <li><b>Rewards.</b> After each win you are shown 3 cards and may swap one into your deck, in place of a pick of the same size. What you give up is gone for good.</li></ol>
+        <li><b>Rewards.</b> After each win you get ${SWAP_STEPS.length} swaps, each a choice of 3 cards: two of Trainers and Special Energy, then one of Pokémon. A new card takes the place of a pick of the same size, and what you give up is gone for good. You can skip any of them.</li></ol>
       <span class="kicker">${STAGES()} bosses, each revealed when you reach it</span>${ladderHTML(null, false)}
       <button class="pri cta" type="button" data-start="1">✦ Start a run</button></section>
     <div class="ar-startside">${lastHTML}<section class="panel ar-prizes"><span class="kicker">Prizes</span><h2>What a run pays</h2>
