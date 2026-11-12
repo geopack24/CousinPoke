@@ -2,7 +2,7 @@
 
     python tools/arena_bosses.py "path/to/Arena bosses.xlsx"
 
-Tabs read: Bosses (one row per Colossal Pokémon, in fight order), Attacks (one row per attack, with its Energy cost), Rules (shared settings).
+Tabs read: Bosses (one row per Colossal Pokémon; rows that share a Stage number are alternatives, and each run meets one of them), Attacks (one row per attack, with its Energy cost), Rules (shared settings).
 Anything it can't understand stops the run with the tab, row and reason, and nothing is written.
 """
 import json, re, sys
@@ -14,10 +14,10 @@ SETS = {'base set': 'base1', 'base': 'base1', 'jungle': 'base2', 'fossil': 'base
 TYPES = ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting', 'Colorless']
 EFFECTS = {'': None, 'none': None, 'poisoned': 'PSN', 'burned': 'BRN', 'paralyzed': 'PAR', 'asleep': 'SLP', 'confused': 'CNF', 'discard energy': 'energy', 'heal itself': 'heal', 'force switch': 'switch'}
 RULES = {  # label in the sheet -> (key, default)
-    'knock outs the boss needs to win': ('kos', 6), 'most energy it can hold': ('energyMax', 5), 'energy it gains each turn': ('energyPerTurn', 1), 'energy it starts with': ('energyStart', 0), 'hp of each energy': ('energyHP', 20),
+    'knock outs the boss needs to win': ('kos', 6), 'most energy it can hold': ('energyMax', 5), 'energy it gains each turn': ('energyPerTurn', 1), 'energy it starts with': ('energyStart', 0), 'energy charge gains': ('energyCharge', 2), 'hp of each energy': ('energyHP', 20),
     'weak points on its bench': ('_old1', 0), 'extra damage when a weak point is hit': ('_old2', 0),  # from the first version of the sheet: read and ignored
     'biggest hit from one move': ('maxHit', 150), 'super fang, life drain and destiny bond do this much': ('percentHit', 40),
-    'poisoned lasts (boss turns)': ('PSN', 2), 'burned lasts (boss turns)': ('BRN', 2), 'confused lasts (boss turns)': ('CNF', 2), 'asleep lasts (boss turns)': ('SLP', 0), 'paralyzed lasts (boss turns)': ('PAR', 0),
+    'poisoned lasts (boss turns)': ('PSN', 2), 'burned lasts (boss turns)': ('BRN', 2), 'confused lasts (boss turns)': ('CNF', 2), 'asleep lasts (boss turns)': ('SLP', 0), 'paralyzed lasts (boss turns)': ('PAR', 1),
     'weakness and resistance count (1 = yes, 0 = no)': ('wr', 0),
 }
 
@@ -96,13 +96,21 @@ def main():
         if not any(pat): die(f'{w}: the attack pattern needs at least one attack')
         hp = num(col(r, 'hp'), w + ' HP', 10, 5000)
         if hp % 10: die(f'{w}: HP must be a multiple of 10')
-        bosses.append({'n': len(bosses) + 1, 'name': card['name'], 'card': card['id'], 'hp': hp,
+        st = col(r, 'stage', 'order'); stage = num(st, w + ' stage', 1, 20) if st is not None and text(st) != '' else len(bosses) + 1
+        bosses.append({'n': len(bosses) + 1, 'stage': stage, 'name': card['name'], 'card': card['id'], 'hp': hp,
                        'type': typ(col(r, 'type'), w + ' type') or (card.get('types') or ['Colorless'])[0], 'wk': typ(col(r, 'weakness'), w + ' weakness'), 'rs': typ(col(r, 'resistance'), w + ' resistance'),
                        'armor': num(col(r, 'armor'), w + ' armor', 0, 100), 'thorns': num(col(r, 'strikes back'), w + ' strikes back', 0, 100), 'enrage': num(col(r, 'enrage'), w + ' enrage', 0, 100),
                        'pattern': pat, 'attacks': [mine[k] for k in sorted(mine)]})
     if attacks: die('the Attacks tab has rows for ' + ', '.join(sorted(attacks)) + ', which is not on the Bosses tab')
     if not bosses: die('the Bosses tab is empty')
+    # a boss keeps the number it already has in arena-bosses.js (games in progress refer to it); a new boss gets the next free one
+    target = ROOT / 'public' / 'js' / 'arena-bosses.js'
+    old = dict((m.group(2), int(m.group(1))) for m in re.finditer(r'\{ n: (\d+), (?:stage: \d+, )?name: "([^"]+)"', target.read_text(encoding='utf-8'))) if target.exists() else {}
+    used = {old[b['name']] for b in bosses if b['name'] in old}; free = (k for k in range(1, 1000) if k not in used)
+    for b in bosses: b['n'] = old[b['name']] if b['name'] in old else next(free)
     if len({b['name'] for b in bosses}) != len(bosses): die('each boss must be a different Pokémon')
+    stages = sorted({b['stage'] for b in bosses})
+    if stages != list(range(1, len(stages) + 1)): die(f'the stages must run 1, 2, 3 with none missing (found {stages})')
 
     rules = {key: d for key, d in RULES.values()}; seen = set()
     for i, r in rows(wb['Rules']):
@@ -127,6 +135,7 @@ def main():
            f"  energyMax: {rules['energyMax']},    // the most Energy it can hold (each one sits on its Bench)",
            f"  energyPerTurn: {rules['energyPerTurn']}, // Energy it gains at the start of each of its turns",
            f"  energyStart: {rules['energyStart']},  // Energy it starts the fight with",
+           f"  energyCharge: {rules['energyCharge']}, // Energy Charge: extra Energy it gains on a turn it can't pay for its next attack (0 = off: it uses its 0-cost basic attack instead, or rests)",
            f"  energyHP: {rules['energyHP']},    // HP of each Energy on its Bench",
            f"  maxHit: {rules['maxHit']},     // the most a single move can take off it",
            f"  percentHit: {rules['percentHit']},  // what Super Fang, Life Drain and Destiny Bond do to it instead",
@@ -134,11 +143,11 @@ def main():
            f"  conditions: {{ PSN: {rules['PSN']}, BRN: {rules['BRN']}, CNF: {rules['CNF']}, SLP: {rules['SLP']}, PAR: {rules['PAR']} }}, // how many of its own turns a Special Condition lasts on it (0 = immune)",
            '};', 'export const BOSSES = [']
     for b in bosses:
-        out.append(f"  {{ n: {b['n']}, name: {js(b['name'])}, card: {js(b['card'])}, hp: {b['hp']}, type: {js(b['type'])}, wk: {js(b['wk'])}, rs: {js(b['rs'])}, armor: {b['armor']}, thorns: {b['thorns']}, enrage: {b['enrage']}, pattern: {js(b['pattern'])},")
+        out.append(f"  {{ n: {b['n']}, stage: {b['stage']}, name: {js(b['name'])}, card: {js(b['card'])}, hp: {b['hp']}, type: {js(b['type'])}, wk: {js(b['wk'])}, rs: {js(b['rs'])}, armor: {b['armor']}, thorns: {b['thorns']}, enrage: {b['enrage']}, pattern: {js(b['pattern'])},")
         out.append('    attacks: [' + ', '.join(atk(a) for a in b['attacks']) + '] },')
     out.append('];')
     (ROOT / 'public' / 'js' / 'arena-bosses.js').write_text('\n'.join(out) + '\n', encoding='utf-8', newline='')
-    for b in bosses:
+    for b in sorted(bosses, key=lambda x: x['stage']):
         hit = lambda a: a['dmg'] * (a['flips'] / 2 if a.get('flips') else 1)
         free = [a for a in b['attacks'] if a['cost'] == 0]; jab = max(free, key=hit) if free else None
         en = rules['energyStart']; step = 0; total = 0; turns = 120
@@ -147,8 +156,9 @@ def main():
             if not k: step += 1; continue
             a = b['attacks'][k - 1]
             if en >= a['cost']: total += hit(a); en -= a['cost']; step += 1
+            elif rules['energyCharge']: en = min(rules['energyMax'], en + rules['energyCharge'])
             elif jab: total += hit(jab)
-        print(f"{b['n']}. Colossal {b['name']:<10} {b['hp']:>4} HP   {len(b['attacks'])} attacks{'' if jab else ' (no basic attack: it rests while charging)'}   about {total / turns:.0f} damage a turn")
-    print(f"wrote public/js/arena-bosses.js ({len(bosses)} bosses)")
+        print(f"stage {b['stage']}: Colossal {b['name']:<10} {b['hp']:>4} HP   {len(b['attacks'])} attacks   about {total / turns:.0f} damage a turn")
+    print(f"wrote public/js/arena-bosses.js ({len(bosses)} bosses in {len(stages)} stages)")
 
 main()

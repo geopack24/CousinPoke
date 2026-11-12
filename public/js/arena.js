@@ -91,20 +91,32 @@ function topCards(cards, n) {
   return Object.keys(cards || {}).filter((cid) => C(cid).st === 'Pokémon').sort((a, b) => rank(b) - rank(a)).slice(0, n);
 }
 
-/** The Colossal Pokémon a run faces next: one for each win so far. */
-const bossAt = (wins) => BOSSES[Math.min(wins, BOSSES.length - 1)];
-const bossName = (wins) => 'Colossal ' + bossAt(wins).name;
-/** The ladder of bosses, with the ones already beaten ticked off. Tap one to read its attacks. */
-function ladderHTML(wins, playing) {
-  return `<div class="ar-ladder">${BOSSES.map((b, i) => `<button type="button" class="ar-boss ${i < wins ? 'beaten' : i === wins && playing ? 'now' : ''}" data-view="${bossId(b.n)}" title="Colossal ${esc(b.name)}: ${b.hp} HP">
-      <span class="ab-card">${PT.cardHTML(bossId(b.n), 0.24)}${i < wins ? '<span class="ab-tick">✓</span>' : ''}</span><b>${esc(b.name)}</b><small>${b.hp} HP</small></button>`).join('')}</div>`;
+/* The bosses are fought in stages, one stage per win. A stage can have several possible bosses: each run meets one of
+   them, picked from the run's seed (so it never changes for that run) and shown only when it is the next one up. */
+const stageOf = (b) => b.stage || b.n;
+const STAGES = () => Math.max(1, ...BOSSES.map(stageOf));
+/** The Colossal Pokémon a run faces after `wins` wins. */
+function bossAt(r, wins) {
+  const stage = Math.min(wins, STAGES() - 1) + 1; const opts = BOSSES.filter((b) => stageOf(b) === stage); if (!opts.length) return BOSSES[BOSSES.length - 1];
+  let h = ((((r && r.seed) || 1) >>> 0) ^ Math.imul(stage, 2654435761)) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822519) >>> 0; h ^= h >>> 13;
+  return opts[h % opts.length];
+}
+const bossName = (r, wins) => 'Colossal ' + bossAt(r, wins).name;
+/** The ladder of stages. The bosses already beaten are ticked off and the next one is shown; the rest stay face down
+ *  until you reach them. Tap a revealed one to read its attacks. */
+function ladderHTML(r, playing) {
+  const wins = r ? r.wins : 0;
+  return `<div class="ar-ladder">${Array.from({ length: STAGES() }, (_, i) => { const b = bossAt(r, i); return (r && (i < wins || (i === wins && playing))
+    ? `<button type="button" class="ar-boss ${i < wins ? 'beaten' : 'now'}" data-view="${bossId(b.n)}" title="Colossal ${esc(b.name)}: ${b.hp} HP">
+      <span class="ab-card">${PT.cardHTML(bossId(b.n), 0.24)}${i < wins ? '<span class="ab-tick">✓</span>' : ''}</span><b>${esc(b.name)}</b><small>${b.hp} HP</small></button>`
+    : `<div class="ar-boss hidden" title="Boss ${i + 1}: revealed when you reach it"><span class="ab-card">${PT.backHTML(0.24)}<span class="ab-q">?</span></span><b>???</b><small>Boss ${i + 1}</small></div>`); }).join('')}</div>`;
 }
 /** Start (or resume) the next game of the run: a table against the next Colossal Pokémon, already dealt. */
 async function battle() {
   const r = run(); if (!r || r.status !== 'play') return;
   if (r.gameId) { PT.openGame(r.gameId); return; }
   if (V.busy || r.swap) return; // the reward for the last win comes first
-  const n = r.games.length + 1; const boss = bossAt(r.wins); const title = bossName(r.wins);
+  const n = r.games.length + 1; const boss = bossAt(r, r.wins); const title = bossName(r, r.wins);
   const myCards = finalDeck(PT.CARDS, r.cards, r.energy);
   const id = 'ar' + rid() + rid();
   try { await PT.api('PUT', 'players/' + BOT_UID, { data: { name: 'Computer', updatedAt: Date.now() } }); } catch (e) { /* the name is cosmetic */ }
@@ -133,7 +145,7 @@ async function record(gid, won) {
   let after = null;
   const ok = await mutate((d) => {
     const r = d.run; if (!r || r.status !== 'play' || r.gameId !== gid || r.games.some((x) => x.id === gid)) return false;
-    r.games.push({ id: gid, title: bossName(r.wins), won, at: Date.now() });
+    r.games.push({ id: gid, title: bossName(r, r.wins), won, at: Date.now() });
     if (won) r.wins++; else r.losses++; r.gameId = null;
     if (r.wins >= ARENA.wins || (!won && r.losses >= ARENA.losses)) finishRun(d);
     else if (won) { const keys = makeSwapOffer(PT.CARDS, r.seed, r.wins, r.cards, rules()); r.swap = keys.length ? { n: r.wins, keys } : null; }
@@ -144,7 +156,7 @@ async function record(gid, won) {
 }
 function resultModal(r, won) {
   if (r.status === 'done') { PT.closeModal(); chestReveal(r); return; }
-  const body = `<p>Arena record: <b>${r.wins}–${r.losses}</b>. ${won ? `${r.swap ? 'You earned a card swap. ' : ''}Next up: <b>${esc(bossName(r.wins))}</b>.` : ''}</p>`;
+  const body = `<p>Arena record: <b>${r.wins}–${r.losses}</b>. ${won ? `${r.swap ? 'You earned a card swap. ' : ''}Next up: <b>${esc(bossName(r, r.wins))}</b>.` : ''}</p>`;
   PT.showModal(won ? 'Victory!' : 'Defeat', body, `<button class="pri" id="tarena" type="button">Back to the Arena</button>`, (m) => { m.querySelector('#tarena').onclick = () => { PT.closeModal(); PT.go('arena'); }; });
 }
 /* ---------- the prize chest ----------
@@ -414,7 +426,7 @@ const sizeLabel = (e) => (e.size === 1 ? ({ basic: 'Basic Pokémon', trainer: 'T
 function swapHTML(r) {
   const cards = r.swap.keys.map((k) => { const e = poolEntry(PT.CARDS, k, rules()); if (!e) return ''; const c = C(e.cid);
     return `<div class="ar-swapc t-${e.tier}"><button type="button" class="ar-swapbtn" data-swapin="${esc(k)}" aria-label="Swap in ${esc(c.name)}">${PT.cardHTML(e.cid, 0.5)}</button><b>${esc(c.name)}</b><span class="ar-gem">${TIER_NAMES[e.tier]}</span><small>${sizeLabel(e)}</small><button type="button" class="sm ghost" data-read="${esc(k)}">Read it</button></div>`; }).join('');
-  return `<section class="panel ar-next ar-swap"><span class="kicker">Reward for beating ${esc(bossName(r.swap.n - 1))}</span><h2>Swap a card into your deck</h2>
+  return `<section class="panel ar-next ar-swap"><span class="kicker">Reward for beating ${esc(bossName(r, r.swap.n - 1))}</span><h2>Swap a card into your deck</h2>
       <p class="muted">Tap one of these, then choose what it replaces. It has to take the place of the same number of cards: a single card for a single card, an evolution line for a line of the same length. What you give up is gone for good.</p>
       <div class="ar-swaprow">${cards}</div>
       <div class="ar-actions"><button class="sec" type="button" data-skipswap="1">Keep my deck as it is</button></div></section>`;
@@ -433,13 +445,13 @@ function swapModal(inKey) {
   });
 }
 function playView(r) {
-  const boss = bossAt(r.wins); const title = bossName(r.wins);
+  const boss = bossAt(r, r.wins); const title = bossName(r, r.wins);
   const games = r.games.map((x) => `<li class="${x.won ? 'w' : 'l'}"><b>${x.won ? 'W' : 'L'}</b> ${esc(x.title)}</li>`).join('');
   if (r.swap && !r.gameId) return `<div class="ar-play">${swapHTML(r)}${deckPanel(r, 'Your Arena deck', r.energy)}</div>`;
   return `<div class="ar-play">
-    <section class="panel ar-next"><span class="kicker">Boss ${Math.min(r.wins + 1, BOSSES.length)} of ${BOSSES.length}</span><h2>${r.gameId ? `${esc(title)} is waiting` : `Next: ${esc(title)}`}</h2>
-      <p class="muted">${r.gameId ? 'Pick up where you left off.' : `${boss.hp} HP. Knock it Out before it Knocks Out ${BOSS_RULES.kos} of your Pokémon. Tap a boss to read its attacks.`}</p>
-      ${ladderHTML(r.wins, true)}
+    <section class="panel ar-next"><span class="kicker">Boss ${Math.min(r.wins + 1, STAGES())} of ${STAGES()}</span><h2>${r.gameId ? `${esc(title)} is waiting` : `Next: ${esc(title)}`}</h2>
+      <p class="muted">${r.gameId ? 'Pick up where you left off.' : `${boss.hp} HP. Knock it Out before it Knocks Out ${BOSS_RULES.kos} of your Pokémon. Tap it to read its attacks. The bosses after it stay hidden until you get there.`}</p>
+      ${ladderHTML(r, true)}
       <div class="ar-actions"><button class="pri cta" type="button" data-battle="1">${r.gameId ? '▶ Resume game' : '⚔ Battle!'}</button>${r.gameId ? '<button class="sec" type="button" data-forfeit="1">Forfeit this game</button>' : ''}</div>
       ${games ? `<ul class="ar-games">${games}</ul>` : ''}
       <div class="ar-foot"><button class="sm ghost" type="button" data-savedeck="1">Copy this deck to Your Decks</button><button class="sm ghost" type="button" data-retire="1">End this run now</button></div></section>
@@ -454,9 +466,9 @@ function startView(d) {
     <section class="panel ar-begin"><h2>${last ? 'Ready for another run?' : 'Enter the Arena'}</h2>
       <ol class="ar-steps"><li><b>Draft.</b> Make ${ARENA.picksTo} picks: 1 of 3 cards each time, or a basic Energy instead. Only the top of each evolution line is offered, and an evolved Pokémon brings its whole line (2 of each card).</li>
         <li><b>Free cards.</b> Every deck starts with ${ARENA.bills} Bills (so Bill is never in the draft), ${ARENA.oaks} Professor Oak and ${ARENA.energy} basic Energy for your Pokémon's types. Want more Energy? Take it with your picks. That makes 60.</li>
-        <li><b>Battle.</b> Take on ${BOSSES.length} Colossal Pokémon, one after another. Each is a single giant with a huge HP pool: Knock it Out before it Knocks Out ${BOSS_RULES.kos} of yours. ${ARENA.wins} wins is a perfect run. There are no second chances: lose once and the run is over.</li>
+        <li><b>Battle.</b> Take on ${STAGES()} Colossal Pokémon, one after another. Which one waits at each stage changes from run to run, and you only find out when you get there. Each is a single giant with a huge HP pool: Knock it Out before it Knocks Out ${BOSS_RULES.kos} of yours. ${ARENA.wins} wins is a perfect run. There are no second chances: lose once and the run is over.</li>
         <li><b>Rewards.</b> After each win you are shown 3 cards and may swap one into your deck, in place of a pick of the same size. What you give up is gone for good.</li></ol>
-      <span class="kicker">The bosses, in order (tap one to read it)</span>${ladderHTML(0, false)}
+      <span class="kicker">${STAGES()} bosses, each revealed when you reach it</span>${ladderHTML(null, false)}
       <button class="pri cta" type="button" data-start="1">✦ Start a run</button></section>
     <div class="ar-startside">${lastHTML}<section class="panel ar-prizes"><span class="kicker">Prizes</span><h2>What a run pays</h2>
       <ol class="ar-ptable">${ARENA_REWARDS.map((t, w) => `<li class="${w >= ARENA.wins ? 'top' : ''}"><span>${w} ${w === 1 ? 'win' : 'wins'}</span><b>${COIN.icon} ${t}</b>${w >= ARENA.wins ? '<em>+ a gold card</em>' : ''}</li>`).join('')}</ol>

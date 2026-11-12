@@ -35,7 +35,7 @@ export function colossalText(b, r = BOSS_RULES) {
   const out = [`Knock it Out to win. It wins when it has Knocked Out ${r.kos} of your Pokémon.`];
   if (!r.wr) out.push(`Weakness and Resistance don't count in this fight, for either side.`);
   out.push(`Each time it loses a sixth of its HP you take a Prize.`);
-  out.push(`Energy: it starts with ${rule(r, 'energyStart', 0) || 'none'} and gains ${rule(r, 'energyPerTurn', 1)} at the start of each of its turns (up to ${rule(r, 'energyMax', 5)}). Its Energy sits on its Bench with ${rule(r, 'energyHP', 20)} HP each, and each attack uses up its Energy cost. While it is charging it uses its basic attack, which costs nothing. Destroy or discard its Energy to hold its big attacks back.`);
+  out.push(`Energy: it starts with ${rule(r, 'energyStart', 0) || 'none'} and gains ${rule(r, 'energyPerTurn', 1)} at the start of each of its turns (up to ${rule(r, 'energyMax', 5)}). Its Energy sits on its Bench with ${rule(r, 'energyHP', 20)} HP each, and each attack uses up its Energy cost. ${rule(r, 'energyCharge', 2) ? `When it can't pay for its next attack it uses Energy Charge instead and gains ${rule(r, 'energyCharge', 2)} more.` : 'While it is charging it uses its basic attack, which costs nothing.'} Destroy or discard its Energy to hold its attacks back.`);
   if (lasts.length) out.push(`${lasts.join(', ')}: wears off after ${[...new Set(Object.values(r.conditions).filter(Boolean))].join(' or ')} of its turns.`);
   if (never.length) out.push(`It can't be ${never.join(' or ')}, moved, copied, or stopped from attacking.`);
   if (b.armor) out.push(`Armor: takes ${b.armor} less damage from each attack.`);
@@ -104,10 +104,11 @@ export function nextBossAttack(g, db) {
   if (!g.boss) return null; const b = db[g.boss.cid].boss; const idx = (b.pattern[g.boss.step % b.pattern.length] || 0) - 1; // 0 in the pattern is a turn it sits out
   const atk = idx >= 0 ? b.attacks[idx] : null; const have = g.p[g.boss.seat].bench.length; const cost = atk ? costOf(atk) : 0;
   const max = rule(g.boss.r, 'energyMax', 5); const gain = rule(g.boss.r, 'energyPerTurn', 1);
-  // its basic attack: the strongest one that costs no Energy. It uses it on every turn it is still charging, so it never sits idle.
+  // its basic attack: the strongest one that costs no Energy. With Energy Charge switched off it uses it on every turn it is still charging.
   let ji = -1; b.attacks.forEach((a, i) => { if (costOf(a) === 0 && (ji < 0 || (a.dmg || 0) > (b.attacks[ji].dmg || 0))) ji = i; });
-  const ready = !!atk && have >= cost;
-  return { idx, atk, card: idx >= 0 ? db[g.boss.cid].atk[idx] : null, have, cost, max, ready, soon: !!atk && Math.min(max, have + gain) >= cost,
+  const ready = !!atk && have >= cost; const charge = rule(g.boss.r, 'energyCharge', 2); // Energy Charge comes before the basic attack
+  if (charge > 0) ji = -1;
+  return { idx, atk, card: idx >= 0 ? db[g.boss.cid].atk[idx] : null, have, cost, max, ready, soon: !!atk && Math.min(max, have + gain) >= cost, charge,
     jab: ji >= 0 && ji !== idx ? { idx: ji, atk: b.attacks[ji], card: db[g.boss.cid].atk[ji] } : null, use: atk ? (ready ? idx : ji) : -1 };
 }
 
@@ -123,7 +124,12 @@ function addEnergy(g, db, rng, n) {
 /** The start of its turn: it gains Energy. */
 export function bossCharge(ctx) {
   const { g, db } = ctx; const k = addEnergy(g, db, ctx.rng, rule(g.boss.r, 'energyPerTurn', 1));
-  if (k) { ctx.log(`${ctx.name(g.boss.seat)} gains ${k === 1 ? 'an Energy' : k + ' Energy'} (${P(g, g.boss.seat).bench.length})`); ctx.event({ t: 'bossenergy', n: P(g, g.boss.seat).bench.length }); }
+  if (k) { ctx.log(`${ctx.name(g.boss.seat)} gains ${k === 1 ? 'an Energy' : k + ' Energy'} (${P(g, g.boss.seat).bench.length})`); ctx.event({ t: 'bossenergy', k, n: P(g, g.boss.seat).bench.length }); }
+}
+/** Energy Charge: what it does on a turn it can't pay for its next attack. It gains extra Energy instead of attacking. */
+export function bossEnergyCharge(ctx) {
+  const { g, db } = ctx; const k = addEnergy(g, db, ctx.rng, rule(g.boss.r, 'energyCharge', 2)); const n = P(g, g.boss.seat).bench.length;
+  ctx.log(`${ctx.name(g.boss.seat)} used Energy Charge${k ? ` and gains ${k === 1 ? 'an Energy' : k + ' Energy'} (${n})` : ''}`); ctx.event({ t: 'bosscharge', k, n });
 }
 /** Using an attack uses up its Energy cost: the most damaged Energy goes first. */
 export function bossSpend(ctx, n) {

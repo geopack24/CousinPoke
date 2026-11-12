@@ -10,7 +10,7 @@ import { R, isBasicLike } from './rules.js';
 import { mulberry32, shuffleWith } from './rng.js';
 import { P, other, mons, allMons, findMon, toMon, monCards, pullCard, removeMon, replaceMon, instId } from './state.js';
 import { CARD_SCRIPTS } from './cards/index.js';
-import { nextBossAttack, bossCharge, bossSpend, bossEnergySync } from './boss.js';
+import { nextBossAttack, bossCharge, bossSpend, bossEnergySync, bossEnergyCharge } from './boss.js';
 
 export const STATUS_NAMES = { SLP: 'Asleep', CNF: 'Confused', PAR: 'Paralyzed', PSN: 'Poisoned', BRN: 'Burned' };
 const TYPES = ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting', 'Colorless'];
@@ -156,7 +156,7 @@ export function retreatBlocked(g, db, seat) {
 export function canAttack(g, seat, idx, db, srcCid) {
   CUR_G = g;
   const r = R(g.rules); const p = P(g, seat); const m = p.active; if (!m) return { ok: false, why: 'No Active Pokémon' };
-  if (!myTurn(g, seat)) return { ok: false, why: 'Not your turn' };
+  if (!myTurn(g, seat)) { const t = !g.winner && g.pending[0] && g.pending[0].seat === seat ? g.pending[0].t : null; return { ok: false, why: t === 'prize' ? 'Take your Prize card first' : t === 'promote' ? 'Choose your new Active Pokémon first' : 'Not your turn' }; }
   if (g.attacked) return { ok: false, why: 'Already attacked this turn' };
   if (r.noAttackAfterRetreat && p.retreatedThisTurn) return { ok: false, why: 'You retreated this turn' };
   if (!r.firstTurnAttack && g.turnNo === 1 && g.turn === g.first) return { ok: false, why: 'No attacking on the first turn' };
@@ -518,6 +518,8 @@ function runAction(ctx, a) {
     case 'endTurn': {
       const nb = bossSeat(g, seat) && !g.attacked ? nextBossAttack(g, db) : null;
       if (nb && nb.idx < 0) { g.boss.step++; ctx.log(`${ctx.name(seat)} gathers its strength`); ctx.event({ t: 'bossrest' }); }
+      else if (nb && P(g, seat).active && P(g, seat).active.st.some((x) => x === 'PAR' || x === 'SLP')) ctx.log(`${ctx.name(seat)} is ${P(g, seat).active.st.includes('PAR') ? 'Paralyzed' : 'Asleep'} and can't act this turn`);
+      else if (nb && !nb.ready && nb.charge > 0) bossEnergyCharge(ctx);
       else if (nb && !nb.ready) { ctx.log(`${ctx.name(seat)} is charging ${nb.atk.name} (${nb.have} of ${nb.cost} Energy)`); ctx.event({ t: 'bossrest' }); }
       else ctx.log(`${ctx.name(seat)} ended the turn`);
       finishTurnIfClear(ctx, true); return;

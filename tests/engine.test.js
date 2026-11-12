@@ -775,7 +775,7 @@ function actAuto(g, action, seat = 'a') { let a = { seat, seed: 1, answers: [], 
 /** The boss takes its turn the way the table drives it: its pattern attack if it has one, otherwise it ends the turn. */
 function bossTurn(g, seed = 1) { const l = legalActions(g, 'b', DB); const a = l.find((x) => x.type === 'attack') || { type: 'endTurn' }; return act(g, { type: a.type, index: a.index }, { seat: 'b', seed }); }
 
-test('a Colossal Pokémon starts with no Energy, gains one a turn, and spends it on the attacks of its pattern', () => {
+test('a Colossal Pokémon starts with no Energy, gains one a turn, spends it on the attacks of its pattern, and uses Energy Charge when it is short', () => {
   let g = bossGame(98, { active: N['Chansey'] });
   assert.equal(DB[bossMon(g).c].name, 'Colossal Testzilla'); assert.equal(g.p.b.bench.length, 0);
   assert.equal(g.p.b.deck.length + g.p.b.hand.length + g.p.b.prizes.length, 0); assert.equal(g.first, 'a');
@@ -787,11 +787,12 @@ test('a Colossal Pokémon starts with no Energy, gains one a turn, and spends it
   assert.equal(g.p.b.bench.length, 0, 'Stomp used up its Energy'); assert.equal(bossMon(g).en.length, 0);
   g = act(g, { type: 'endTurn' });
   assert.equal(nextBossAttack(g, DB).atk.name, 'Roar'); assert.ok(!has(legalActions(g, 'b', DB), 'attack'), 'Roar needs 2 Energy and it has 1');
-  g = bossTurn(g); assert.equal(active(g, 'a').dmg, 30); assert.ok(g.log.some((l) => /is charging Roar \(1 of 2 Energy\)/.test(l.m)));
+  g = bossTurn(g); assert.equal(active(g, 'a').dmg, 30, 'no attack this turn'); assert.ok(g.log.some((l) => /used Energy Charge and gains 2 Energy \(3\)/.test(l.m)));
+  assert.equal(g.p.b.bench.length, 3); assert.equal(bossMon(g).en.length, 3);
   assert.equal(bossMon(g).dmg, 0, 'no deck-out damage for having no deck');
   g = act(g, { type: 'endTurn' }); g = bossTurn(g);
   assert.equal(active(g, 'a').dmg, 60); assert.ok(active(g, 'a').st.includes('PSN')); // Roar: 20 and Poisoned, then the first 10 of poison
-  assert.equal(g.p.b.bench.length, 0); assert.equal(nextBossAttack(g, DB).atk.name, 'Stomp', 'the pattern starts again');
+  assert.equal(g.p.b.bench.length, 2, '3 + 1 for the turn, less the 2 Roar used up'); assert.equal(nextBossAttack(g, DB).atk.name, 'Stomp', 'the pattern starts again');
 });
 
 test("Colossal Pokémon: its Energy can be Knocked Out on its Bench or discarded, which holds its attacks back", () => {
@@ -853,6 +854,15 @@ test('Colossal Pokémon: Poison and Confusion wear off after 2 of its turns; it 
   g = act(g, { type: 'override', op: 'status', target: g.boss.id, code: 'PSN' }); assert.ok(bossMon(g).st.includes('PSN'), 'it can be Poisoned again afterwards');
 });
 
+test('Colossal Pokémon: Paralysis costs it one turn, with no attack and no Energy Charge', () => {
+  let g = bossGame(98, { active: N['Chansey'] }, { conditions: { PSN: 2, BRN: 2, CNF: 2, SLP: 0, PAR: 1 } });
+  g = act(g, { type: 'override', op: 'status', target: g.boss.id, code: 'PAR' }); assert.deepEqual(bossMon(g).st, ['PAR']);
+  g = act(g, { type: 'endTurn' }); assert.ok(!has(legalActions(g, 'b', DB), 'attack'));
+  g = bossTurn(g); assert.equal(active(g, 'a').dmg, 0); assert.equal(g.p.b.bench.length, 1, 'only the Energy every turn brings');
+  assert.deepEqual(bossMon(g).st, [], 'it wears off after that turn'); assert.ok(g.log.some((l) => /is Paralyzed and can't act/.test(l.m)));
+  g = act(g, { type: 'endTurn' }); g = bossTurn(g); assert.equal(active(g, 'a').dmg, 30, 'back to its pattern');
+});
+
 test('Colossal Pokémon: Super Fang, Ditto, Metronome, Hurricane and Invisible Wall are kept in check', () => {
   const C4 = [N['Double Colorless Energy'], N['Double Colorless Energy']];
   let g = bossGame(98, { active: { c: N['Raticate'], en: C4 } });
@@ -871,8 +881,8 @@ test('Colossal Pokémon: Super Fang, Ditto, Metronome, Hurricane and Invisible W
   g = act(g, { type: 'override', op: 'damage', target: g.boss.id, delta: 290 }); assert.equal(bossMon(g).dmg, 150, 'no more than the cap at once');
 });
 
-test('Colossal Pokémon: a basic attack that costs no Energy is used on every turn it is still charging', () => {
-  let g = bossGame(97, { active: N['Chansey'] });
+test('Colossal Pokémon: with Energy Charge switched off, a basic attack that costs no Energy is used on every turn it is still charging', () => {
+  let g = bossGame(97, { active: N['Chansey'] }, { energyCharge: 0 });
   assert.deepEqual([nextBossAttack(g, DB).atk.name, nextBossAttack(g, DB).jab.atk.name], ['Blast', 'Jab']);
   g = act(g, { type: 'endTurn' });
   assert.deepEqual(legalActions(g, 'b', DB).filter((a) => a.type === 'attack').map((a) => a.name), ['Jab'], '1 Energy: not enough for Blast, so it jabs');

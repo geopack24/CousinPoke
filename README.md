@@ -50,11 +50,11 @@ Boss attacks are announced on the table: the attack's name slams in, the giant r
 
 ### Colossal Pokémon (the Arena's bosses)
 
-Each Arena game is against one Colossal Pokémon: a single giant with a large HP pool in seat B, no deck, hand or Prizes. `public/js/engine/boss.js` builds the game (`newBossGame`) and the boss cards; the rules live in `engine.js` behind `g.boss`.
+On the Arena page a boss stays face down until it is the next one to fight. Each Arena game is against one Colossal Pokémon: a single giant with a large HP pool in seat B, no deck, hand or Prizes. `public/js/engine/boss.js` builds the game (`newBossGame`) and the boss cards; the rules live in `engine.js` behind `g.boss`.
 
 - **Reward.** After each win the player is shown 3 cards (`makeSwapOffer`) and may swap one into the deck in place of a pick of the same size: a single card for a single card, an evolution line for a line of the same length. A size the deck has none of is never offered, and what leaves the deck is gone for good.
 - **Winning and losing.** Knock it Out to win. It wins when it has Knocked Out 6 of your Pokémon (Clefairy Doll and Mysterious Fossil don't count). You take a Prize for each sixth of its HP you knock off.
-- **Energy.** It starts with none and gains 1 at the start of each of its turns (up to 5). Each attack has an Energy cost, all of which is used up. It works through its attack pattern in order: when it can pay for the next attack it uses it. An attack that costs 0 is its basic attack, which it uses on every turn it is still charging, so it attacks every turn (a boss without one rests while it charges). The table shows what is coming and how much Energy it has for it.
+- **Energy.** It starts with none and gains 1 at the start of each of its turns (up to 5). Each attack has an Energy cost, all of which is used up. It works through its attack pattern in order: when it can pay for the next attack it uses it. When it can't pay for its next attack it uses Energy Charge instead: it gains 2 more Energy that turn and doesn't attack. (With Energy Charge set to 0 in the sheet, it uses its 0-cost basic attack on those turns, or rests if it has none.) The table shows what is coming and how much Energy it has for it.
 - **Its Energy is on its Bench.** Each Energy is a Bench target with 20 HP and is also attached to the boss as an Energy card. Knock one Out (attacks that hit the Bench) or discard one (Energy Removal, attacks that discard Energy) and it is gone, which holds the boss's attacks back. No Prize for it.
 - **Its attacks** get past Pokémon Powers that prevent damage (Invisible Wall).
 - **No Weakness or Resistance.** Neither counts in a boss fight, for your Pokémon or the boss.

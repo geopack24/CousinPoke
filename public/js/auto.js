@@ -383,7 +383,12 @@ function bossImpact(board, atk, events) {
 /** The smaller beats of a boss fight: an Energy arriving, the giant charging up, a Knock Out added to its count. */
 function bossBeats(events) {
   const board = boardEl(); if (!board) return; const flash = (el, cls, ms) => { if (el && fxEnabled()) { el.classList.add(cls); setTimeout(() => el.classList.remove(cls), ms); } };
-  if (events.some((e) => e.t === 'bossenergy')) { sfx.play('boss.energy'); const all = board.querySelectorAll('.bossbench .mon'); flash(all[all.length - 1], 'epop', 900); }
+  const gained = events.filter((e) => e.t === 'bossenergy' || e.t === 'bosscharge').reduce((n, e) => n + (e.k || 0), 0);
+  if (gained) { sfx.play('boss.energy'); const all = [...board.querySelectorAll('.bossbench .mon')]; all.slice(-gained).forEach((el, i) => setTimeout(() => flash(el, 'epop', 900), i * 140)); }
+  if (events.some((e) => e.t === 'bosscharge')) { // Energy Charge is announced like an attack
+    sfx.play('boss.charge', 150); flash(board.querySelector('.bossfig'), 'charging', 1300);
+    if (fxEnabled()) { const el = document.createElement('div'); el.className = 'boss-call t-Charge'; el.innerHTML = `<small>${esc(C(PT.S.game.state.boss.cid).name)}</small><b>Energy Charge</b>`; board.appendChild(el); setTimeout(() => el.remove(), 1350); }
+  }
   if (events.some((e) => e.t === 'bossrest')) { sfx.play('boss.charge', 200); flash(board.querySelector('.bossfig'), 'charging', 1300); }
   if (events.some((e) => e.t === 'bossko')) flash(board.querySelector('.bosskos'), 'kpop', 900);
 }
@@ -489,9 +494,11 @@ export function render(main, doc) {
     const hand = own ? `<div class="z handz" style="align-items:stretch"><span class="zlbl">${compact ? `Hand · ${p.hand.length} · drag to play` : `Your hand · ${p.hand.length} · drag a card onto a Pokémon or the bench, or tap it for options`}</span><div class="hand ${compact ? 'strip' : ''}" data-handzone="${seat}">${handCards.map((c) => PT.cardHTML(c.c, SC.hand, `data-hand="${c.id}"`, (legal.some((a) => a.card === c.id) ? 'click can' : 'click') + (drawFlying.has(c.id) ? ' incoming' : ''))).join('') || '<span class="small muted">empty</span>'}</div></div>` : '';
     const live = g.phase === 'main' && !g.winner && ((pending && pending.seat === seat) || (!pending && g.turn === seat));
     const cls = `side ${own ? 'mine' : ''} ${live ? 'live' : (g.phase === 'main' && !g.winner ? 'idle' : '')}`;
-    return isTop ? `<div class="${cls}">${name}${rail}${field}</div>` : `<div class="${cls}">${name}${field}${rail}${hand}</div>`;
+    // a Prize is waiting: say so in the middle of the player's side (it can come mid-turn against a boss), and let a tap on it take one
+    const prizeCall = prizeClick ? `<div class="prizecall" data-prize="0" data-seat="${seat}" role="button" tabindex="0"><b>🎁 Take a Prize card</b><span>${pending.n > 1 ? `${pending.n} to take · ` : ''}tap here, or one of your Prizes</span></div>` : '';
+    return isTop ? `<div class="${cls}">${name}${rail}${field}</div>` : `<div class="${cls}">${name}${prizeCall}${field}${rail}${hand}</div>`;
   };
-  const statusLine = g.winner ? `${esc(g.seats[g.winner].name)} wins` : g.phase === 'setup' ? 'Setup: place your Basic Pokémon' : pending ? `${pending.seat === me ? 'YOU' : esc(g.seats[pending.seat].name)}: ${pending.t === 'prize' ? 'take a prize' : pending.t === 'promote' ? 'promote a Pokémon' : 'mulligan draw'}` : g.turn === me ? `YOUR TURN · turn ${g.turnNo}` : `${esc(g.seats[g.turn].name)}'s turn · ${g.turnNo}`;
+  const statusLine = g.winner ? `${esc(g.seats[g.winner].name)} wins` : g.phase === 'setup' ? 'Setup: place your Basic Pokémon' : pending ? `${pending.seat === me ? 'YOU' : esc(g.seats[pending.seat].name)}: ${pending.t === 'prize' ? 'take a Prize card' : pending.t === 'promote' ? 'promote a Pokémon' : 'mulligan draw'}` : g.turn === me ? `YOUR TURN · turn ${g.turnNo}` : `${esc(g.seats[g.turn].name)}'s turn · ${g.turnNo}`;
   const waitingOnMe = me && !g.winner && g.phase === 'main' && ((pending && pending.seat === me) || (!pending && g.turn === me));
   const inflightMine = doc.inflight && doc.inflight.prompt && doc.inflight.prompt.seat === me;
   const buttons = me ? `
@@ -539,6 +546,7 @@ export function render(main, doc) {
     const stEl = t.closest('[data-stadium]'); if (stEl) return PT.viewCard(stEl.dataset.stadium);
     const chip = t.closest('.FX[data-desc]'); if (chip) return PT.toast(chip.dataset.desc);
     const hand = t.closest('[data-hand]'); if (hand && me) return handMenu(doc, legal, hand.dataset.hand, hand);
+    const bcard = t.closest('[data-bosscard]'); if (bcard) return PT.viewCard(bcard.dataset.bosscard);
     const mon = t.closest('[data-mon]');
     if (mon && arrangeState && arrangeTapSel && mon.classList.contains('drop-ok')) { const sel = arrangeTapSel; arrangeTapSel = null; clearTapClasses(main.querySelector('.board.auto')); arrangeMove(sel.from, mon.dataset.mon, sel.card); return; }
     if (mon) return monMenu(doc, legal, mon.dataset.mon, mon, me);
@@ -601,7 +609,8 @@ function bossSideHTML(g, seat, compact, SC) {
   const nextHTML = !m ? '' : nx.atk
     ? `<b>${esc(nx.atk.name)}</b>${nx.atk.dmg ? `<span class="bn-d">${nx.atk.flips ? nx.atk.dmg + rage + '×' : nx.atk.dmg + rage}</span>` : ''}<span class="bn-e" title="Energy it has / Energy this attack uses up">⚡ ${nx.have} / ${nx.cost}</span><span class="bn-t">${esc(nx.card.t || '')}</span>`
     : `<b>Gathering strength</b><span class="bn-t">No attack ${turnNow ? 'this' : 'on its next'} turn.</span>`;
-  const jabHTML = m && nx.atk && !coming && nx.jab ? `<span class="bn-j">${turnNow ? 'This turn' : 'Until then'}: <b>${esc(nx.jab.atk.name)}</b> ${nx.jab.atk.flips ? nx.jab.atk.dmg + rage + '×' : (nx.jab.atk.dmg || 0) + rage}${nx.jab.atk.bench ? ` · ${nx.jab.atk.bench} to your Bench` : ''}</span>` : '';
+  const jabHTML = m && nx.atk && !coming && nx.charge > 0 ? `<span class="bn-j">${turnNow ? 'This turn' : 'Next turn'}: <b>Energy Charge</b> · gains ${nx.charge} Energy</span>`
+    : m && nx.atk && !coming && nx.jab ? `<span class="bn-j">${turnNow ? 'This turn' : 'Until then'}: <b>${esc(nx.jab.atk.name)}</b> ${nx.jab.atk.flips ? nx.jab.atk.dmg + rage + '×' : (nx.jab.atk.dmg || 0) + rage}${nx.jab.atk.bench ? ` · ${nx.jab.atk.bench} to your Bench` : ''}</span>` : '';
   const pips = Array.from({ length: b.r.kos }, (_, i) => `<i class="${i < b.kos ? 'on' : ''}"></i>`).join('');
   const ticks = [1, 2, 3, 4, 5].map((i) => `<s class="${i <= b.given ? 'got' : ''}" style="left:${(100 - i / 6 * 100).toFixed(2)}%"></s>`).join('');
   const traits = [def.armor ? [`🛡 Armor ${def.armor}`, `Takes ${def.armor} less damage from each attack. Hits on a weak point ignore it.`] : null,
@@ -610,6 +619,8 @@ function bossSideHTML(g, seat, compact, SC) {
     .filter(Boolean).map(([t, d]) => `<span class="btrait${/Enraged/.test(t) ? ' hot' : ''}" title="${esc(d)}">${esc(t)}</span>`).join('');
   const scBoss = compact ? .36 : .6; const scPart = compact ? .13 : .17;
   const fig = m ? monHTML({ ...m, en: [] }, seat, true, false, scBoss) : `<div class="bossdown">${PT.cardHTML(b.cid, scBoss)}<span>Defeated</span></div>`;
+  // everything it can do, with the next one marked; tap for the full card text
+  const moves = `<div class="bossmoves" data-bosscard="${esc(b.cid)}" role="button" tabindex="0" title="Tap for the full text of its attacks"><span class="k">Its moves</span>${(def.attacks || []).map((a, k) => `<span class="bm${k === nx.idx ? ' next' : ''}"><b>${esc(a.name)}</b><i>⚡${a.cost == null ? 1 : a.cost}</i><em>${a.flips ? a.dmg + '×' : a.dmg || '–'}${a.bench ? '+' : ''}</em></span>`).join('')}${nx.charge > 0 ? `<span class="bm ec"><b>Energy Charge</b><i>+${nx.charge}⚡</i><em>–</em></span>` : ''}</div>`;
   // laid out like an opposing player: its Energy along the far edge (its Bench), the Colossal Pokémon in front of it in the middle
   const slots = Array.from({ length: Math.max(nx.max, p.bench.length) }, (_, k) => (p.bench[k] ? monHTML(p.bench[k], seat, false, false, scPart) : `<div class="slot" style="--s:${scPart}">energy</div>`)).join('');
   return `<div class="side boss ${live ? 'live' : (g.phase === 'main' && !g.winner ? 'idle' : '')}${rage ? ' raging' : ''}">
@@ -620,7 +631,7 @@ function bossSideHTML(g, seat, compact, SC) {
       <div class="bossmid"><div class="bossfig" data-active-slot="${seat}">${fig}</div>
         <div class="bosshp"><div class="bossbar ${frac <= .25 ? 'crit' : frac <= .5 ? 'hurt' : ''}" title="Each mark is a Prize for you."><i style="width:${(frac * 100).toFixed(1)}%"></i>${ticks}</div><div class="bosshpn"><b>${left}</b> / ${hp} HP</div></div></div>
       <div class="bossright"><div class="bosskos" title="It wins when it has Knocked Out ${b.r.kos} of your Pokémon."><span class="k">Knock Outs</span><span class="pips">${pips}</span><b>${b.kos} / ${b.r.kos}</b></div>
-        ${traits ? `<div class="bosstraits">${traits}</div>` : ''}</div>
+        ${traits ? `<div class="bosstraits">${traits}</div>` : ''}${m ? moves : ''}</div>
     </div></div>`;
 }
 function monHTML(m, seat, active, promoteClick, scale) {
