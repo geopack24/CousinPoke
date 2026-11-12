@@ -18,7 +18,7 @@ const run = () => (mine() && mine().run) || null;
 const rid = () => Math.random().toString(36).slice(2, 10);
 const rules = () => clone(PT.rules());
 /** The currency Arena runs pay out (spent in the shop later). */
-const COIN = { name: 'Tokens', one: 'Token', icon: '🪙' };
+const COIN = { name: 'Cousin Tokens', one: 'Cousin Token', icon: '🪙' };
 const coins = (n) => `${n} ${n === 1 ? COIN.one : COIN.name}`;
 const goldIds = (d) => ((d && d.gold) || []).map((g) => g.cid);
 /** A card with the gold holographic finish. */
@@ -250,9 +250,9 @@ function deckPanel(r, title, energy) {
   const n = draftedCount(r.cards); const basics = basicsIn(r.cards, PT.CARDS);
   const lastE = !energy && r.picks.length && V.offer && V.offer.first ? poolEntry(PT.CARDS, r.picks[r.picks.length - 1], rules()) : null;
   const fresh = lastE ? new Set(Object.keys(lastE.cards)) : null;
-  return `<aside class="panel ar-side ar-deck"><div class="ar-dhead"><h3>${esc(title)}</h3><span class="ar-count"><b>${energy ? n + ARENA.energy : n}</b>/${energy ? ARENA.picksTo + ARENA.energy : ARENA.picksTo}</span></div>
-    ${curveHTML(r.cards)}<p class="small muted ar-basics">${basics} Basic Pokémon${energy ? '' : ` · ${ARENA.energy} Energy added at the end`}</p>
-    <div class="ar-tiles">${n || energy ? tilesHTML(r.cards, energy, fresh) : '<p class="muted small">Your picks show up here.</p>'}</div></aside>`;
+  return `<aside class="panel ar-side ar-deck"><div class="ar-dhead"><h3>${esc(title)}</h3><span class="ar-count"><b>${n + ARENA.bills + (energy ? ARENA.energy : 0)}</b>/${ARENA.picksTo + ARENA.bills + (energy ? ARENA.energy : 0)}</span></div>
+    ${curveHTML(finalDeck(PT.CARDS, r.cards, {}))}<p class="small muted ar-basics">${basics} Basic Pokémon · ${ARENA.bills} Bills included${energy ? '' : ` · ${ARENA.energy} Energy added at the end`}</p>
+    <div class="ar-tiles">${tilesHTML(r.cards, energy, fresh)}</div></aside>`;
 }
 
 function draftView(r) {
@@ -273,7 +273,7 @@ function draftView(r) {
     <section class="ar-stage"><div class="ar-stagehead"><div><span class="kicker">Pick ${r.round + 1}</span><h2>Choose a card</h2></div>
       <div class="ar-bar" title="${n} of ${ARENA.picksTo} cards"><i style="width:${Math.round((n / ARENA.picksTo) * 100)}%"></i></div></div>
       <div class="ar-offer">${offer.map(choice).join('')}</div>
-      <p class="small muted ar-hint">Click a card to draft it, or 🔍 to read it first. Evolved Pokémon bring their whole line, 2 of each card.</p>
+      <p class="small muted ar-hint">Click a card to draft it, or 🔍 to read it first. Evolved Pokémon bring their whole line, 2 of each card. Your deck already has ${ARENA.bills} Bills.</p>
       <button class="sm ghost ar-abandon" type="button" data-retire="1">Abandon this run</button></section>
     ${deckPanel(r, 'Your deck')}</div>`;
 }
@@ -319,8 +319,8 @@ function startView(d) {
       ${last.reward ? `<p class="ar-lastprize">${COIN.icon} <b>+${last.reward.tokens}</b> ${COIN.name}${last.reward.gold ? ` · gold <b>${esc(C(last.reward.gold).name)}</b>` : ''}</p>` : ''}</section>` : '';
   return `<div class="ar-start">
     <section class="panel ar-begin"><h2>${last ? 'Ready for another run?' : 'Enter the Arena'}</h2>
-      <ol class="ar-steps"><li><b>Draft.</b> Pick 1 of 3 cards until you have ${ARENA.picksTo}. Only the top of each evolution line is offered, and an evolved Pokémon brings its whole line (2 of each card).</li>
-        <li><b>Energy.</b> ${ARENA.energy} basic Energy are added for your Pokémon's types.</li>
+      <ol class="ar-steps"><li><b>Draft.</b> Pick 1 of 3 cards until you have drafted ${ARENA.picksTo}. Only the top of each evolution line is offered, and an evolved Pokémon brings its whole line (2 of each card).</li>
+        <li><b>Free cards.</b> Every deck gets ${ARENA.bills} Bills (so Bill is never in the draft), plus ${ARENA.energy} basic Energy for your Pokémon's types. That makes 60.</li>
         <li><b>Battle.</b> Play the computer under the league's standard rules. ${ARENA.wins} wins is a perfect run; ${ARENA.losses} losses ends it.</li></ol>
       <button class="pri cta" type="button" data-start="1">✦ Start a run</button></section>
     <div class="ar-startside">${lastHTML}<section class="panel ar-prizes"><span class="kicker">Prizes</span><h2>What a run pays</h2>

@@ -9,35 +9,32 @@ export const TIERS = {
   'gym1-1': 'L', // Blaine's Moltres
   'base1-2': 'L', // Blastoise
   'base1-4': 'L', // Charizard
-  'base1-71': 'L', // Computer Search
   'base5-1': 'L', // Dark Alakazam
   'base5-8': 'L', // Dark Gyarados
   'base5-13': 'L', // Dark Vileplume
   'base3-4': 'L', // Dragonite
+  'gym2-4': 'L', // Erika's Venusaur
   'base3-5': 'L', // Gengar
   'gym2-5': 'L', // Giovanni's Gyarados
   'gym2-6': 'L', // Giovanni's Machamp
   'gym2-7': 'L', // Giovanni's Nidoking
   'base1-6': 'L', // Gyarados
-  'base1-74': 'L', // Item Finder
   'base1-10': 'L', // Mewtwo
+  'gym2-13': 'L', // Misty's Gyarados
   'base3-12': 'L', // Moltres
   'base3-13': 'L', // Muk
   'base1-11': 'L', // Nidoking
   'base1-12': 'L', // Ninetales
-  'base1-88': 'L', // Professor Oak
   'gym2-14': 'L', // Rocket's Mewtwo
   'gym2-15': 'L', // Rocket's Zapdos
   'gym2-29': 'L', // Sabrina's Gengar
   'gym1-14': 'L', // Sabrina's Gengar
-  'base1-79': 'L', // Super Energy Removal
   'base1-15': 'L', // Venusaur
   'base3-15': 'L', // Zapdos
+  'base1-16': 'L', // Zapdos
   'base1-23': 'E', // Arcanine
   'gym2-1': 'E', // Blaine's Arcanine
-  'gym2-35': 'E', // Brock's Primeape
-  'gym1-2': 'E', // Brock's Rhydon
-  'base1-3': 'E', // Chansey
+  'base1-71': 'E', // Computer Search
   'base5-4': 'E', // Dark Charizard
   'base5-5': 'E', // Dark Dragonite
   'base1-21': 'E', // Electrode
@@ -45,19 +42,23 @@ export const TIERS = {
   'gym1-5': 'E', // Erika's Vileplume
   'gym2-23': 'E', // Giovanni's Nidoqueen
   'base3-36': 'E', // Golem
+  'base1-74': 'E', // Item Finder
   'gym2-9': 'E', // Koga's Beedrill
   'gym1-8': 'E', // Lt. Surge's Magneton
   'gym1-28': 'E', // Lt. Surge's Raichu
   'base1-8': 'E', // Machamp
   'base3-11': 'E', // Magneton
-  'gym2-13': 'E', // Misty's Gyarados
+  'base1-88': 'E', // Professor Oak
   'gym2-16': 'E', // Sabrina's Alakazam
+  'base1-79': 'E', // Super Energy Removal
   'base2-15': 'E', // Vileplume
-  'base1-16': 'E', // Zapdos
   'base1-17': 'R', // Beedrill
   'gym2-21': 'R', // Blaine's Ninetales
   'gym2-3': 'R', // Brock's Ninetales
+  'gym2-35': 'R', // Brock's Primeape
+  'gym1-2': 'R', // Brock's Rhydon
   'base2-33': 'R', // Butterfree
+  'base1-3': 'R', // Chansey
   'base5-6': 'R', // Dark Dugtrio
   'base5-9': 'R', // Dark Hypno
   'base5-83': 'R', // Dark Raichu
@@ -129,7 +130,6 @@ export const TIERS = {
   'base3-59': 'U', // Energy Search
   'gym1-16': 'U', // Erika
   'gym1-3': 'U', // Erika's Clefable
-  'gym2-4': 'U', // Erika's Venusaur
   'base2-3': 'U', // Flareon
   'base1-82': 'U', // Full Heal
   'base5-81': 'U', // Full Heal Energy

@@ -1,4 +1,4 @@
-// Arena draft: pick 1 of 3 until the deck has 42 cards, then 18 basic Energy fill it to 60.
+// Arena draft: pick 1 of 3 until you have 38 cards; every deck also gets 4 Bills, and 18 basic Energy fill it to 60.
 // Every card has a rarity tier (arena-tiers.js, from the spreadsheet); rarer tiers are offered less often.
 // Only the top of each evolution line is offered; drafting an evolved Pokémon brings 2 copies of every card in its line.
 // Pure functions (no page state) so the page, the tests and the simulator share them.
@@ -6,13 +6,14 @@ import { mulberry32 } from './engine/rng.js';
 import { R } from './engine/rules.js';
 import { TIERS, TIER_WEIGHTS } from './arena-tiers.js';
 
-export const ARENA = { picksTo: 42, energy: 18, wins: 7, losses: 3, lineCopies: 2 };
-/** Prize for a finished run, by wins: Tokens (index = wins). A perfect run also wins a gold card. */
+export const ARENA = { picksTo: 38, bills: 4, energy: 18, wins: 7, losses: 3, lineCopies: 2 };
+/** Prize for a finished run, by wins: Cousin Tokens (index = wins). A perfect run also wins a gold card. */
 export const ARENA_REWARDS = [0, 15, 30, 50, 75, 100, 150, 250];
 const SETS = ['base1', 'base2', 'base3', 'base5', 'gym1', 'gym2']; // no promos
 const BASIC_TYPES = ['Fire', 'Water', 'Grass', 'Lightning', 'Psychic', 'Fighting'];
 // Not offered in the draft. Rainbow Energy: under the house rules any Energy already pays any cost.
-const NOT_IN_DRAFT = new Set(['Rainbow Energy']);
+// Bill: every Arena deck is given 4 of them, so nobody has to spend picks on card draw.
+const NOT_IN_DRAFT = new Set(['Rainbow Energy', 'Bill']);
 
 /** Card signature: reprints (same name, HP, attacks, powers) count as one card. */
 const sig = (c) => JSON.stringify([c.name, c.hp, c.sub, (c.atk || []).map((a) => [a.n, a.d, (a.c || []).length]), c.pw ? c.pw.n : null]);
@@ -42,7 +43,7 @@ export function arenaPool(db, rules) {
     pool.push(entry(c, 'line', line, ARENA.lineCopies));
   }
   for (const c of uniq) {
-    if (c.st === 'Trainer' && !banned.has(c.name) && !/Stadium/.test(c.sub || '')) pool.push(entry(c, 'trainer', [c], 1));
+    if (c.st === 'Trainer' && !banned.has(c.name) && !NOT_IN_DRAFT.has(c.name) && !/Stadium/.test(c.sub || '')) pool.push(entry(c, 'trainer', [c], 1));
     if (c.st === 'Energy' && c.sub !== 'Basic' && !banned.has(c.name) && !NOT_IN_DRAFT.has(c.name)) pool.push(entry(c, 'energy', [c], 1));
   }
   CACHE = { db, pool };
@@ -76,9 +77,9 @@ export function makeOffer(db, seed, round, cards, rules) {
   const mons = pool.filter((e) => e.kind === 'line' || e.kind === 'basic');
   const left = ARENA.picksTo - draftedCount(cards); const basics = basicsIn(cards, db);
   const needMons = basics < 8 && left <= (8 - basics) * 3;
-  // steer toward roughly 24 Pokémon and 18 Trainers: the more Pokémon cards drafted, the fewer Pokémon offered
+  // steer toward roughly 24 Pokémon and 14 Trainers (plus the 4 Bills): the more Pokémon cards drafted, the fewer Pokémon offered
   const drafted = draftedCount(cards); const monCards = drafted - trainerCards(cards, db);
-  const pMon = drafted ? Math.max(0.15, Math.min(0.85, 0.5 + (24 / 42 - monCards / drafted) * 2.5)) : 0.6;
+  const pMon = drafted ? Math.max(0.15, Math.min(0.85, 0.5 + (24 / ARENA.picksTo - monCards / drafted) * 2.5)) : 0.6;
   const out = []; const used = new Set();
   const isMon = (e) => e.kind === 'line' || e.kind === 'basic';
   /**
@@ -130,9 +131,12 @@ export function energySplit(db, cards) {
 }
 /** The basic Energy card id for a type (Base Set printing). */
 export function energyId(db, type) { const c = Object.values(db).find((x) => x.st === 'Energy' && x.sub === 'Basic' && x.name === type + ' Energy' && x.set === 'base1') || Object.values(db).find((x) => x.st === 'Energy' && x.sub === 'Basic' && x.name === type + ' Energy'); return c && c.id; }
-/** The finished 60-card deck: drafted cards plus the Energy. */
+/** Bill (Base Set): 4 come with every Arena deck. */
+export function billId(db) { const c = Object.values(db).find((x) => x.name === 'Bill' && x.set === 'base1') || Object.values(db).find((x) => x.name === 'Bill'); return c && c.id; }
+/** The finished 60-card deck: drafted cards, the 4 Bills, and the Energy (pass {} as `split` for the deck without Energy yet). */
 export function finalDeck(db, cards, split) {
-  const out = { ...(cards || {}) }; for (const [t, k] of Object.entries(split || energySplit(db, cards))) { const id = energyId(db, t); if (id) out[id] = (out[id] || 0) + k; } return out;
+  const out = { ...(cards || {}) }; const bill = billId(db); if (bill) out[bill] = (out[bill] || 0) + ARENA.bills;
+  for (const [t, k] of Object.entries(split || energySplit(db, cards))) { const id = energyId(db, t); if (id) out[id] = (out[id] || 0) + k; } return out;
 }
 
 /* ---------- the computer's draft ---------- */

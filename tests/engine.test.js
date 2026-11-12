@@ -641,20 +641,23 @@ test('taking your last prize wins even when a double Knock Out owed you more pri
   assert.equal(s.winner, 'a');
 });
 
-test('the Arena draft never offers banned cards, Stadiums, promos or Rainbow Energy, and drafts legal 60-card decks', () => {
+test('the Arena draft never offers banned cards, Stadiums, promos, Rainbow Energy or Bill, and drafts legal 60-card decks with 4 Bills', () => {
   const pool = arenaPool(DB, DEFAULT_RULES);
   const names = new Set(pool.flatMap((e) => Object.keys(e.cards).map((id) => DB[id].name)));
   for (const n of DEFAULT_RULES.banned) assert.ok(!names.has(n), n + ' is in the Arena pool');
   assert.ok(!names.has('Rainbow Energy'));
+  assert.ok(!names.has('Bill'), 'Bill is given, not drafted');
+  assert.equal(ARENA.picksTo + ARENA.bills + ARENA.energy, 60);
   assert.ok(!pool.some((e) => Object.keys(e.cards).some((id) => /Stadium/.test(DB[id].sub || '') || id.startsWith('basep'))));
   for (let seed = 1; seed <= 25; seed++) {
     const d = botDraft(DB, seed, 0.5, DEFAULT_RULES);
-    assert.equal(Object.values(d).reduce((a, b) => a + b, 0), ARENA.picksTo + ARENA.energy);
+    assert.equal(Object.values(d).reduce((a, b) => a + b, 0), 60);
+    assert.equal(d[N['Bill']], ARENA.bills, 'every Arena deck gets 4 Bills');
     assert.deepEqual(validateDeck({ cards: d }, DEFAULT_RULES, DB).filter((x) => x.bad), []);
   }
 });
 
-test('Arena prizes: more wins pay more Tokens, and a gold card is always one the player does not own', () => {
+test('Arena prizes: more wins pay more Cousin Tokens, and a gold card is always one the player does not own', () => {
   assert.equal(ARENA_REWARDS.length, ARENA.wins + 1);
   for (let w = 1; w <= ARENA.wins; w++) assert.ok(ARENA_REWARDS[w] > ARENA_REWARDS[w - 1]);
   const pool = goldPool(DB);
