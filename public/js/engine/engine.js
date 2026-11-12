@@ -166,7 +166,7 @@ export function canAttack(g, seat, idx, db, srcCid) {
   const c = srcCid ? db[srcCid] : effectiveCard(g, db, m); const atk = (c.atk || [])[idx]; if (!atk) return { ok: false, why: 'No such attack' };
   if (isBoss(g, m)) { const nb = nextBossAttack(g, db); if (nb.use !== idx) return { ok: false, why: nb.idx === idx ? 'Not enough Energy' : 'Not its next attack' }; }
   if (!canPay(db, g.rules, m, atk.c)) return { ok: false, why: 'Not enough energy' };
-  if (!isBoss(g, m) && fxOf(m, 'noAttack').some((f) => f.attack === atk.n || !f.attack)) return { ok: false, why: `Can't use ${atk.n} this turn` };
+  if (fxOf(m, 'noAttack').some((f) => f.attack === atk.n || !f.attack)) return { ok: false, why: `Can't use ${atk.n} this turn` };
   if (m.flags['used:' + atk.n] && attackScript(c.id, atk.n) && attackScript(c.id, atk.n).oncePerLife) return { ok: false, why: 'Already used' };
   const s = attackScript(c.id, atk.n);
   if (s && s.canUse) { const why = s.canUse({ g, db, seat, m, atk }); if (why) return { ok: false, why }; }
@@ -505,7 +505,7 @@ function runAction(ctx, a) {
       let proceed = true;
       if (m.st.includes('CNF')) { if (!ctx.flip('confusion')) { ctx.event({ t: 'confused', attacker: m.id }); ctx.log(`${nameOf(db, m.c)} is Confused and hurt itself`); dealDamage(ctx, m, R(g.rules).confusionSelfDamage, { noWR: true, self: true }); proceed = false; } }
       if (proceed && ctx.defender && db[ctx.defender.c] && db[ctx.defender.c].sub === 'Baby' && !ctx.copying) { if (!ctx.flip('Baby Rule')) { ctx.log(`Baby Rule: tails, the attack on ${nameOf(db, ctx.defender.c)} does nothing`); proceed = false; } }
-      if (proceed && hasFx(m, 'sandAttack') && !isBoss(g, m)) { if (!ctx.flip('Sand-attack')) { ctx.log('The attack does nothing (Sand-attack)'); proceed = false; } }
+      if (proceed && hasFx(m, 'sandAttack')) { if (!ctx.flip('Sand-attack')) { ctx.log('The attack does nothing (Sand-attack)'); proceed = false; } }
       if (proceed) { const bs = scriptOf(m.c).passive; if (bs && bs.beforeAttack && powersActive(g, db) && bs.beforeAttack(ctx, m) === false) proceed = false; }
       if (proceed && ctx.defender) { const ps = scriptOf(ctx.defender.c).passive; if (ps && ps.onTargeted && powersActive(g, db) && !conditioned(ctx.defender)) ps.onTargeted(ctx, ctx.defender); }
       if (proceed && ctx.defender && ctx.defender.tools.some((t) => scriptOf(t.c).ninjaTrick) && ctx.opp.bench.length) { const k = ctx.chooseMon("Koga's Ninja Trick: switch before the attack? (or none)", ctx.opp.bench, { seat: other(seat), id: 'ninja', min: 0 }); if (k.length) { const tool = ctx.defender.tools.find((t) => scriptOf(t.c).ninjaTrick); ctx.switchActive(other(seat), k[0], "Koga's Ninja Trick"); pullCard(g, tool.id); ctx.opp.discard.push(tool); ctx.defender = ctx.opp.active; } }

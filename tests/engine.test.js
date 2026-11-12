@@ -840,12 +840,11 @@ test('Colossal Pokémon: the player takes a Prize for each sixth of its HP, wins
   assert.equal(g.boss.kos, 2); assert.equal(g.winner, 'b');
 });
 
-test('Colossal Pokémon: Poison and Confusion wear off after 2 of its turns; it cannot be put to sleep, Paralyzed, or stopped from attacking', () => {
+test('Colossal Pokémon: Poison and Confusion wear off after 2 of its turns, and a condition set to 0 turns never sticks', () => {
   let g = bossGame(98, { active: N['Chansey'] }, { conditions: { PSN: 2, BRN: 2, CNF: 2, SLP: 0, PAR: 0 } });
   for (const code of ['SLP', 'PAR']) { g = act(g, { type: 'override', op: 'status', target: g.boss.id, code }); assert.deepEqual(bossMon(g).st, []); }
   g = act(g, { type: 'override', op: 'status', target: g.boss.id, code: 'PSN' }); g = act(g, { type: 'override', op: 'status', target: g.boss.id, code: 'CNF' });
   assert.deepEqual(bossMon(g).st.slice().sort(), ['CNF', 'PSN']);
-  g = act(g, { type: 'override', op: 'flag', target: g.boss.id, k: 'noAttack' }); // Tail Wag and the like
   g = act(g, { type: 'endTurn' }); assert.ok(has(legalActions(g, 'b', DB), 'attack'));
   g = bossTurn(g, HEADS); g = act(g, { type: 'endTurn' });
   assert.ok(bossMon(g).st.includes('PSN'), 'still Poisoned during its second turn');
@@ -868,6 +867,20 @@ test('Colossal Pokémon: Paralysis costs it one turn, with no attack and no Ener
   t = bossTurn(t); assert.equal(active(t, 'a').dmg, 0); assert.equal(t.p.b.bench.length, 1); assert.deepEqual(bossMon(t).st, [], 'awake after the turn it lost');
   let h = act(z, { type: 'endTurn' }, { seed: HEADS }); assert.deepEqual(bossMon(h).st, [], 'heads: it wakes up');
   h = bossTurn(h); assert.equal(active(h, 'a').dmg, 30, 'and attacks');
+});
+
+test("Colossal Pokémon: effects on its next attack work (Dark Jolteon's Lightning Flash makes it flip; Tail Wag can stop it)", () => {
+  const dj = cardId('Dark Jolteon', 'base5'); const flash = DB[dj].atk.findIndex((x) => x.n === 'Lightning Flash');
+  const start = () => act(bossGame(98, { active: { c: dj, en: [N['Lightning Energy'], N['Lightning Energy'], N['Lightning Energy']] } }), { type: 'attack', index: flash });
+  let g = start(); assert.equal(bossMon(g).dmg, 20); assert.equal(g.turn, 'b');
+  let t = bossTurn(g, TAILS); assert.equal(active(t, 'a').dmg, 0, 'tails: its attack does nothing'); assert.ok(t.log.some((l) => /does nothing \(Sand-attack\)/.test(l.m)));
+  assert.equal(t.p.b.bench.length, 0, 'the Energy for the attack is still used up'); assert.equal(t.boss.step, 1);
+  let h = bossTurn(g, HEADS); assert.equal(active(h, 'a').dmg, 30, 'heads: the attack lands');
+  // "can't attack next turn" (Tail Wag, Leer): it has no attack to make that turn
+  g = bossGame(98, { active: N['Chansey'] }); g = act(g, { type: 'override', op: 'flag', target: g.boss.id, k: 'noAttack', until: 2 });
+  g = act(g, { type: 'endTurn' }); assert.ok(!has(legalActions(g, 'b', DB), 'attack'));
+  g = bossTurn(g); assert.equal(active(g, 'a').dmg, 0);
+  g = act(g, { type: 'endTurn' }); assert.ok(has(legalActions(g, 'b', DB), 'attack'), 'and it is free again the turn after');
 });
 
 test('Colossal Pokémon: Super Fang, Ditto, Metronome, Hurricane and Invisible Wall are kept in check', () => {

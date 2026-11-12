@@ -37,7 +37,7 @@ export function colossalText(b, r = BOSS_RULES) {
   out.push(`Each time it loses a sixth of its HP you take a Prize.`);
   out.push(`Energy: it starts with ${rule(r, 'energyStart', 0) || 'none'} and gains ${rule(r, 'energyPerTurn', 1)} at the start of each of its turns (up to ${rule(r, 'energyMax', 5)}). Its Energy sits on its Bench with ${rule(r, 'energyHP', 20)} HP each, and each attack uses up its Energy cost. ${rule(r, 'energyCharge', 2) ? `When it can't pay for its next attack it uses Energy Charge instead and gains ${rule(r, 'energyCharge', 2)} more.` : 'While it is charging it uses its basic attack, which costs nothing.'} Destroy or discard its Energy to hold its attacks back.`);
   if (lasts.length) out.push(`${lasts.join(', ')}: wears off after ${[...new Set(Object.values(r.conditions).filter(Boolean))].join(' or ')} of its turns.`);
-  if (never.length) out.push(`It can't be ${never.join(' or ')}, moved, copied, or stopped from attacking.`);
+  out.push(`It can't be ${never.length ? never.join(' or ') + ', ' : ''}moved or copied.`);
   if (b.armor) out.push(`Armor: takes ${b.armor} less damage from each attack.`);
   if (b.thorns) out.push(`Strikes back: ${b.thorns} damage to any Pokémon that damages it with an attack.`);
   if (b.enrage) out.push(`Enraged at half HP: its attacks do ${b.enrage} more damage.`);

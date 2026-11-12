@@ -58,7 +58,7 @@ On the Arena page a boss stays face down until it is the next one to fight. Each
 - **Its Energy is on its Bench.** Each Energy is a Bench target with 20 HP and is also attached to the boss as an Energy card. Knock one Out (attacks that hit the Bench) or discard one (Energy Removal, attacks that discard Energy) and it is gone, which holds the boss's attacks back. No Prize for it.
 - **Its attacks** get past Pokémon Powers that prevent damage (Invisible Wall).
 - **No Weakness or Resistance.** Neither counts in a boss fight, for your Pokémon or the boss.
-- **Special Conditions.** Poison, Burn and Confusion wear off after 2 of its turns. Paralysis costs it one turn (no attack, no Energy Charge; it still gains its Energy). Sleep gets the usual wake-up flip and costs it one turn if it stays Asleep. Effects that stop it attacking in other ways, move it, copy it or return it to hand do nothing.
+- **Special Conditions.** Poison, Burn and Confusion wear off after 2 of its turns. Paralysis costs it one turn (no attack, no Energy Charge; it still gains its Energy). Sleep gets the usual wake-up flip and costs it one turn if it stays Asleep. Effects on its next attack work as printed (Lightning Flash and Smokescreen make it flip, Tail Wag and Leer can stop it). Effects that move it, copy it or return it to hand do nothing.
 - **Limits.** No single move takes more than 150 off it. Super Fang, Life Drain and Destiny Bond do a fixed 40 instead.
 - **Traits.** A boss may have armor (less damage from each attack), strike back (damage to whatever hits it) and an enrage bonus at half HP.
 
