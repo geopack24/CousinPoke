@@ -28,5 +28,5 @@ export const BOSSES = [
   { n: 6, stage: 6, name: "Dragonite", card: "base3-4", hp: 360, type: "Colorless", wk: "", rs: "", armor: 0, thorns: 0, enrage: 0, pattern: [1, 2, 3], energy: "Lightning",
     attacks: [{ name: "Slam", cost: 2, dmg: 30, flips: 2 }, { name: "Twister", cost: 2, dmg: 20, bench: 20 }, { name: "Hyper Beam", cost: 3, dmg: 60, effect: "energy" }] },
   { n: 7, stage: 7, name: "Charizard", card: "base1-4", hp: 400, type: "Fire", wk: "", rs: "", armor: 0, thorns: 0, enrage: 10, pattern: [1, 2, 3], energy: "Fire",
-    attacks: [{ name: "Flamethrower", cost: 2, dmg: 40 }, { name: "Heat Wave", cost: 2, dmg: 20, bench: 10, effect: "BRN" }, { name: "Fire Spin", cost: 4, dmg: 80 }] },
+    attacks: [{ name: "Flamethrower", cost: 2, dmg: 40 }, { name: "Heat Wave", cost: 2, dmg: 20, bench: 10, effect: "BRN" }, { name: "Fire Spin", cost: 5, dmg: 100 }] },
 ];
