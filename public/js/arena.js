@@ -265,15 +265,15 @@ function draftView(r) {
     const tag = e.kind === 'line' ? `${c.sub} line · ${e.size} cards` : e.kind === 'basic' ? 'Basic Pokémon' : e.kind === 'energy' ? 'Special Energy' : (c.sub || 'Trainer');
     const line = e.kind === 'line' ? `<div class="ar-line">${e.line.map((cid) => `${ARENA.lineCopies}× ${esc(C(cid).name)}`).join(' › ')}</div>` : '';
     return `<div class="ar-choice ${e.kind} t-${t}${first ? ' enter' : ''}" style="--i:${i}" data-pick="${esc(k)}" data-tier="${t}" role="button" tabindex="0" aria-label="Draft ${esc(c.name)} (${TIER_NAMES[t]})">
-      <div class="ar-card"><span class="ar-aura" aria-hidden="true"></span>${PT.cardHTML(e.cid, 1).replace(/ data-cid="[^"]*"/, '')}${e.kind === 'line' ? `<span class="ar-stack" aria-hidden="true">×${e.size}</span>` : ''}
-        <button type="button" class="ar-zoom" data-view="${esc(e.cid)}" title="Read ${esc(c.name)} (or hold the card down)" aria-label="Read ${esc(c.name)}">🔍</button></div>
-      <div class="ar-gem">${TIER_NAMES[t]}</div><div class="ar-tag">${esc(tag)}</div>${line}</div>`;
+      <div class="ar-card"><span class="ar-aura" aria-hidden="true"></span>${PT.cardHTML(e.cid, 1).replace(/ data-cid="[^"]*"/, '')}${e.kind === 'line' ? `<span class="ar-stack" aria-hidden="true">×${e.size}</span>` : ''}</div>
+      <div class="ar-under"><span class="ar-gem">${TIER_NAMES[t]}</span><button type="button" class="ar-read" data-read="${esc(k)}" title="Read ${esc(c.name)} up close" aria-label="Read ${esc(c.name)}"><span aria-hidden="true">🔍</span> Read</button></div>
+      <div class="ar-tag">${esc(tag)}</div>${line}</div>`;
   };
   return `<div class="ar-draft">
     <section class="ar-stage"><div class="ar-stagehead"><div><span class="kicker">Pick ${r.round + 1}</span><h2>Choose a card</h2></div>
       <div class="ar-bar" title="${n} of ${ARENA.picksTo} cards"><i style="width:${Math.round((n / ARENA.picksTo) * 100)}%"></i></div></div>
       <div class="ar-offer">${offer.map(choice).join('')}</div>
-      <p class="small muted ar-hint"><b>Click</b> a card to draft it. <b>Hold</b> it down to read it up close. Evolved Pokémon bring their whole line, 2 of each card. Your deck already has ${ARENA.bills} Bills.</p>
+      <p class="small muted ar-hint"><b>Click</b> a card to draft it. <b>Hold</b> it down, or press <b>Read</b>, to see it up close. Evolved Pokémon bring their whole line, 2 of each card. Your deck already has ${ARENA.bills} Bills.</p>
       <button class="sm ghost ar-abandon" type="button" data-retire="1">Abandon this run</button></section>
     ${deckPanel(r, 'Your deck')}</div>`;
 }
@@ -315,24 +315,24 @@ function cardText(cid, small) {
     ${(c.atk || []).map((a) => `<div class="pk-atk"><div><span class="pk-cost">${(a.c || []).map((t) => `<i style="background:${TCOL[t] || '#999'}" title="${esc(t)}"></i>`).join('')}<small>${costText(a)}</small></span><b>${esc(a.n)}</b><strong>${esc(a.d || '')}</strong></div>${a.t ? `<p>${esc(a.t)}</p>` : ''}</div>`).join('')}
     ${c.txt ? `<p class="pk-txt">${esc(c.txt)}</p>` : ''}${foot.length ? `<div class="pk-foot">${esc(foot.join(' · '))}</div>` : ''}</div>`;
 }
-function showPeek(key) {
+function showPeek(key, sticky) {
   hidePeek();
   const e = poolEntry(PT.CARDS, key, rules()); if (!e) return;
   const phone = window.innerWidth < 720;
   const s = phone ? Math.min(1.25, (window.innerWidth - 40) / 240, (window.innerHeight * 0.42) / 330) : Math.min(1.7, (window.innerHeight - 80) / 330, (window.innerWidth - 520) / 240);
   const pre = e.kind === 'line' ? e.line.slice(0, -1).reverse() : [];
-  const ov = document.createElement('div'); ov.className = `ar-peek t-${e.tier}`; ov.setAttribute('aria-hidden', 'true');
+  const ov = document.createElement('div'); ov.className = `ar-peek t-${e.tier}${sticky ? ' sticky' : ''}`; if (sticky) { ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', C(e.cid).name); ov.onclick = hidePeek; } else ov.setAttribute('aria-hidden', 'true');
   ov.innerHTML = `<div class="ar-peek-in"><div class="ar-peek-card"><span class="ar-aura"></span>${PT.cardHTML(e.cid, Math.max(0.6, s).toFixed(2)).replace(/ data-cid="[^"]*"/, '')}</div>
     <div class="ar-peek-text"><span class="ar-gem">${TIER_NAMES[e.tier]}</span>${cardText(e.cid)}
       ${pre.length ? `<div class="pk-with">Comes with ${ARENA.lineCopies} of each</div>${pre.map((cid) => cardText(cid, true)).join('')}` : ''}
-      <div class="pk-hint">Let go to close</div></div></div>`;
+      <div class="pk-hint">${sticky ? 'Click anywhere to close' : 'Let go to close'}</div></div></div>`;
   document.body.appendChild(ov); V.peek = ov;
 }
 function hidePeek() { if (V.peek) { V.peek.remove(); V.peek = null; } }
 let hold = null;
 function holdStart(e) {
   if (e.button != null && e.button !== 0) return;
-  const ch = e.target.closest && e.target.closest('.ar-choice[data-pick]'); if (!ch || e.target.closest('button') || V.picking) return;
+  const ch = e.target.closest && e.target.closest('.ar-choice[data-pick]'); if (!ch || !e.target.closest('.ar-card') || V.picking) return;
   holdCancel();
   hold = { x: e.clientX, y: e.clientY, shown: false, t: setTimeout(() => { if (hold) { hold.shown = true; showPeek(ch.dataset.pick); } }, HOLD_MS) };
 }
@@ -346,6 +346,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('pointerup', holdEnd); window.addEventListener('pointercancel', () => { holdCancel(); hidePeek(); });
   window.addEventListener('pointermove', holdMove, { passive: true });
   window.addEventListener('blur', () => { holdCancel(); hidePeek(); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && V.peek) hidePeek(); });
   window.addEventListener('contextmenu', (e) => { if (e.target.closest && e.target.closest('.ar-choice, .ar-peek')) e.preventDefault(); });
 }
 function playView(r) {
@@ -407,7 +408,8 @@ export function render(main) {
     if (V.noClick) { V.noClick = false; return; }
     const b = e.target.closest('button');
     const v = e.target.closest('[data-view]'); if (v && (!b || b === v)) { PT.viewCard(v.dataset.view); return; }
-    const ch = e.target.closest('.ar-choice[data-pick]'); if (ch && !b) { pickAnimated(ch); return; }
+    if (b && b.dataset.read) { showPeek(b.dataset.read, true); return; }
+    const ch = e.target.closest('.ar-choice[data-pick]'); if (ch && !b && e.target.closest('.ar-card')) { pickAnimated(ch); return; }
     if (!b) return;
     if (b.dataset.start) A.start();
     else if (b.dataset.battle) battle();
