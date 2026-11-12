@@ -1,11 +1,13 @@
 // The Arena: single-player runs. Draft a deck 1-of-3, then play the computer until 7 wins or 3 losses.
 // One document per player (arena/<pid>) holds the current run and the player's record; the page syncs everyone's
 // documents for the leaderboard. Arena games are ordinary auto-rules tables with the computer in seat B.
-import { ARENA, arenaPool, makeOffer, poolEntry, addPick, draftedCount, basicsIn, energySplit, finalDeck, botDraft, OPPONENTS, oppSkill } from './arena-draft.js';
+import { ARENA, arenaPool, makeOffer, poolEntry, addPick, draftedCount, basicsIn, energySplit, finalDeck, botDraft, OPPONENTS, oppSkill, tierOf } from './arena-draft.js';
+import { TIER_NAMES } from './arena-tiers.js';
 import { BOT_UID } from './bot.js';
+import { play as sfx } from './sfx.js';
 
 let PT = null;
-const V = { busy: false, noted: new Set() };
+const V = { busy: false, noted: new Set(), revealed: null, offer: null, picking: false };
 const esc = (s) => PT.esc(s);
 const me = () => PT.uid();
 const C = (cid) => PT.CARDS[cid] || {};
@@ -137,7 +139,7 @@ async function checkCurrent() {
 const TCOL = { Fire: '#f08030', Water: '#6890f0', Grass: '#78c850', Lightning: '#f8d030', Psychic: '#f85888', Fighting: '#c03028', Colorless: '#a8a878' };
 function header(r) {
   const rec = r && r.status !== 'done' ? `<div class="ar-record">${recordHTML(r)}</div>` : '';
-  return `<header class="arhead"><div class="ar-copy"><span class="kicker">Single player</span><h1>The Arena</h1><div class="ornate" aria-hidden="true"></div>
+  return `<header class="arhead${r && r.status === 'draft' ? ' slim' : ''}"><div class="ar-copy"><span class="kicker">Single player</span><h1>The Arena</h1><div class="ornate" aria-hidden="true"></div>
     <p class="small muted">Draft a deck one pick at a time, then take on the computer. Seven wins is a perfect run; three losses and you're out.</p></div>${rec}</header>`;
 }
 function recordHTML(r) {
@@ -145,44 +147,94 @@ function recordHTML(r) {
   const l = Array.from({ length: ARENA.losses }, (_, i) => `<i class="ar-l${i < r.losses ? ' on' : ''}" title="Loss ${i + 1}"></i>`).join('');
   return `<div class="ar-wins"><span>Wins</span><div>${w}</div><b>${r.wins}</b></div><div class="ar-losses"><span>Losses</span><div>${l}</div><b>${r.losses}</b></div>`;
 }
-function deckList(cards, energy) {
-  const all = finalDeck(PT.CARDS, cards, energy);
-  const groups = { 'Pokémon': [], Trainers: [], Energy: [] };
-  for (const [cid, k] of Object.entries(all)) { const c = C(cid); (c.st === 'Pokémon' ? groups['Pokémon'] : c.st === 'Energy' ? groups.Energy : groups.Trainers).push([cid, k]); }
-  const byName = (a, b) => (C(a[0]).name > C(b[0]).name ? 1 : -1);
-  groups['Pokémon'].sort(byName); groups.Trainers.sort(byName);
-  return Object.entries(groups).filter(([, l]) => l.length).map(([g, l]) => `<div class="ar-dsec"><h4>${g} <span>${l.reduce((n, [, k]) => n + k, 0)}</span></h4>${l.map(([cid, k]) => `<button type="button" class="ar-row" data-view="${esc(cid)}"><b>${k}</b><span>${esc(C(cid).name)}</span><em>${esc(C(cid).sub || '')}</em></button>`).join('')}</div>`).join('');
+/* Deck panel in the style of Hearthstone's Arena: a "curve" by stage, then one tile per card (its art, name and count). */
+const KIND_ORDER = { Basic: 0, Baby: 0, 'Stage 1': 1, 'Stage 2': 2 };
+function sortKey(cid) { const c = C(cid); const g = c.st === 'Pokémon' ? 0 : c.st === 'Trainer' ? 1 : 2; return [g, c.st === 'Pokémon' ? (KIND_ORDER[c.sub] ?? 0) : 0, c.name]; }
+function cmpKey(a, b) { const x = sortKey(a), y = sortKey(b); for (let i = 0; i < x.length; i++) { if (x[i] < y[i]) return -1; if (x[i] > y[i]) return 1; } return 0; }
+function curveHTML(cards) {
+  const cols = [['Basic', 0], ['Stage 1', 0], ['Stage 2', 0], ['Trainer', 0], ['Sp. Energy', 0]];
+  for (const [cid, k] of Object.entries(cards || {})) {
+    const c = C(cid); const i = c.st === 'Pokémon' ? (c.sub === 'Stage 2' ? 2 : c.sub === 'Stage 1' ? 1 : 0) : c.st === 'Trainer' ? 3 : c.sub === 'Basic' ? -1 : 4;
+    if (i >= 0) cols[i][1] += k;
+  }
+  const max = Math.max(4, ...cols.map((x) => x[1]));
+  return `<div class="ar-curve" aria-label="Deck makeup">${cols.map(([l, n]) => `<div class="ar-cbar"><b>${n}</b><div><i style="height:${Math.round((n / max) * 100)}%"></i></div><span>${l}</span></div>`).join('')}</div>`;
 }
+function tilesHTML(cards, energy, fresh) {
+  const all = finalDeck(PT.CARDS, cards, energy || {});
+  const ids = Object.keys(all).sort(cmpKey); let last = null;
+  return ids.map((cid) => {
+    const c = C(cid); const grp = c.st === 'Pokémon' ? 'Pokémon' : c.st === 'Trainer' ? 'Trainers' : 'Energy';
+    const head = grp !== last ? `<h4 class="ar-tgrp">${grp}</h4>` : ''; last = grp;
+    const t = (c.types || [])[0] || (c.st === 'Energy' ? c.name.split(' ')[0] : 'Trainer');
+    return `${head}<button type="button" class="ar-tile t-${tierOf(cid)}${fresh && fresh.has(cid) ? ' fresh' : ''}" data-view="${esc(cid)}" style="--tc:${TCOL[t] || '#8a7fb0'}"><span class="ar-tart" aria-hidden="true">${PT.cardHTML(cid, 0.9)}</span><span class="ar-tname">${esc(c.name)}</span><b class="ar-tn">${all[cid] > 1 ? '×' + all[cid] : ''}</b></button>`;
+  }).join('');
+}
+function deckPanel(r, title, energy) {
+  const n = draftedCount(r.cards); const basics = basicsIn(r.cards, PT.CARDS);
+  const lastE = !energy && r.picks.length && V.offer && V.offer.first ? poolEntry(PT.CARDS, r.picks[r.picks.length - 1], rules()) : null;
+  const fresh = lastE ? new Set(Object.keys(lastE.cards)) : null;
+  return `<aside class="panel ar-side ar-deck"><div class="ar-dhead"><h3>${esc(title)}</h3><span class="ar-count"><b>${energy ? n + ARENA.energy : n}</b>/${energy ? ARENA.picksTo + ARENA.energy : ARENA.picksTo}</span></div>
+    ${curveHTML(r.cards)}<p class="small muted ar-basics">${basics} Basic Pokémon${energy ? '' : ` · ${ARENA.energy} Energy added at the end`}</p>
+    <div class="ar-tiles">${n || energy ? tilesHTML(r.cards, energy, fresh) : '<p class="muted small">Your picks show up here.</p>'}</div></aside>`;
+}
+
 function draftView(r) {
   const offer = makeOffer(PT.CARDS, r.seed, r.round, r.cards, rules());
-  const n = draftedCount(r.cards); const basics = basicsIn(r.cards, PT.CARDS);
-  const choice = (key) => {
-    const e = poolEntry(PT.CARDS, key, rules()); const c = C(e.cid);
-    const line = e.kind === 'line' ? `<div class="ar-line">${e.line.map((cid) => `<span>${ARENA.lineCopies}× ${esc(C(cid).name)}</span>`).join('<i aria-hidden="true">›</i>')}</div>` : '';
-    const tag = e.kind === 'line' ? `${c.sub} line · ${e.size} cards` : e.kind === 'basic' ? 'Basic Pokémon · 1 card' : e.kind === 'energy' ? 'Special Energy · 1 card' : `${c.sub || 'Trainer'} · 1 card`;
-    return `<div class="ar-choice ${e.kind}"><div class="ar-card" data-view="${esc(e.cid)}">${PT.cardHTML(e.cid, 0.8)}${e.kind === 'line' ? `<span class="ar-stack" aria-hidden="true">×${e.size}</span>` : ''}</div>
-      <div class="ar-tag">${esc(tag)}</div>${line}<button class="pri" type="button" data-pick="${esc(key)}">Draft ${esc(c.name)}</button></div>`;
+  const n = draftedCount(r.cards);
+  const key = r.id + ':' + r.round; const first = V.revealed !== key; // the cards flip in (and sound) once per round, not on every refresh
+  V.offer = { key, first, tiers: offer.map((k) => tierOf(k)) };
+  const choice = (k, i) => {
+    const e = poolEntry(PT.CARDS, k, rules()); const c = C(e.cid); const t = e.tier;
+    const tag = e.kind === 'line' ? `${c.sub} line · ${e.size} cards` : e.kind === 'basic' ? 'Basic Pokémon' : e.kind === 'energy' ? 'Special Energy' : (c.sub || 'Trainer');
+    const line = e.kind === 'line' ? `<div class="ar-line">${e.line.map((cid) => `${ARENA.lineCopies}× ${esc(C(cid).name)}`).join(' › ')}</div>` : '';
+    return `<div class="ar-choice ${e.kind} t-${t}${first ? ' enter' : ''}" style="--i:${i}" data-pick="${esc(k)}" data-tier="${t}" role="button" tabindex="0" aria-label="Draft ${esc(c.name)} (${TIER_NAMES[t]})">
+      <div class="ar-card"><span class="ar-aura" aria-hidden="true"></span>${PT.cardHTML(e.cid, 1).replace(/ data-cid="[^"]*"/, '')}${e.kind === 'line' ? `<span class="ar-stack" aria-hidden="true">×${e.size}</span>` : ''}
+        <button type="button" class="ar-zoom" data-view="${esc(e.cid)}" title="Read ${esc(c.name)}" aria-label="Read ${esc(c.name)}">🔍</button></div>
+      <div class="ar-gem">${TIER_NAMES[t]}</div><div class="ar-tag">${esc(tag)}</div>${line}</div>`;
   };
-  const pct = Math.round((n / ARENA.picksTo) * 100);
   return `<div class="ar-draft">
-    <section class="panel ar-offer-wrap"><div class="ar-progress"><div><b>Pick ${r.round + 1}</b><span class="muted small"> · choose one</span></div><div class="ar-bar"><i style="width:${pct}%"></i></div><div class="small"><b>${n}</b> / ${ARENA.picksTo} cards · <b>${basics}</b> Basic${basics === 1 ? '' : 's'}</div></div>
+    <section class="ar-stage"><div class="ar-stagehead"><div><span class="kicker">Pick ${r.round + 1}</span><h2>Choose a card</h2></div>
+      <div class="ar-bar" title="${n} of ${ARENA.picksTo} cards"><i style="width:${Math.round((n / ARENA.picksTo) * 100)}%"></i></div></div>
       <div class="ar-offer">${offer.map(choice).join('')}</div>
-      <p class="small muted ar-hint">Evolved Pokémon come with their whole line, 2 of each card. ${ARENA.energy} basic Energy are added for you at the end, matched to your Pokémon. Tap a card to read it.</p></section>
-    <aside class="panel ar-side"><h3>Your deck so far</h3>${n ? deckList(r.cards, {}) : '<p class="muted small">Nothing yet. Your picks show up here.</p>'}
-      <div class="ar-dsec"><h4>Energy <span>${ARENA.energy}</span></h4><p class="small muted">Added when the draft ends.</p></div>
-      <button class="sm ghost" type="button" data-retire="1">Abandon this run</button></aside></div>`;
+      <p class="small muted ar-hint">Click a card to draft it, or 🔍 to read it first. Evolved Pokémon bring their whole line, 2 of each card.</p>
+      <button class="sm ghost ar-abandon" type="button" data-retire="1">Abandon this run</button></section>
+    ${deckPanel(r, 'Your deck')}</div>`;
+}
+/** Fit the three cards to the space they have (as big as the screen allows, like Hearthstone). */
+function sizeOffer() {
+  const o = document.querySelector('.ar-offer'); if (!o) return;
+  const gap = parseFloat(getComputedStyle(o).columnGap) || 16;
+  const w = (o.clientWidth - 2 * gap) / 3 - 6;
+  const h = Math.max(240, window.innerHeight - (o.getBoundingClientRect().top + window.scrollY) - 96); // the whole card and its labels fit on screen
+  o.style.setProperty('--cs', Math.max(0.3, Math.min(1.25, w / 240, h / 330)).toFixed(3));
+}
+if (typeof window !== 'undefined') window.addEventListener('resize', sizeOffer);
+/** After the draft screen is drawn: size the cards, and the first time a round is shown, play its reveal sounds. */
+function afterDraft() {
+  sizeOffer();
+  const o = V.offer; if (!o || !o.first || !document.querySelector('.ar-offer')) return;
+  V.revealed = o.key;
+  sfx('arena.deal', 0);
+  const best = ['L', 'E', 'R'].find((t) => o.tiers.includes(t));
+  if (best) sfx(best === 'L' ? 'arena.legendary' : best === 'E' ? 'arena.epic' : 'arena.rare', 260 + o.tiers.indexOf(best) * 140);
+}
+function pickAnimated(el) {
+  if (V.picking || V.busy) return; V.picking = true;
+  document.querySelectorAll('.ar-choice').forEach((x) => { x.classList.remove('enter'); x.classList.add(x === el ? 'chosen' : 'passed'); });
+  sfx('arena.pick', 0, el.dataset.tier);
+  setTimeout(async () => { try { await A.pick(el.dataset.pick); } finally { V.picking = false; } }, 430);
 }
 function playView(r) {
   const title = OPPONENTS[Math.min(r.wins, OPPONENTS.length - 1)];
   const games = r.games.map((x, i) => `<li class="${x.won ? 'w' : 'l'}"><b>${x.won ? 'W' : 'L'}</b> Game ${i + 1} vs ${esc(x.title)}</li>`).join('');
-  const energy = Object.entries(r.energy || {}).map(([t, k]) => `<span class="ar-en"><i style="background:${TCOL[t] || '#999'}"></i>${k} ${esc(t)}</span>`).join('');
   return `<div class="ar-play">
     <section class="panel ar-next"><span class="kicker">Game ${r.games.length + 1} of up to ${ARENA.wins + ARENA.losses - 1}</span><h2>${r.gameId ? 'Your game is waiting' : `Next opponent: ${esc(title)}`}</h2>
       <p class="muted">${r.gameId ? 'Pick up where you left off.' : `The computer drafts its own deck for each game, and it drafts better as your wins climb.`}</p>
       <div class="ar-actions"><button class="pri cta" type="button" data-battle="1">${r.gameId ? '▶ Resume game' : '⚔ Battle!'}</button>${r.gameId ? '<button class="sec" type="button" data-forfeit="1">Forfeit this game</button>' : ''}</div>
       ${games ? `<ul class="ar-games">${games}</ul>` : ''}
       <div class="ar-foot"><button class="sm ghost" type="button" data-savedeck="1">Copy this deck to Your Decks</button><button class="sm ghost" type="button" data-retire="1">End this run now</button></div></section>
-    <aside class="panel ar-side"><h3>Your Arena deck</h3><div class="ar-energy">${energy}</div>${deckList(r.cards, r.energy)}</aside></div>`;
+    ${deckPanel(r, 'Your Arena deck', r.energy)}</div>`;
 }
 function startView(d) {
   const last = d && d.run && d.run.status === 'done' ? d.run : null;
@@ -215,12 +267,14 @@ export function render(main) {
   if (r && r.gameId) checkCurrent();
   const body = !r || r.status === 'done' ? startView(d) : r.status === 'draft' ? draftView(r) : playView(r);
   main.innerHTML = `<div class="arena">${header(r)}${body}<div class="ar-lower">${boardHTML()}${historyHTML(d)}</div></div>`;
+  if (r && r.status === 'draft') afterDraft();
+  main.onkeydown = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('ar-choice')) { e.preventDefault(); pickAnimated(e.target); } };
   main.onclick = (e) => {
     const b = e.target.closest('button');
     const v = e.target.closest('[data-view]'); if (v && (!b || b === v)) { PT.viewCard(v.dataset.view); return; }
+    const ch = e.target.closest('.ar-choice[data-pick]'); if (ch && !b) { pickAnimated(ch); return; }
     if (!b) return;
     if (b.dataset.start) A.start();
-    else if (b.dataset.pick) A.pick(b.dataset.pick);
     else if (b.dataset.battle) battle();
     else if (b.dataset.forfeit) forfeit();
     else if (b.dataset.savedeck) saveDeck();

@@ -1,8 +1,10 @@
 // Arena draft: pick 1 of 3 until the deck has 42 cards, then 18 basic Energy fill it to 60.
+// Every card has a rarity tier (arena-tiers.js, from the spreadsheet); rarer tiers are offered less often.
 // Only the top of each evolution line is offered; drafting an evolved Pokémon brings 2 copies of every card in its line.
 // Pure functions (no page state) so the page, the tests and the simulator share them.
 import { mulberry32 } from './engine/rng.js';
 import { R } from './engine/rules.js';
+import { TIERS, TIER_WEIGHTS } from './arena-tiers.js';
 
 export const ARENA = { picksTo: 42, energy: 18, wins: 7, losses: 3, lineCopies: 2 };
 const SETS = ['base1', 'base2', 'base3', 'base5', 'gym1', 'gym2']; // no promos
@@ -47,7 +49,7 @@ export function arenaPool(db, rules) {
 function entry(top, kind, line, copies) {
   const cards = {}; const names = {};
   for (const c of line) { cards[c.id] = (cards[c.id] || 0) + copies; names[c.name] = (names[c.name] || 0) + copies; }
-  return { key: top.id, cid: top.id, kind, cards, names, size: line.length * copies, line: line.map((c) => c.id) };
+  return { key: top.id, cid: top.id, kind, tier: TIERS[top.id] || 'C', cards, names, size: line.length * copies, line: line.map((c) => c.id) };
 }
 
 /** Copies of each name already in the drafted cards (basic Energy doesn't count). */
@@ -69,23 +71,37 @@ export function basicsIn(cards, db) { let n = 0; for (const [cid, k] of Object.e
 export function makeOffer(db, seed, round, cards, rules) {
   const rng = mulberry32(((seed >>> 0) ^ Math.imul(round + 1, 2654435761)) >>> 0);
   const pool = arenaPool(db, rules).filter((e) => fits(e, cards, db, rules));
-  const mons = pool.filter((e) => e.kind === 'line' || e.kind === 'basic'); const rest = pool.filter((e) => e.kind === 'trainer' || e.kind === 'energy');
+  const mons = pool.filter((e) => e.kind === 'line' || e.kind === 'basic');
   const left = ARENA.picksTo - draftedCount(cards); const basics = basicsIn(cards, db);
   const needMons = basics < 8 && left <= (8 - basics) * 3;
   // steer toward roughly 24 Pokémon and 18 Trainers: the more Pokémon cards drafted, the fewer Pokémon offered
   const drafted = draftedCount(cards); const monCards = drafted - trainerCards(cards, db);
   const pMon = drafted ? Math.max(0.15, Math.min(0.85, 0.5 + (24 / 42 - monCards / drafted) * 2.5)) : 0.6;
-  const lines = mons.filter((e) => e.kind === 'line'), singles = mons.filter((e) => e.kind === 'basic');
   const out = []; const used = new Set();
-  const take = (list) => { const l = list.filter((e) => !used.has(e.key)); if (!l.length) return null; const e = l[Math.floor(rng() * l.length)]; used.add(e.key); return e; };
-  const takeMon = () => (rng() < 0.4 ? take(singles) || take(lines) : take(lines) || take(singles));
+  const isMon = (e) => e.kind === 'line' || e.kind === 'basic';
+  /**
+   * One slot. The tier is rolled FIRST, by its weight alone (how many cards a tier holds never changes how often it
+   * comes up); then a card is picked at random from that tier, a Pokémon or a Trainer as the deck needs when the
+   * tier has both. `only` restricts the slot to Pokémon when the deck is short of Basics.
+   */
+  const take = (wantMon, only) => {
+    const l = (only || pool).filter((e) => !used.has(e.key)); if (!l.length) return null;
+    const by = {}; for (const e of l) (by[e.tier] = by[e.tier] || []).push(e);
+    const tiers = Object.keys(by).filter((t) => (TIER_WEIGHTS[t] || 0) > 0).sort(); if (!tiers.length) return null;
+    let roll = rng() * tiers.reduce((a, t) => a + TIER_WEIGHTS[t], 0); let tier = tiers[tiers.length - 1];
+    for (const t of tiers) { roll -= TIER_WEIGHTS[t]; if (roll < 0) { tier = t; break; } }
+    const kind = by[tier].filter((e) => isMon(e) === wantMon); const from = kind.length ? kind : by[tier];
+    const e = from[Math.floor(rng() * from.length)]; used.add(e.key); return e;
+  };
   for (let i = 0; i < 3; i++) {
     const wantMon = needMons || (i === 0 && monCards < 18) || rng() < pMon;
-    const e = wantMon ? takeMon() || take(rest) : take(rest) || takeMon(); if (e) out.push(e);
+    const e = (needMons && take(true, mons)) || take(wantMon); if (e) out.push(e);
   }
   return out.map((e) => e.key);
 }
 export const poolEntry = (db, key, rules) => arenaPool(db, rules).find((e) => e.key === key) || null;
+/** A card's tier letter: C, U, R, E or L. */
+export const tierOf = (cid) => TIERS[cid] || 'C';
 
 /** Add a pick to the drafted cards (returns a new object). */
 export function addPick(db, cards, key, rules) {
@@ -126,7 +142,7 @@ export function pickValue(db, e, cards) {
   if (e.kind === 'energy') return c.name === 'Double Colorless Energy' ? 32 : 14;
   const best = Math.max(0, ...(c.atk || []).map(atkVal)); const pw = c.pw ? 18 : 0;
   const basics = basicsIn(cards, db);
-  let v = best * 0.6 + (c.hp || 0) * 0.25 + pw;
+  let v = best * 0.6 + (c.hp || 0) * 0.25 + pw + ({ L: 14, E: 9, R: 4 }[e.tier] || 0);
   if (e.kind === 'line') v -= (e.line.length - 1) * 6; // slower to set up
   if (e.kind === 'basic' && basics < 10) v += 10; // a deck needs Basics
   return v;

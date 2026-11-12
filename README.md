@@ -44,6 +44,8 @@ New table → "Practice against the computer" puts a computer opponent in seat B
 
 Arena → Start a run. Draft 1 of 3 cards until you have 42: only the top of each evolution line is offered, and an evolved Pokémon brings its whole line (2 of each card). 18 basic Energy are added for your Pokémon's types. Then play the computer under the standard rules until 7 wins or 3 losses; each opponent drafts its own deck and drafts better as your wins climb. Runs and the leaderboard live in the `arena` collection (one document per player). `public/js/arena-draft.js` is the draft (pure, shared with the simulator); `public/js/arena.js` is the screen.
 
+Every draftable card has a rarity tier (Common, Uncommon, Rare, Epic, Legendary). Each slot rolls a tier by its weight first, then a random card from that tier, so a tier's size never changes how often it comes up. Rare, Epic and Legendary cards glow blue, purple and orange when they are dealt, with a sound for each. The tiers and weights come from a spreadsheet: `python tools/arena_tiers.py "Arena rarity tiers.xlsx"` rewrites `public/js/arena-tiers.js`.
+
 ## Ranked league
 
 The League tab (`public/js/league.js`) runs a yearly draft and the standings for ranked play. Everything is one document, `leagues/main`; whoever sets the league up is the commissioner.

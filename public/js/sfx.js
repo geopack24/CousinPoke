@@ -63,6 +63,27 @@ const FX = {
   turn: (t) => { for (const [dt, f] of [[0, 988], [0.18, 1319]]) { tone(t + dt, { type: 'sine', f, dur: 0.75, g: 0.3, a: 0.004, hold: 0.05 }); tone(t + dt, { type: 'sine', f: f * 2, dur: 0.35, g: 0.07, a: 0.004, hold: 0.05 }); } },
   draw: (t) => noise(t, { dur: 0.09, type: 'highpass', f: 3200, to: 1400, g: 0.1, a: 0.004 }),
   win: (t) => arp(t, [523, 659, 784, 1047, 784, 1047, 1319], 0.11, { type: 'square', g: 0.14 }),
+  // Arena draft: cards flip in; a chime for a Rare, a rising shimmer for an Epic, a full fanfare for a Legendary; a thunk when you take one
+  'arena.deal': (t) => { for (let i = 0; i < 3; i++) noise(t + i * 0.11, { dur: 0.1, type: 'highpass', f: 2600, to: 1200, g: 0.09, a: 0.004 }); },
+  'arena.rare': (t) => { for (const [dt, f] of [[0, 784], [0.09, 1175]]) { tone(t + dt, { type: 'sine', f, dur: 0.6, g: 0.16, a: 0.004, hold: 0.05 }); tone(t + dt, { type: 'sine', f: f * 2, dur: 0.3, g: 0.04, a: 0.004, hold: 0.05 }); } },
+  'arena.epic': (t) => {
+    tone(t, { type: 'sawtooth', f: 110, to: 440, dur: 0.55, g: 0.07, filter: { f: 1400 }, hold: 0.8 });
+    noise(t, { dur: 0.6, type: 'bandpass', f: 600, to: 5200, q: 2, g: 0.1, a: 0.3, hold: 0.8 });
+    [554, 698, 831, 1109, 1397].forEach((f, i) => { tone(t + 0.5 + i * 0.07, { type: 'triangle', f, dur: 0.9, g: 0.13, a: 0.005, hold: 0.08 }); tone(t + 0.5 + i * 0.07, { type: 'sine', f: f * 2, dur: 0.5, g: 0.04, a: 0.005, hold: 0.05 }); });
+    for (let i = 0; i < 8; i++) tone(t + 0.9 + i * 0.06, { type: 'sine', f: rnd(2200, 4200), dur: 0.12, g: 0.035 });
+  },
+  'arena.legendary': (t) => {
+    tone(t, { type: 'sine', f: 55, to: 41, dur: 1.5, g: 0.3, a: 0.02, hold: 0.5 }); // the floor shakes
+    noise(t, { dur: 0.9, type: 'lowpass', f: 300, to: 90, g: 0.3, a: 0.01 });
+    tone(t, { type: 'sawtooth', f: 98, to: 392, dur: 0.75, g: 0.09, filter: { f: 1800 }, hold: 0.85 });
+    noise(t + 0.1, { dur: 0.7, type: 'bandpass', f: 500, to: 7000, q: 1.5, g: 0.13, a: 0.4, hold: 0.85 });
+    // a bright brass-like chord lands, then rings out
+    for (const f of [392, 494, 587, 784]) { tone(t + 0.75, { type: 'sawtooth', f, dur: 1.5, g: 0.085, a: 0.012, hold: 0.45, filter: { f: 2600 } }); tone(t + 0.75, { type: 'square', f: f / 2, dur: 1.2, g: 0.035, a: 0.012, hold: 0.4, filter: { f: 900 } }); }
+    [784, 988, 1175, 1568, 1976, 2349].forEach((f, i) => tone(t + 0.85 + i * 0.075, { type: 'triangle', f, dur: 0.8, g: 0.11, a: 0.004, hold: 0.06 }));
+    for (let i = 0; i < 16; i++) tone(t + 1.1 + i * 0.07, { type: 'sine', f: rnd(2400, 5200), dur: 0.14, g: 0.03 });
+    noise(t + 0.75, { dur: 0.5, type: 'highpass', f: 5000, g: 0.08, a: 0.005 });
+  },
+  'arena.pick': (t, tier) => { noise(t, { dur: 0.12, type: 'lowpass', f: 700, g: 0.3, a: 0.003 }); tone(t, { type: 'sine', f: 180, to: 90, dur: 0.16, g: 0.22 }); const up = tier === 'L' ? [784, 1175, 1568] : tier === 'E' ? [698, 1047] : [880]; up.forEach((f, i) => tone(t + 0.05 + i * 0.07, { type: 'triangle', f, dur: 0.35, g: 0.1, a: 0.004, hold: 0.06 })); },
   // Charizard's Fire Spin: charge, roar, stream, tornado, blast
   // Zapdos's Thunderbolt: storm rumble, far thunder, a rising charge, the giant crack
   'storm.rumble': (t) => { noise(t, { dur: 2.8, type: 'lowpass', f: 260, to: 120, g: 0.32, a: 0.4, hold: 0.7 }); tone(t, { type: 'sine', f: 48, to: 38, dur: 2.6, g: 0.22, a: 0.5, hold: 0.7 }); noise(t, { dur: 2.6, type: 'highpass', f: 5000, g: 0.05, a: 0.3, hold: 0.7 }); },
