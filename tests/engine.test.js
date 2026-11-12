@@ -629,3 +629,11 @@ test('Stadium cards are banned by default: they fail deck checks and cannot be p
   const g = setup({ a: { hand: ['gym1-124'], active: N['Chansey'], deck: [N['Bill']] }, b: { active: N['Chansey'], deck: [N['Bill']] } });
   assert.throws(() => act(g, { type: 'playTrainer', card: g.p.a.hand[0].id }), /banned/);
 });
+
+test('taking your last prize wins even when a double Knock Out owed you more prizes than you had left', () => {
+  const g = setup({ a: { active: N['Pikachu'], prizes: [N['Bill']] }, b: { active: N['Pikachu'], bench: [N['Pikachu']] } });
+  g.pending = [{ t: 'prize', seat: 'a', n: 2 }];
+  const s = act(g, { type: 'takePrize', index: 0 }, { seat: 'a' });
+  assert.equal(s.p.a.prizes.length, 0);
+  assert.equal(s.winner, 'a');
+});

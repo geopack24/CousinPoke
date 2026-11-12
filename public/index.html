@@ -544,6 +544,7 @@ table.dboard th.me{color:var(--fg)}
   <nav>
     <button data-nav="lobby" id="nav-lobby">Lobby</button>
     <button data-nav="builder" id="nav-builder">Deck builder</button>
+    <button data-nav="arena" id="nav-arena">Arena</button>
     <button data-nav="league" id="nav-league">League</button>
     <button data-nav="game" id="nav-game" hidden>Table</button>
   </nav>
@@ -582,7 +583,7 @@ const STATUS=[['SLP','Asleep'],['CNF','Confused'],['PAR','Paralyzed'],['PSN','Po
 let DATA=null,CARDS={},SETS=[],SETIDX={};
 let uid=null;
 const S={screen:'lobby',gameId:null,games:[],decks:[],players:{},game:null,league:null,name:'',ready:false,online:false};
-const LG=()=>window.LEAGUE||null;
+const LG=()=>window.LEAGUE||null;const AR=()=>window.ARENA||null;
 const LEAGUE_ID=(()=>{try{const v=new URLSearchParams(location.search).get('league');return v&&/^[a-z0-9-]{1,24}$/.test(v)?v:'main'}catch(e){return 'main'}})();
 
 /* ---------- data ---------- */
@@ -662,12 +663,13 @@ async function sync(){
   if(document.hidden&&S.screen!=='game'&&!(LG()&&LG().liveDraft())){syncSoon(15000);return}
   syncing=true;let changed=false;
   try{
-    const d=await api('POST','sync',{pid:uid,lobby:S.screen!=='game',game:S.screen==='game'?S.gameId:null,gv:S.game?S.game.version:null,league:1,lid:LEAGUE_ID,lv:S.league?S.league.version:null});
+    const d=await api('POST','sync',{pid:uid,lobby:S.screen!=='game',game:S.screen==='game'?S.gameId:null,gv:S.game?S.game.version:null,league:1,lid:LEAGUE_ID,lv:S.league?S.league.version:null,arena:S.screen!=='game'?1:0});
     if(!S.online){S.online=true;changed=true;setOnline(true)}
     const sig=k=>JSON.stringify(d[k]);
     if(d.players&&sig('players')!==lastSig.players){lastSig.players=sig('players');S.players=d.players;changed=true}
     if(d.decks&&sig('decks')!==lastSig.decks){lastSig.decks=sig('decks');S.decks=d.decks;changed=true}
     if(d.games&&sig('games')!==lastSig.games){lastSig.games=sig('games');S.games=d.games;changed=true}
+    if(d.arena&&sig('arena')!==lastSig.arena){lastSig.arena=sig('arena');S.arena=d.arena;if(S.screen==='arena'||S.screen==='lobby')changed=true}
     if(d.game){
       if(d.game.missing){if(S.screen==='game'){toast('That table was closed');S.gameId=null;S.game=null;go('lobby')}}
       else if(!d.game.unchanged&&(!S.game||S.game.id!==d.game.id||d.game.version!==S.game.version)){S.game=d.game;changed=true}
@@ -753,7 +755,8 @@ $('#namebtn').addEventListener('click',()=>{showModal('Your name',`<p class="sma
 /* ---------- render root ---------- */
 function render(){
   if(!S.ready)return;renderHeader();const main=$('#main');main.className=S.screen==='game'?'wide':S.screen==='builder'?'roomy':'';
-  if(S.screen==='lobby')renderLobby(main);else if(S.screen==='builder')renderBuilder(main);else if(S.screen==='league'){if(LG())LG().render(main);else main.innerHTML='<div class="panel muted">Loading the league…</div>'}else renderGame(main);
+  if(S.screen==='lobby')renderLobby(main);else if(S.screen==='builder')renderBuilder(main);else if(S.screen==='league'){if(LG())LG().render(main);else main.innerHTML='<div class="panel muted">Loading the league…</div>'}else if(S.screen==='arena'){if(AR())AR().render(main);else main.innerHTML='<div class="panel muted">Loading the Arena…</div>'}else renderGame(main);
+  if(S.screen==='game'&&S.game&&S.game.arena&&AR())AR().noteGame(S.game);
 }
 
 /* ---------- lobby ---------- */
@@ -818,7 +821,7 @@ function heroHTML(games){
   const sparks=[[8,20,0],[42,12,1.1],[30,70,2.2],[88,18,.6],[70,60,1.7],[56,30,2.8]].map(([x,y,d])=>`<i class="spark" style="left:${x}%;top:${y}%;animation-delay:${d}s"></i>`).join('');
   return `<section class="hero">${sparks}
     <div class="hero-copy"><h1 class="wordmark"><small>Cousin</small>Pokémon League</h1><p class="slogan">There's only one right way to play</p>
-      <div class="hero-cta"><button class="pri cta" type="button" data-hero="play"><span aria-hidden="true">⚔</span> Play a Match</button><button class="sec cta" type="button" data-hero="build"><span aria-hidden="true">✦</span> Build a Deck</button><button class="gold-ghost cta" type="button" data-hero="league"><span aria-hidden="true">🏆</span> League Standings</button></div>
+      <div class="hero-cta"><button class="pri cta" type="button" data-hero="play"><span aria-hidden="true">⚔</span> Play a Match</button><button class="sec cta" type="button" data-hero="build"><span aria-hidden="true">✦</span> Build a Deck</button><button class="sec cta" type="button" data-hero="arena"><span aria-hidden="true">⚡</span> Enter the Arena</button><button class="gold-ghost cta" type="button" data-hero="league"><span aria-hidden="true">🏆</span> League Standings</button></div>
       <div class="hcount"><div class="hc gold"><b>${live}</b><span>${live===1?'Table':'Tables'} live</span></div><div class="hc"><b>${S.decks.length}</b><span>Your ${S.decks.length===1?'deck':'decks'}</span></div><div class="hc"><b>${players}</b><span>League ${players===1?'player':'players'}</span></div></div></div>
     <div class="hero-fan" aria-hidden="true">${fan}</div></section>`}
 /** A deck's look in the lobby: its two headline Pokémon and its main types. */
@@ -848,7 +851,7 @@ function deckCard(d){
     <button class="sm" data-edit="${d.id}" type="button">Edit deck</button></div></article>`}
 function renderLobby(main){
   const online=S.online;
-  const games=S.games.filter(g=>g.status!=='done'||g.host===uid||(g.seats&&((g.seats.a||{}).uid===uid||(g.seats.b||{}).uid===uid)));
+  const games=S.games.filter(g=>!g.arena&&(g.status!=='done'||g.host===uid||(g.seats&&((g.seats.a||{}).uid===uid||(g.seats.b||{}).uid===uid))));
   const decks=S.decks.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
   main.innerHTML=`${heroHTML(games)}${LG()?LG().tickerHTML():''}
   ${!online?`<div class="notice" style="margin-bottom:16px"><b>Can't reach the game server.</b> Check your connection; the page reconnects on its own. Saving decks and playing need the server.</div>`:''}
@@ -857,6 +860,7 @@ function renderLobby(main){
       <div class="realm-body">${games.length?`<div class="tgrid">${games.map(tableCard).join('')}</div>`:`<div class="empty"><img src="art/orb.webp" alt="" width="542" height="203"><p><b>No tables yet.</b> ${online?'Create one and your cousins can take the other seat from their own device.':''}</p></div>`}
         <p class="realm-note">Auto-rules tables enforce every card for you. Tabletop tables only move the cards and count damage, like a real table.</p></div></section>
     ${LG()?LG().lobbyFeature():''}
+    ${AR()?AR().lobbyFeature():''}
     <section class="realm realm-decks"><header class="realm-head sunset"><div class="rh-copy"><span class="kicker">Sunset Peaks</span><h2>Your Decks</h2></div><button class="sec" id="todeck" type="button">Open the Deck Builder</button></header>
       <div class="realm-body">${decks.length?`<div class="dgrid">${decks.map(deckCard).join('')}<button class="dcard dnew" data-newdeck="1" type="button"><span aria-hidden="true">＋</span>New deck</button></div>`:`<div class="empty"><img src="art/orb.webp" alt="" width="542" height="203"><p><b>No decks yet.</b> Build one from Base Set, Jungle, Fossil, Team Rocket, Gym Heroes and Gym Challenge.</p><button class="pri" data-newdeck="1" type="button">Build your first deck</button></div>`}</div></section>
   </div>`;
@@ -864,6 +868,7 @@ function renderLobby(main){
     if(b.dataset.hero==='play'){if(S.online)newGameModal();else toast("Can't reach the game server right now")}
     else if(b.dataset.hero==='build')go('builder');
     else if(b.dataset.hero==='league')go('league');
+    else if(b.dataset.hero==='arena'||b.dataset.arena)go('arena');
     else if(b.id==='todeck')go('builder');
     else if(b.dataset.newdeck){B.deck=null;B.deckId=null;B.dirty=false;ls.set('cpl.draft',null);ls.set('cpl.lastDeck',null);go('builder')}
     else if(b.dataset.league)go('league');
@@ -1293,7 +1298,7 @@ async function start(){
   try{await loadData()}catch(e){$('#main').innerHTML='<div class="panel"><b>Could not load the card database.</b> Reload the page to try again.</div>';return}
   initIdentity();S.ready=true;renderHeader();
   const v=ls.get('view',{screen:'lobby'});
-  if(v.screen==='game'&&v.gameId)openGame(v.gameId);else if(v.screen==='builder')go('builder');else if(v.screen==='league')go('league');else go('lobby');
+  if(v.screen==='game'&&v.gameId)openGame(v.gameId);else if(v.screen==='builder')go('builder');else if(v.screen==='league')go('league');else if(v.screen==='arena')go('arena');else go('lobby');
   if(S.name)savePlayerName(S.name,true);
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();closeModal()}});
@@ -1304,16 +1309,18 @@ async function saveGame(doc){
     if(r&&r.version!=null&&S.game&&S.game.id===id){S.game.version=r.version}return true}
   catch(e){toast('Could not save ('+(e.code||'error')+')');return false}
 }
-window.PT={esc,api,syncSoon,rules:()=>DEFAULT_RULES,newGame:p=>newGameModal(p),confirmDeleteGame,report:reportModal,get CARDS(){return CARDS},cardHTML,backHTML,cardStyle,showModal,closeModal,showMenu,toast,nameOf,uid:()=>uid,S,saveGame,render,go,viewCard,rulesSummary};
+window.PT={esc,api,syncSoon,rules:()=>DEFAULT_RULES,newGame:p=>newGameModal(p),confirmDeleteGame,report:reportModal,get CARDS(){return CARDS},cardHTML,backHTML,cardStyle,showModal,closeModal,showMenu,toast,nameOf,uid:()=>uid,S,saveGame,render,go,viewCard,rulesSummary,openGame};
 start();
 })();
 </script>
 <script type="module">
 import { install } from './js/auto.js';
 import { installLeague } from './js/league.js';
+import { installArena } from './js/arena.js';
 window.AUTO = install(window.PT);
 window.LEAGUE = installLeague(window.PT);
-if (window.PT && window.PT.S && ['game', 'league', 'lobby'].includes(window.PT.S.screen)) window.PT.render();
+window.ARENA = installArena(window.PT);
+if (window.PT && window.PT.S && ['game', 'league', 'lobby', 'arena'].includes(window.PT.S.screen)) window.PT.render();
 </script>
 </body>
 </html>

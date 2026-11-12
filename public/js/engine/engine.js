@@ -408,7 +408,7 @@ function runAction(ctx, a) {
   // pending obligations first
   if (g.pending.length) {
     const t = g.pending[0]; must(t.seat === seat, `Waiting for ${ctx.name(t.seat)}`);
-    if (t.t === 'prize') { must(a.type === 'takePrize', 'Take a prize first'); const c = p.prizes.splice(a.index, 1)[0]; must(c, 'No such prize'); p.hand.push(c); p.prizesTaken++; ctx.log(`${ctx.name(seat)} took a prize (${p.prizes.length} left)`); ctx.event({ t: 'prize', seat, left: p.prizes.length }); if (--t.n <= 0) g.pending.shift(); checkWin(ctx); afterPending(ctx); return; }
+    if (t.t === 'prize') { must(a.type === 'takePrize', 'Take a prize first'); const c = p.prizes.splice(a.index, 1)[0]; must(c, 'No such prize'); p.hand.push(c); p.prizesTaken++; ctx.log(`${ctx.name(seat)} took a prize (${p.prizes.length} left)`); ctx.event({ t: 'prize', seat, left: p.prizes.length }); if (--t.n <= 0 || !p.prizes.length) g.pending.shift(); if (!p.prizes.length) g.pending = g.pending.filter((x) => !(x.t === 'prize' && x.seat === seat)); checkWin(ctx); afterPending(ctx); return; }
     if (t.t === 'promote') { must(a.type === 'promote', 'Promote a Pokémon first'); const i = p.bench.findIndex((m) => m.id === a.target); must(i >= 0, 'Not on your bench'); p.active = p.bench.splice(i, 1)[0]; ctx.log(`${ctx.name(seat)} moved ${nameOf(db, p.active.c)} to Active`); ctx.event({ t: 'promote', seat, id: p.active.id }); g.pending.shift(); afterPending(ctx); return; }
     if (t.t === 'mulliganDraw') { must(a.type === 'mulliganDraw', 'Decide on the mulligan draw'); if (a.n > 0) ctx.draw(seat, Math.min(a.n, t.n)); g.pending.shift(); return; }
     ctx.fail('Unknown pending step');

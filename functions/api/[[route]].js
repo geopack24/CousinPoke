@@ -1,13 +1,13 @@
 // Poké Table API — a tiny document store on Cloudflare D1.
 // Routes (all under /api/):
-//   POST sync                 -> { players, decks, games?, game?, league? }  (the page polls this)
+//   POST sync                 -> { players, decks, games?, game?, league?, arena? }  (the page polls this)
 //   GET  :col/:id             -> the document, or { missing: true }
 //   PUT  :col/:id             -> body { data, ifVersion? }; returns { version } or 409 { conflict, doc }
 //   DELETE :col/:id
 //   GET  reports              -> [{ id, at, byName, gameName, note, status }] newest first (problem reports)
-// Collections: games, decks, players, reports, leagues (one document, leagues/main). No accounts: anyone with the link can play.
+// Collections: games, decks, players, reports, leagues (one document, leagues/main), arena (one per player). No accounts: anyone with the link can play.
 
-const COLS = new Set(['games', 'decks', 'players', 'reports', 'leagues']);
+const COLS = new Set(['games', 'decks', 'players', 'reports', 'leagues', 'arena']);
 const ID = /^[A-Za-z0-9_-]{1,48}$/;
 const MAX_BYTES = 400000;
 let schemaReady = false;
@@ -62,6 +62,11 @@ async function handleSync(db, body) {
     const lid = typeof body.lid === 'string' && ID.test(body.lid) ? body.lid : 'main';
     const r = await db.prepare("SELECT id, data, version FROM docs WHERE col = 'leagues' AND id = ?").bind(lid).first();
     out.league = !r ? { missing: true } : r.version === body.lv ? { unchanged: true } : rowToDoc(r);
+  }
+  if (body.arena) {
+    const ar = await db.prepare("SELECT id, data, version FROM docs WHERE col = 'arena' ORDER BY updated_at DESC LIMIT 100").all();
+    out.arena = {};
+    for (const r of ar.results) out.arena[r.id] = rowToDoc(r);
   }
   // Occasionally forget tables nobody has touched in 45 days.
   if (Math.random() < 0.02) {

@@ -25,7 +25,7 @@ The database tables are created automatically on first use. No SQL to run by han
 
 - `public/index.html` — the whole app (lobby, deck builder, game table).
 - `public/cards.json` — card data for the six sets. `public/*.webp` — card art sprite sheets and the card back.
-- `functions/api/[[route]].js` — the API: `POST /api/sync`, plus `GET`/`PUT`/`DELETE` on `/api/{games|decks|players}/{id}`.
+- `functions/api/[[route]].js` — the API: `POST /api/sync`, plus `GET`/`PUT`/`DELETE` on `/api/{games|decks|players|leagues|arena}/{id}`.
 
 Card data comes from the PokemonTCG/pokemon-tcg-data project and images.pokemontcg.io. Card art is © The Pokémon Company; this is a private fan project.
 
@@ -38,7 +38,11 @@ Tables created in "auto" mode run a rules engine (`public/js/engine/`) with scri
 
 ## Practice against the computer
 
-New table → "Practice against the computer" puts a computer opponent in seat B with one of three built-in decks (Haymaker, Rain Dance, Charizard) or any of your own decks. It plays with the same rules engine, choosing from the table's legal actions: it benches Basics, evolves, attaches energy where it is needed, draws with Bill, Oak and Computer Search, uses PlusPower, Defender and Energy Removal when they matter, retreats a stuck Active, and picks the strongest attack, going for knockouts. Its moves run in your browser one at a time, so you see every animation. `public/js/bot.js` holds the policy; prompts it cannot reason about get a sensible default answer.
+New table → "Practice against the computer" puts a computer opponent in seat B with one of three built-in decks (Haymaker, Rain Dance, Charizard) or any of your own decks. It plays with the same rules engine. On its turn it tries each legal move on a copy of the game, plays the turn out (each attack averaged over a few coin flips of its own, never the real ones), scores the board (prizes, damage, energy where it is useful, evolutions, knockout threats, hand and deck sizes; it never looks at your hand) and keeps the best line. Its moves run in your browser one at a time, so you see every animation. `public/js/bot.js` holds the policy; prompts it cannot reason about get a sensible default answer.
+
+## The Arena (single player)
+
+Arena → Start a run. Draft 1 of 3 cards until you have 42: only the top of each evolution line is offered, and an evolved Pokémon brings its whole line (2 of each card). 18 basic Energy are added for your Pokémon's types. Then play the computer under the standard rules until 7 wins or 3 losses; each opponent drafts its own deck and drafts better as your wins climb. Runs and the leaderboard live in the `arena` collection (one document per player). `public/js/arena-draft.js` is the draft (pure, shared with the simulator); `public/js/arena.js` is the screen.
 
 ## Ranked league
 

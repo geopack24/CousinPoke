@@ -8,7 +8,7 @@ DBP = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dev.sqlite')
 if os.path.exists(DBP): os.remove(DBP)
 db = sqlite3.connect(DBP, check_same_thread=False)
 db.execute('CREATE TABLE IF NOT EXISTS docs (col TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL, PRIMARY KEY (col,id))')
-COLS = {'games', 'decks', 'players', 'reports', 'leagues'}
+COLS = {'games', 'decks', 'players', 'reports', 'leagues', 'arena'}
 ID = re.compile(r'^[A-Za-z0-9_-]{1,48}$')
 import threading
 lock = threading.Lock()
@@ -62,6 +62,8 @@ class H(SimpleHTTPRequestHandler):
                     lid = b.get('lid') if isinstance(b.get('lid'), str) and ID.match(b.get('lid')) else 'main'
                     r = db.execute("SELECT id,data,version FROM docs WHERE col='leagues' AND id=?", (lid,)).fetchone()
                     out['league'] = {'missing': True} if not r else ({'unchanged': True} if r[2] == b.get('lv') else row_to_doc(r))
+                if b.get('arena'):
+                    out['arena'] = {r[0]: row_to_doc(r) for r in db.execute("SELECT id,data,version FROM docs WHERE col='arena' ORDER BY updated_at DESC LIMIT 100")}
             return self.send_json(out)
         return self.send_json({'error': 'not_found'}, 404)
     def do_PUT(self):
