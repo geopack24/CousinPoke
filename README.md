@@ -52,14 +52,15 @@ Each Arena game is against one Colossal Pokémon: a single giant with a large HP
 
 - **Reward.** After each win the player is shown 3 cards (`makeSwapOffer`) and may swap one into the deck in place of a pick of the same size: a single card for a single card, an evolution line for a line of the same length. A size the deck has none of is never offered, and what leaves the deck is gone for good.
 - **Winning and losing.** Knock it Out to win. It wins when it has Knocked Out 6 of your Pokémon (Clefairy Doll and Mysterious Fossil don't count). You take a Prize for each sixth of its HP you knock off.
-- **Its turn.** It follows a fixed attack pattern, which may include rest turns; the table always shows what it will do next. Its attacks cost no Energy and get past Pokémon Powers that prevent damage (Invisible Wall).
+- **Energy.** It starts with none and gains 1 at the start of each of its turns (up to 5). Each attack has an Energy cost, all of which is used up. It works through its attack pattern in order: when it can pay for the next attack it uses it, otherwise it spends the turn charging. The table shows what is coming and how much Energy it has for it.
+- **Its Energy is on its Bench.** Each Energy is a Bench target with 20 HP and is also attached to the boss as an Energy card. Knock one Out (attacks that hit the Bench) or discard one (Energy Removal, attacks that discard Energy) and it is gone, which holds the boss's attacks back. No Prize for it.
+- **Its attacks** get past Pokémon Powers that prevent damage (Invisible Wall).
 - **No Weakness or Resistance.** Neither counts in a boss fight, for your Pokémon or the boss.
-- **Weak points.** Its Bench holds weak points. Damage done to one is done to the boss (ignoring armor), so attacks that hit the Bench still matter.
 - **Special Conditions.** Poison, Burn and Confusion wear off after 2 of its turns. It can't be Asleep or Paralyzed, and effects that stop it attacking, move it, copy it or return it to hand do nothing.
 - **Limits.** No single move takes more than 150 off it. Super Fang, Life Drain and Destiny Bond do a fixed 40 instead.
 - **Traits.** A boss may have armor (less damage from each attack), strike back (damage to whatever hits it) and an enrage bonus at half HP.
 
-The bosses, their attacks and the shared settings come from a spreadsheet: `python tools/arena_bosses.py "Arena bosses.xlsx"` rewrites `public/js/arena-bosses.js`. Trainers that do nothing against a boss (Energy Removal, Sleep!, Pokémon Flute…) or that have the opponent draw cards (Erika, Blaine's Quizzes, Misty's Duel, Sabrina's Gaze) are left out of the draft.
+The bosses, their attacks and the shared settings come from a spreadsheet: `python tools/arena_bosses.py "Arena bosses.xlsx"` rewrites `public/js/arena-bosses.js`. Left out of the draft: Trainers that do nothing against a boss (Sleep!, Pokémon Flute…) or that have the opponent draw cards (Erika, Blaine's Quizzes, Misty's Duel, Sabrina's Gaze), and Mr. Mime, Clefable (with its Clefairy) and Sabrina's Jynx, which are too strong against one huge Pokémon. A card effect that gives the opponent a Prize (Electrode's Buzzap) counts as a Knock Out for the boss.
 
 ## Ranked league
 

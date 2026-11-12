@@ -561,15 +561,16 @@ const BOOSTS = {
   defender: { cls: 'df', icon: '🛡', sign: '−', amt: 20, label: 'Defender', what: 'attacks do less damage to it until the end of the opponent’s next turn' },
 };
 /* A Colossal Pokémon's side of the table: the giant itself, its HP bar (marked where each Prize is earned), what it
-   will do next, the Knock Outs it has, and its weak points. It has no deck, hand or Prizes to show. */
+   will do next, the Knock Outs it has, and its Energy (targets on its Bench). It has no deck, hand or Prizes to show. */
 function bossSideHTML(g, seat, compact, SC) {
   const b = g.boss; const p = g.p[seat]; const m = p.active && p.active.id === b.id ? p.active : null; const c = C(b.cid); const def = c.boss || {};
   const hp = c.hp || 1; const left = m ? Math.max(0, hp - m.dmg) : 0; const frac = left / hp;
   const turnNow = g.phase === 'main' && !g.winner && !g.pending.length && g.turn === seat;
   const live = g.phase === 'main' && !g.winner && ((g.pending[0] && g.pending[0].seat === seat) || (!g.pending.length && g.turn === seat));
   const nx = nextBossAttack(g, PT.CARDS); const rage = def.enrage && m && m.dmg * 2 >= hp ? def.enrage : 0;
+  const coming = nx.atk && (turnNow ? nx.ready : nx.soon); // will this attack land on its (current or next) turn?
   const nextHTML = !m ? '' : nx.atk
-    ? `<b>${esc(nx.atk.name)}</b>${nx.atk.dmg ? `<span class="bn-d">${nx.atk.flips ? nx.atk.dmg + rage + '×' : nx.atk.dmg + rage}</span>` : ''}<span class="bn-t">${esc(nx.card.t || '')}</span>`
+    ? `<b>${esc(nx.atk.name)}</b>${nx.atk.dmg ? `<span class="bn-d">${nx.atk.flips ? nx.atk.dmg + rage + '×' : nx.atk.dmg + rage}</span>` : ''}<span class="bn-e" title="Energy it has / Energy this attack uses up">⚡ ${nx.have} / ${nx.cost}</span><span class="bn-t">${esc(nx.card.t || '')}</span>`
     : `<b>Gathering strength</b><span class="bn-t">No attack ${turnNow ? 'this' : 'on its next'} turn.</span>`;
   const pips = Array.from({ length: b.r.kos }, (_, i) => `<i class="${i < b.kos ? 'on' : ''}"></i>`).join('');
   const ticks = [1, 2, 3, 4, 5].map((i) => `<s class="${i <= b.given ? 'got' : ''}" style="left:${(100 - i / 6 * 100).toFixed(2)}%"></s>`).join('');
@@ -578,17 +579,19 @@ function bossSideHTML(g, seat, compact, SC) {
     def.enrage ? [`${rage ? '🔥 Enraged' : '🔥 Enrages at half HP'} +${def.enrage}`, `At half HP or less its attacks do ${def.enrage} more damage.`] : null]
     .filter(Boolean).map(([t, d]) => `<span class="btrait${/Enraged/.test(t) ? ' hot' : ''}" title="${esc(d)}">${esc(t)}</span>`).join('');
   const scBoss = compact ? .36 : .6; const scPart = compact ? .13 : .17;
-  const fig = m ? monHTML(m, seat, true, false, scBoss) : `<div class="bossdown">${PT.cardHTML(b.cid, scBoss)}<span>Defeated</span></div>`;
-  const parts = p.bench.length ? `<div class="bossparts"><span class="k" title="Damage done to a weak point is done to ${esc(c.name)}. Attacks that hit the Bench hit these.">Weak points</span><div class="bp-row">${p.bench.map((x) => monHTML(x, seat, false, false, scPart)).join('')}</div></div>` : '';
+  const fig = m ? monHTML({ ...m, en: [] }, seat, true, false, scBoss) : `<div class="bossdown">${PT.cardHTML(b.cid, scBoss)}<span>Defeated</span></div>`;
+  // laid out like an opposing player: its Energy along the far edge (its Bench), the Colossal Pokémon in front of it in the middle
+  const slots = Array.from({ length: Math.max(nx.max, p.bench.length) }, (_, k) => (p.bench[k] ? monHTML(p.bench[k], seat, false, false, scPart) : `<div class="slot" style="--s:${scPart}">energy</div>`)).join('');
   return `<div class="side boss ${live ? 'live' : (g.phase === 'main' && !g.winner ? 'idle' : '')}${rage ? ' raging' : ''}">
     <div class="pname"><span>${esc(g.seats[seat].name)}</span>${turnNow ? '<span class="chip">Its turn</span>' : ''}${g.winner === seat ? '<span class="chip">Winner</span>' : ''}</div>
-    <div class="bossrow"><div class="bossfig" data-active-slot="${seat}">${fig}</div>
-      <div class="bossinfo">
-        <div class="bosshp"><div class="bossbar ${frac <= .25 ? 'crit' : frac <= .5 ? 'hurt' : ''}" title="Each mark is a Prize for you."><i style="width:${(frac * 100).toFixed(1)}%"></i>${ticks}</div><div class="bosshpn"><b>${left}</b> / ${hp} HP</div></div>
-        ${m ? `<div class="bossnext${nx.atk ? '' : ' rest'}"><span class="k">${turnNow ? 'This turn' : 'Next turn'}</span>${nextHTML}</div>` : ''}
-        <div class="bosskos" title="It wins when it has Knocked Out ${b.r.kos} of your Pokémon."><span class="k">Knock Outs</span><span class="pips">${pips}</span><b>${b.kos} / ${b.r.kos}</b></div>
-        ${traits ? `<div class="bosstraits">${traits}</div>` : ''}${parts}
-      </div></div></div>`;
+    <div class="bossbench" title="It gains Energy every turn and its attacks use it up. Each Energy is a target on its Bench: Knock it Out or discard it to hold its attacks back."><span class="k">Energy ${p.bench.length} / ${nx.max}</span><div class="bp-row">${slots}</div></div>
+    <div class="bossfield">
+      <div class="bossleft">${m ? `<div class="bossnext${coming ? '' : ' rest'}"><span class="k">${!nx.atk || coming ? (turnNow ? 'This turn' : 'Next turn') : 'Charging'}</span>${nextHTML}</div>` : ''}</div>
+      <div class="bossmid"><div class="bossfig" data-active-slot="${seat}">${fig}</div>
+        <div class="bosshp"><div class="bossbar ${frac <= .25 ? 'crit' : frac <= .5 ? 'hurt' : ''}" title="Each mark is a Prize for you."><i style="width:${(frac * 100).toFixed(1)}%"></i>${ticks}</div><div class="bosshpn"><b>${left}</b> / ${hp} HP</div></div></div>
+      <div class="bossright"><div class="bosskos" title="It wins when it has Knocked Out ${b.r.kos} of your Pokémon."><span class="k">Knock Outs</span><span class="pips">${pips}</span><b>${b.kos} / ${b.r.kos}</b></div>
+        ${traits ? `<div class="bosstraits">${traits}</div>` : ''}</div>
+    </div></div>`;
 }
 function monHTML(m, seat, active, promoteClick, scale) {
   const c = C(m.c); const hp = c.hp; const sc = scale || (active ? .42 : .34); const compact = isCompact(); const step = Math.round(330 * sc * (compact ? 0.12 : 0.13));

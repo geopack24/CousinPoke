@@ -10,7 +10,7 @@ import { R, isBasicLike } from './rules.js';
 import { mulberry32, shuffleWith } from './rng.js';
 import { P, other, mons, allMons, findMon, toMon, monCards, pullCard, removeMon, replaceMon, instId } from './state.js';
 import { CARD_SCRIPTS } from './cards/index.js';
-import { nextBossAttack } from './boss.js';
+import { nextBossAttack, bossCharge, bossSpend, bossEnergySync } from './boss.js';
 
 export const STATUS_NAMES = { SLP: 'Asleep', CNF: 'Confused', PAR: 'Paralyzed', PSN: 'Poisoned', BRN: 'Burned' };
 const TYPES = ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting', 'Colorless'];
@@ -157,7 +157,7 @@ export function canAttack(g, seat, idx, db, srcCid) {
   if (m.st.includes('SLP')) return { ok: false, why: 'Asleep' };
   if (m.st.includes('PAR')) return { ok: false, why: 'Paralyzed' };
   const c = srcCid ? db[srcCid] : effectiveCard(g, db, m); const atk = (c.atk || [])[idx]; if (!atk) return { ok: false, why: 'No such attack' };
-  if (isBoss(g, m) && nextBossAttack(g, db).idx !== idx) return { ok: false, why: 'Not its next attack' };
+  if (isBoss(g, m)) { const nb = nextBossAttack(g, db); if (nb.idx !== idx) return { ok: false, why: 'Not its next attack' }; if (!nb.ready) return { ok: false, why: 'Not enough Energy' }; }
   if (!canPay(db, g.rules, m, atk.c)) return { ok: false, why: 'Not enough energy' };
   if (!isBoss(g, m) && fxOf(m, 'noAttack').some((f) => f.attack === atk.n || !f.attack)) return { ok: false, why: `Can't use ${atk.n} this turn` };
   if (m.flags['used:' + atk.n] && attackScript(c.id, atk.n) && attackScript(c.id, atk.n).oncePerLife) return { ok: false, why: 'Already used' };
@@ -378,7 +378,6 @@ function dealDamage(ctx, target, amount, opts = {}) {
   }
   if (src && src.st.includes('CNF')) { const ss = scriptOf(src.c).passive; if (ss && ss.confusedBonus && powersActive(g, db)) dmg += ss.confusedBonus; }
   if (isBoss(g, target) && !opts.self) { const bd = db[target.c].boss; if (bd.armor && src && dmg > 0) { dmg = Math.max(0, dmg - bd.armor); if (!dmg) ctx.log(`${nameOf(db, target.c)}'s armor stops it`); } if (g.boss.r.maxHit) dmg = Math.min(dmg, g.boss.r.maxHit); }
-  if (isBossPart(db, target) && g.boss && g.boss.r.partBonus && dmg > 0) dmg += g.boss.r.partBonus;
   if (dmg <= 0) return 0;
   target.dmg += dmg; target.flags.lastHit = { amount: dmg, turn: g.turnNo };
   events.push({ t: 'damage', target: target.id, amount: dmg, wr: info.wr, self: !!opts.self });
@@ -495,7 +494,7 @@ function runAction(ctx, a) {
       const chk = canAttack(g, seat, a.index, db, a.src); must(chk.ok, chk.why);
       const m = p.active; const ec = a.src ? db[a.src] : effectiveCard(g, db, m); const atk = ec.atk[a.index]; ctx.attacker = m; ctx.defender = ctx.opp.active; ctx.attackName = atk.n; ctx.attackCard = ec.id;
       ctx.log(`${isBoss(g, m) ? nameOf(db, m.c) : ctx.name(seat) + "'s " + nameOf(db, m.c)} used ${atk.n}`); ctx.event({ t: 'attack', attacker: m.id, name: atk.n, type: typeOf(g, db, m) });
-      g.attacked = true; g.lastAttack = { seat, attacker: m.id, name: atk.n, turn: g.turnNo }; if (isBoss(g, m)) g.boss.step++;
+      g.attacked = true; g.lastAttack = { seat, attacker: m.id, name: atk.n, turn: g.turnNo }; if (isBoss(g, m)) { g.boss.step++; bossSpend(ctx, (db[m.c].boss.attacks[a.index] || {}).cost == null ? 1 : db[m.c].boss.attacks[a.index].cost); }
       let proceed = true;
       if (m.st.includes('CNF')) { if (!ctx.flip('confusion')) { ctx.event({ t: 'confused', attacker: m.id }); ctx.log(`${nameOf(db, m.c)} is Confused and hurt itself`); dealDamage(ctx, m, R(g.rules).confusionSelfDamage, { noWR: true, self: true }); proceed = false; } }
       if (proceed && ctx.defender && db[ctx.defender.c] && db[ctx.defender.c].sub === 'Baby' && !ctx.copying) { if (!ctx.flip('Baby Rule')) { ctx.log(`Baby Rule: tails, the attack on ${nameOf(db, ctx.defender.c)} does nothing`); proceed = false; } }
@@ -510,7 +509,9 @@ function runAction(ctx, a) {
       checkKOs(ctx); finishTurnIfClear(ctx); return;
     }
     case 'endTurn': {
-      if (bossSeat(g, seat) && !g.attacked && nextBossAttack(g, db).idx < 0) { g.boss.step++; ctx.log(`${ctx.name(seat)} gathers its strength`); ctx.event({ t: 'bossrest' }); }
+      const nb = bossSeat(g, seat) && !g.attacked ? nextBossAttack(g, db) : null;
+      if (nb && nb.idx < 0) { g.boss.step++; ctx.log(`${ctx.name(seat)} gathers its strength`); ctx.event({ t: 'bossrest' }); }
+      else if (nb && !nb.ready) { ctx.log(`${ctx.name(seat)} is charging ${nb.atk.name} (${nb.have} of ${nb.cost} Energy)`); ctx.event({ t: 'bossrest' }); }
       else ctx.log(`${ctx.name(seat)} ended the turn`);
       finishTurnIfClear(ctx, true); return;
     }
@@ -585,6 +586,7 @@ function beginTurn(ctx, seat) {
   const { g, db } = ctx; const r = R(g.rules); const p = P(g, seat);
   g.turn = seat; g.attacked = false; p.attachedThisTurn = false; p.retreatedThisTurn = false;
   ctx.log(`Turn ${g.turnNo}: ${ctx.name(seat)}`); ctx.event({ t: 'turn', seat, turnNo: g.turnNo });
+  if (bossSeat(g, seat)) bossCharge(ctx);
   if (r.autoDraw && !bossSeat(g, seat)) {
     if (p.deck.length) ctx.draw(seat, 1);
     else if (r.deckOutDamage) { if (p.active) { p.active.dmg += 10; ctx.log(`${ctx.name(seat)} has no cards to draw: 10 damage on ${nameOf(db, p.active.c)} (now ${p.active.dmg})`); ctx.event({ t: 'damage', target: p.active.id, amount: 10 }); checkKOs(ctx); } }
@@ -644,11 +646,15 @@ function endTurn(ctx) {
 }
 
 /* ---------- knockouts, prizes, win ---------- */
-/** Colossal Pokémon upkeep: weak-point damage carries through, no move takes more than the cap, and the player
+/** Colossal Pokémon upkeep: its Energy is kept in step, no move takes more than the cap, and the player
  *  takes a Prize for each sixth of its HP knocked off (the last sixth is the Knock Out itself). */
 function bossSync(ctx) {
-  const { g, db } = ctx; const b = g.boss; const p = P(g, b.seat); const m = p.active; if (!m || m.id !== b.id) return;
-  for (const part of p.bench) { if (part.dmg > 0) { m.dmg += part.dmg; ctx.log(`Weak point hit: ${part.dmg} damage to ${nameOf(db, m.c)} (now ${m.dmg})`); ctx.event({ t: 'damage', target: m.id, amount: part.dmg }); part.dmg = 0; } part.st = []; part.fx = []; }
+  const { g, db } = ctx; const b = g.boss; const p = P(g, b.seat); const m = p.active;
+  // a Prize owed to it by a card effect (Electrode's Buzzap) counts as a Knock Out instead: it has no Prizes to take
+  const owed = g.pending.filter((t) => t.t === 'prize' && t.seat === b.seat).reduce((n, t) => n + (t.n || 1), 0);
+  if (owed) { g.pending = g.pending.filter((t) => !(t.t === 'prize' && t.seat === b.seat)); b.kos += owed; ctx.log(`${ctx.name(b.seat)} has Knocked Out ${b.kos} of the ${b.r.kos} Pokémon it needs`); ctx.event({ t: 'bossko', n: b.kos, of: b.r.kos }); }
+  if (!m || m.id !== b.id) return;
+  bossEnergySync(ctx);
   const cap = b.r.maxHit || 0; if (cap && m.dmg - b.seen > cap) { m.dmg = b.seen + cap; ctx.log(`${nameOf(db, m.c)} can't lose more than ${cap} HP to one move (now ${m.dmg})`); }
   b.seen = m.dmg;
   const hp = monHP(db, m, g); const n = R(g.rules).prizes; const you = other(b.seat);
@@ -667,11 +673,12 @@ function checkKOs(ctx) {
         const doll = isDollLike(db, m) && scriptOf(m.c).asPokemon && scriptOf(m.c).asPokemon.noPrize;
         { const fs = scriptOf(m.c).passive; if (fs && fs.onWouldKO && g.lastAttack && g.lastAttack.turn === g.turnNo && g.lastAttack.seat === other(s) && powersActive(g, db) && !conditioned(m) && fs.onWouldKO(ctx, m)) { m.dmg = monHP(db, m, g) - 10; ctx.log(`${nameOf(db, m.c)} hangs on with 10 HP`); continue; } }
         { const ks = scriptOf(m.c).passive; if (ks && ks.onKnockedOut && g.lastAttack && g.lastAttack.turn === g.turnNo && g.lastAttack.seat === other(s) && powersActive(g, db) && !conditioned(m)) { const att = findMon(g, g.lastAttack.attacker); if (att) ks.onKnockedOut(ctx, m, att.m); } }
+        if (isBossPart(db, m)) { removeMon(g, m.id); ctx.log(`${nameOf(db, m.c)} is destroyed`); ctx.event({ t: 'ko', id: m.id, seat: s }); bossEnergySync(ctx); continue; } // one of its Energy: no Prize, nothing to discard
         removeMon(g, m.id); const rebirth = (scriptOf(m.c).passive || {}).rebirth && !conditioned(m) && powersActive(g, db);
         for (const c of monCards(m)) { if (rebirth && c.id === m.id) p.hand.push(c); else p.discard.push(c); }
         if (rebirth) ctx.log(`Rebirth: ${nameOf(db, m.c)} returns to hand`);
         ctx.log(`${isBoss(g, m) ? '' : ctx.name(s) + "'s "}${nameOf(db, m.c)} was Knocked Out`); ctx.event({ t: 'ko', id: m.id, seat: s });
-        if (isBoss(g, m)) p.bench = []; // its weak points go with it
+        if (isBoss(g, m)) p.bench = []; // its Energy goes with it
         else if (!doll && bossSeat(g, other(s))) { g.boss.kos++; ctx.log(`${ctx.name(other(s))} has Knocked Out ${g.boss.kos} of the ${g.boss.r.kos} Pokémon it needs`); ctx.event({ t: 'bossko', n: g.boss.kos, of: g.boss.r.kos }); }
         else if (!doll) g.pending.push({ t: 'prize', seat: other(s), n: 1 });
         // Destiny Bond

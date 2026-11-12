@@ -17,10 +17,12 @@ const BASIC_TYPES = ['Fire', 'Water', 'Grass', 'Lightning', 'Psychic', 'Fighting
 // Not offered in the draft. Rainbow Energy: under the house rules any Energy already pays any cost.
 // Bill: every Arena deck is given 4 of them, so nobody has to spend picks on card draw.
 const NOT_IN_DRAFT = new Set(['Rainbow Energy', 'Bill',
-  // cards that do nothing against a Colossal Pokémon (it has no Energy, hand, deck or discard pile, and can't be put to sleep or moved)
-  'Energy Removal', 'Super Energy Removal', 'Pokémon Flute', "Rocket's Sneak Attack", "The Rocket's Trap", 'Sleep!', "Erika's Perfume", 'Minion of Team Rocket', 'Tickling Machine', "Sabrina's Psychic Control",
+  // cards that do nothing against a Colossal Pokémon (it has no hand, deck or discard pile, and can't be put to sleep or moved)
+  'Pokémon Flute', "Rocket's Sneak Attack", "The Rocket's Trap", 'Sleep!', "Erika's Perfume", 'Minion of Team Rocket', 'Tickling Machine', "Sabrina's Psychic Control",
   // cards that have the opponent draw cards: a Colossal Pokémon has no deck or hand
-  'Erika', "Blaine's Quiz #1", "Blaine's Quiz #2", "Blaine's Quiz #3", "Misty's Duel", "Sabrina's Gaze"]);
+  'Erika', "Blaine's Quiz #1", "Blaine's Quiz #2", "Blaine's Quiz #3", "Misty's Duel", "Sabrina's Gaze",
+  // Pokémon George took out as too strong against one huge Pokémon (Clefable takes its Clefairy with it)
+  'Mr. Mime', 'Clefable', "Sabrina's Jynx"]);
 
 /** Card signature: reprints (same name, HP, attacks, powers) count as one card. */
 const sig = (c) => JSON.stringify([c.name, c.hp, c.sub, (c.atk || []).map((a) => [a.n, a.d, (a.c || []).length]), c.pw ? c.pw.n : null]);
@@ -45,6 +47,7 @@ export function arenaPool(db, rules) {
   const pool = [];
   for (const c of mon) {
     if (evolvesInto.has(c.name)) continue; // not the top of its line
+    if (NOT_IN_DRAFT.has(c.name)) continue;
     if (c.sub === 'Basic' || c.sub === 'Baby' || !c.ev) { if (speciesEvolves.has(baseSpecies(c.name))) continue; pool.push(entry(c, 'basic', [c], 1)); continue; }
     const line = [c]; let cur = c; let ok = true;
     while (cur.ev) { const p = pre(cur.ev, cur.set); if (!p) { ok = false; break; } line.unshift(p); cur = p; if (line.length > 3) { ok = false; break; } }
