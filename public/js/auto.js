@@ -80,7 +80,8 @@ export async function submit(action, answers = [], opts = {}) {
 /* ---------- click-to-flip coins ----------
    Your own coin flips show a big coin you click to flip (one click per coin; "Flip the rest" for long runs).
    The result is already decided by the move's random seed; clicking just reveals it. The board only shows the
-   outcome after the last coin lands. The other player's flips still animate on their own. */
+   outcome after the last coin lands. The other player's flips (and the computer's) animate on their own: their
+   wake-up and burn checks show the same coin, but it can't be tapped and flips itself. */
 const FLIP_LABELS = { confusion: 'Confusion check', sleep: 'Asleep: wake-up check', burn: 'Burn check', 'Sand-attack': 'Sand-attack', 'Baby Rule': 'Baby Rule', 'confused retreat': 'Confused retreat' };
 const isCheck = (f) => !!(f && f.seat && (f.label === 'sleep' || f.label === 'burn'));
 function checkTitle(f, me) { const whose = f.seat === me ? 'Your' : 'Opponent\u2019s'; return f.label === 'sleep' ? `💤 ${whose} ${f.name} is Asleep — wake-up flip` : `🔥 ${whose} ${f.name} is Burned — burn flip`; }
@@ -120,11 +121,11 @@ function clickCoins(flips, opts = {}) {
     const render = () => {
       const f = flips[i]; const label = opts.title || (f && f.label ? (FLIP_LABELS[f.label] || f.label) : 'Coin flip');
       wrap.innerHTML = `<div class="cf-box"><div class="cf-title">${esc(label)}${flips.length > 1 ? ` · coin ${Math.min(i + 1, flips.length)} of ${flips.length}` : ''}</div>
-        <button type="button" class="cf-coin" aria-label="Flip the coin"><span class="cf-face">?</span></button>
-        <div class="cf-hint">${opts.auto ? 'Flipping…' : 'Tap the coin to flip'}</div>
+        <button type="button" class="cf-coin${opts.auto ? ' auto' : ''}" aria-label="${opts.auto ? 'The coin flips on its own' : 'Flip the coin'}"${opts.auto ? ' tabindex="-1"' : ''}><span class="cf-face">?</span></button>
+        <div class="cf-hint">${opts.auto ? 'Your opponent’s flip. It flips on its own.' : 'Tap the coin to flip'}</div>
         <div class="cf-results">${results.map((h) => `<span class="${h ? 'h' : 't'}">${h ? 'H' : 'T'}</span>`).join('')}</div>
         ${flips.length - i > 2 ? '<button type="button" class="sm cf-all">Flip the rest</button>' : ''}</div>`;
-      wrap.querySelector('.cf-coin').onclick = flipOne;
+      if (!opts.auto) wrap.querySelector('.cf-coin').onclick = flipOne;
       const all = wrap.querySelector('.cf-all'); if (all) all.onclick = (e) => { e.stopPropagation(); flipAll(); };
     };
     let busy = false;
@@ -143,7 +144,7 @@ function clickCoins(flips, opts = {}) {
     };
     const flipAll = () => { if (busy) return; while (i < flips.length) land(!!flips[i].heads); sfx.play('coin', 0, results[results.length - 1]); const res = wrap.querySelector('.cf-results'); if (res) res.innerHTML = results.map((x) => `<span class="${x ? 'h' : 't'}">${x ? 'H' : 'T'}</span>`).join(''); const all = wrap.querySelector('.cf-all'); if (all) all.remove(); finish(); };
     document.body.appendChild(wrap); render();
-    if (opts.auto) setTimeout(flipOne, 500);
+    if (opts.auto) setTimeout(flipOne, 350);
   });
 }
 /** A move can be undone only if it revealed nothing: no flip, draw, search, prize, and it didn't hand the turn over. */
