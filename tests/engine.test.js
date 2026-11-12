@@ -834,6 +834,15 @@ test('Colossal Pokémon: armor, striking back and enraging', () => {
   g = act(g, { type: 'endTurn' }); g = bossTurn(g); assert.equal(active(g, 'a').dmg, 60, 'at half HP it hits for 20 more');
 });
 
+test('Colossal Pokémon: Weakness and Resistance do not count, for either side', () => {
+  let g = bossGame(98, { active: { c: N['Hitmonchan'], en: [N['Fighting Energy']] } }); // Testzilla is listed as weak to Fighting
+  g = act(g, { type: 'attack', index: 0 }); assert.equal(bossMon(g).dmg, 20, 'Jab does its plain 20');
+  g = bossGame(99, { active: N['Chansey'] }); // Testodon is a Fighting type; Chansey is weak to Fighting
+  g = act(g, { type: 'endTurn' }); g = bossTurn(g); assert.equal(active(g, 'a').dmg, 40);
+  g = bossGame(99, { active: N['Charizard'] }); // Charizard resists Fighting
+  g = act(g, { type: 'endTurn' }); g = bossTurn(g); assert.equal(active(g, 'a').dmg, 40);
+});
+
 test('the Arena bosses from the spreadsheet are well formed and never show up as real cards', () => {
   assert.ok(BOSSES.length >= 1);
   for (const b of BOSSES) {

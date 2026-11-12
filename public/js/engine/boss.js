@@ -30,8 +30,9 @@ export function colossalText(b, r = BOSS_RULES) {
   const lasts = Object.entries(r.conditions).filter(([, t]) => t > 0).map(([k]) => STATUS[k]);
   const never = Object.entries(r.conditions).filter(([, t]) => !t).map(([k]) => STATUS[k]);
   const out = [`Knock it Out to win. It wins when it has Knocked Out ${r.kos} of your Pokémon.`];
+  if (!r.wr) out.push(`Weakness and Resistance don't count in this fight, for either side.`);
   out.push(`Each time it loses a sixth of its HP you take a Prize.`);
-  if (r.parts) out.push(`Its Bench holds ${r.parts} weak points: any damage done to one is done to it${r.partBonus ? ` (plus ${r.partBonus})` : ''}, ignoring ${b.armor ? 'Weakness, Resistance and its armor' : 'Weakness and Resistance'}.`);
+  if (r.parts) out.push(`Its Bench holds ${r.parts} weak points: any damage done to one is done to it${r.partBonus ? ` (plus ${r.partBonus})` : ''}${r.wr ? `, ignoring ${b.armor ? 'Weakness, Resistance and its armor' : 'Weakness and Resistance'}` : b.armor ? ', ignoring its armor' : ''}.`);
   if (lasts.length) out.push(`${lasts.join(', ')}: wears off after ${[...new Set(Object.values(r.conditions).filter(Boolean))].join(' or ')} of its turns.`);
   if (never.length) out.push(`It can't be ${never.join(' or ')}, moved, copied, or stopped from attacking.`);
   if (b.armor) out.push(`Armor: takes ${b.armor} less damage from each attack.`);
@@ -49,7 +50,7 @@ export function bossCards(db) {
     db[bossId(b.n)] = {
       id: bossId(b.n), set: 'boss', art, name: 'Colossal ' + b.name, st: 'Pokémon', sub: 'Basic', hp: b.hp, types: [b.type || (src.types || ['Colorless'])[0]],
       atk: b.attacks.map((a) => ({ n: a.name, c: [], d: dmgLabel(a), t: attackText(a) })), pw: [{ n: 'Colossal', t: colossalText(b) }],
-      wk: b.wk ? [b.wk] : null, rs: b.rs ? [b.rs] : null, rc: 0, rar: 'Colossal', boss: b,
+      wk: BOSS_RULES.wr && b.wk ? [b.wk] : null, rs: BOSS_RULES.wr && b.rs ? [b.rs] : null, rc: 0, rar: 'Colossal', boss: b,
     };
     db[partId(b.n)] = { id: partId(b.n), set: 'boss', art, name: `Colossal ${b.name}'s weak point`, st: 'Pokémon', sub: 'Basic', hp: 0, types: ['Colorless'], atk: [], pw: null, wk: null, rs: null, rc: 0, rar: 'Colossal', bossPart: b.n,
       txt: `Damage done here is done to Colossal ${b.name} instead.` };

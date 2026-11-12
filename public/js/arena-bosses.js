@@ -6,6 +6,7 @@ export const BOSS_RULES = {
   partBonus: 0,    // extra damage each time a weak point is hit
   maxHit: 150,     // the most a single move can take off it
   percentHit: 40,  // what Super Fang, Life Drain and Destiny Bond do to it instead
+  wr: 0,           // 1 = Weakness and Resistance count in boss fights; 0 = they don't, for either side
   conditions: { PSN: 2, BRN: 2, CNF: 2, SLP: 0, PAR: 0 }, // how many of its own turns a Special Condition lasts on it (0 = immune)
 };
 export const BOSSES = [

@@ -351,7 +351,7 @@ function dealDamage(ctx, target, amount, opts = {}) {
   const tCard = effectiveCard(g, db, target); const sCard = src ? effectiveCard(g, db, src) : null;
   const info = { target, source: src, base: amount, wr: false }; const st = stadiumScript(g);
   if (opts.pure) { target.dmg += dmg; target.flags.lastHit = { amount: dmg, turn: g.turnNo }; events.push({ t: 'damage', target: target.id, amount: dmg }); ctx.log(`${dmg} damage to ${nameOf(db, target.c)} (Swift, now ${target.dmg})`); return dmg; }
-  if (!opts.noWR && sCard && !opts.bench && !opts.self) {
+  if (!opts.noWR && sCard && !opts.bench && !opts.self && !(g.boss && !g.boss.r.wr)) {
     const type = typeOf(g, db, src);
     const wk = target.flags.wkOverride ? [target.flags.wkOverride] : (tCard.wk || []);
     const rs = target.flags.rsOverride ? [target.flags.rsOverride] : (tCard.rs || []);

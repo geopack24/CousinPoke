@@ -7,7 +7,7 @@ import { R } from './engine/rules.js';
 import { baseSpecies } from './engine/engine.js';
 import { TIERS, TIER_WEIGHTS } from './arena-tiers.js';
 
-export const ARENA = { picksTo: 40, bills: 4, oaks: 1, energy: 15, deck: 60, wins: 7, losses: 3, lineCopies: 2 };
+export const ARENA = { picksTo: 40, bills: 4, oaks: 1, energy: 15, deck: 60, wins: 7, losses: 1, lineCopies: 2 }; // no lives: the first loss ends the run
 /** The pick key for "take a basic Energy instead of one of the three cards". */
 export const ENERGY_PICK = 'energy';
 /** Prize for a finished run, by wins: Cousin Tokens (index = wins). A perfect run also wins a gold card. */

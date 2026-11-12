@@ -17,6 +17,7 @@ RULES = {  # label in the sheet -> (key, default)
     'knock outs the boss needs to win': ('kos', 6), 'weak points on its bench': ('parts', 3), 'extra damage when a weak point is hit': ('partBonus', 0),
     'biggest hit from one move': ('maxHit', 150), 'super fang, life drain and destiny bond do this much': ('percentHit', 40),
     'poisoned lasts (boss turns)': ('PSN', 2), 'burned lasts (boss turns)': ('BRN', 2), 'confused lasts (boss turns)': ('CNF', 2), 'asleep lasts (boss turns)': ('SLP', 0), 'paralyzed lasts (boss turns)': ('PAR', 0),
+    'weakness and resistance count (1 = yes, 0 = no)': ('wr', 0),
 }
 
 def die(msg): sys.exit('STOPPED: ' + msg)
@@ -120,6 +121,7 @@ def main():
            f"  partBonus: {rules['partBonus']},    // extra damage each time a weak point is hit",
            f"  maxHit: {rules['maxHit']},     // the most a single move can take off it",
            f"  percentHit: {rules['percentHit']},  // what Super Fang, Life Drain and Destiny Bond do to it instead",
+           f"  wr: {rules['wr']},           // 1 = Weakness and Resistance count in boss fights; 0 = they don't, for either side",
            f"  conditions: {{ PSN: {rules['PSN']}, BRN: {rules['BRN']}, CNF: {rules['CNF']}, SLP: {rules['SLP']}, PAR: {rules['PAR']} }}, // how many of its own turns a Special Condition lasts on it (0 = immune)",
            '};', 'export const BOSSES = [']
     for b in bosses:

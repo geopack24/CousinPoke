@@ -1,4 +1,4 @@
-// The Arena: single-player runs. Draft a deck 1-of-3, then fight the Colossal Pokémon (one per win) until 7 wins or 3 losses.
+// The Arena: single-player runs. Draft a deck 1-of-3, then fight the Colossal Pokémon (one per win) until 7 wins or a loss.
 // One document per player (arena/<pid>) holds the current run and the player's record; the page syncs everyone's
 // documents for the leaderboard. Arena games are auto-rules tables with a Colossal Pokémon (engine/boss.js) in seat B.
 import { ARENA, ARENA_REWARDS, ENERGY_PICK, addEnergyPick, energyTaken, arenaPool, makeOffer, poolEntry, addPick, draftedCount, basicsIn, energySplit, finalDeck, tierOf, goldPool, pickGold } from './arena-draft.js';
@@ -113,10 +113,10 @@ async function battle() {
   if (prev) PT.api('DELETE', 'games/' + prev).catch(() => {}); // the finished table isn't needed any more
   PT.openGame(id);
 }
-/** Forfeit the game in progress (counts as a loss). */
+/** Forfeit the game in progress (a loss, which ends the run). */
 function forfeit() {
   const r = run(); if (!r || !r.gameId) return;
-  PT.showModal('Forfeit this game?', '<p>It counts as a loss for this run.</p>', '<button class="dng" id="ffok" type="button">Forfeit</button>', (m) => {
+  PT.showModal('Forfeit this game?', '<p>A loss ends your run: you go straight to your prize chest.</p>', '<button class="dng" id="ffok" type="button">Forfeit</button>', (m) => {
     m.querySelector('#ffok').onclick = async () => { PT.closeModal(); const gid = r.gameId; await record(gid, false); PT.api('DELETE', 'games/' + gid).catch(() => {}); };
   });
 }
@@ -128,7 +128,7 @@ async function record(gid, won) {
     const r = d.run; if (!r || r.status !== 'play' || r.gameId !== gid || r.games.some((x) => x.id === gid)) return false;
     r.games.push({ id: gid, title: bossName(r.wins), won, at: Date.now() });
     if (won) r.wins++; else r.losses++; r.gameId = null;
-    if (r.wins >= ARENA.wins || r.losses >= ARENA.losses) finishRun(d);
+    if (r.wins >= ARENA.wins || (!won && r.losses >= ARENA.losses)) finishRun(d);
     after = clone(r);
   });
   if (!ok || !after) { V.noted.delete(gid); return; }
@@ -136,7 +136,7 @@ async function record(gid, won) {
 }
 function resultModal(r, won) {
   if (r.status === 'done') { PT.closeModal(); chestReveal(r); return; }
-  const body = `<p>Arena record: <b>${r.wins}–${r.losses}</b>. ${won ? `Next up: <b>${esc(bossName(r.wins))}</b>.` : `${ARENA.losses - r.losses} ${ARENA.losses - r.losses === 1 ? 'life' : 'lives'} left.`}</p>`;
+  const body = `<p>Arena record: <b>${r.wins}–${r.losses}</b>. ${won ? `Next up: <b>${esc(bossName(r.wins))}</b>.` : ''}</p>`;
   PT.showModal(won ? 'Victory!' : 'Defeat', body, `<button class="pri" id="tarena" type="button">Back to the Arena</button>`, (m) => { m.querySelector('#tarena').onclick = () => { PT.closeModal(); PT.go('arena'); }; });
 }
 /* ---------- the prize chest ----------
@@ -249,12 +249,12 @@ function header(r) {
   const d = mine(); const wallet = `<div class="ar-wallet" title="Arena winnings. A shop to spend them is coming."><span aria-hidden="true">${COIN.icon}</span><b>${(d && d.tokens) || 0}</b><em>${COIN.name}</em></div>`;
   const rec = `<div class="ar-headside">${wallet}${r && r.status !== 'done' ? `<div class="ar-record">${recordHTML(r)}</div>` : ''}</div>`;
   return `<header class="arhead${r && r.status === 'draft' ? ' slim' : ''}"><div class="ar-copy"><span class="kicker">Single player</span><h1>The Arena</h1><div class="ornate" aria-hidden="true"></div>
-    <p class="small muted">Draft a deck one pick at a time, then take down seven Colossal Pokémon. Seven wins is a perfect run; three losses and you're out.</p></div>${rec}</header>`;
+    <p class="small muted">Draft a deck one pick at a time, then take down seven Colossal Pokémon. Seven wins is a perfect run; lose once and the run is over.</p></div>${rec}</header>`;
 }
 function recordHTML(r) {
   const w = Array.from({ length: ARENA.wins }, (_, i) => `<i class="ar-w${i < r.wins ? ' on' : ''}" title="Win ${i + 1}"></i>`).join('');
-  const l = Array.from({ length: ARENA.losses }, (_, i) => `<i class="ar-l${i < r.losses ? ' on' : ''}" title="Loss ${i + 1}"></i>`).join('');
-  return `<div class="ar-wins"><span>Wins</span><div>${w}</div><b>${r.wins}</b></div><div class="ar-losses"><span>Losses</span><div>${l}</div><b>${r.losses}</b></div>`;
+  const l = Array.from({ length: Math.max(ARENA.losses, r.losses) }, (_, i) => `<i class="ar-l${i < r.losses ? ' on' : ''}" title="Loss ${i + 1}"></i>`).join('');
+  return `<div class="ar-wins"><span>Wins</span><div>${w}</div><b>${r.wins}</b></div>${r.losses ? `<div class="ar-losses"><span>Losses</span><div>${l}</div><b>${r.losses}</b></div>` : ''}`;
 }
 /* Deck panel in the style of Hearthstone's Arena: a "curve" by stage, then one tile per card (its art, name and count). */
 const KIND_ORDER = { Basic: 0, Baby: 0, 'Stage 1': 1, 'Stage 2': 2 };
@@ -421,7 +421,7 @@ function startView(d) {
     <section class="panel ar-begin"><h2>${last ? 'Ready for another run?' : 'Enter the Arena'}</h2>
       <ol class="ar-steps"><li><b>Draft.</b> Make ${ARENA.picksTo} picks: 1 of 3 cards each time, or a basic Energy instead. Only the top of each evolution line is offered, and an evolved Pokémon brings its whole line (2 of each card).</li>
         <li><b>Free cards.</b> Every deck starts with ${ARENA.bills} Bills (so Bill is never in the draft), ${ARENA.oaks} Professor Oak and ${ARENA.energy} basic Energy for your Pokémon's types. Want more Energy? Take it with your picks. That makes 60.</li>
-        <li><b>Battle.</b> Take on ${BOSSES.length} Colossal Pokémon, one after another. Each is a single giant with a huge HP pool: Knock it Out before it Knocks Out ${BOSS_RULES.kos} of yours. ${ARENA.wins} wins is a perfect run; ${ARENA.losses} losses ends it.</li></ol>
+        <li><b>Battle.</b> Take on ${BOSSES.length} Colossal Pokémon, one after another. Each is a single giant with a huge HP pool: Knock it Out before it Knocks Out ${BOSS_RULES.kos} of yours. ${ARENA.wins} wins is a perfect run. There are no second chances: lose once and the run is over.</li></ol>
       <span class="kicker">The bosses, in order (tap one to read it)</span>${ladderHTML(0, false)}
       <button class="pri cta" type="button" data-start="1">✦ Start a run</button></section>
     <div class="ar-startside">${lastHTML}<section class="panel ar-prizes"><span class="kicker">Prizes</span><h2>What a run pays</h2>
