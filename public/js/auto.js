@@ -9,7 +9,7 @@ import { playAttack, playKO, playHeal, playSelfHit, playCoins, playWin, playTurn
 import { playBattleIntro, playPokemonMusic, playEventMusic, warmMusic } from './music.js';
 import * as sfx from './sfx.js';
 import { BOT_UID, BOT_DECKS, botDeckCards, botAction, botAnswer, key as botKey } from './bot.js';
-import { nextBossAttack } from './engine/boss.js';
+import { nextBossAttack, bossCrystals } from './engine/boss.js';
 
 let PT = null;           // bridge from index.html
 let promptOpen = null;   // id of the prompt modal currently shown
@@ -638,10 +638,15 @@ function bossSideHTML(g, seat, compact, SC) {
   // everything it can do, with the next one marked, laid over the printed attacks on its card; tap for the full card text
   const moves = `<div class="bossmoves" data-bosscard="${esc(b.cid)}" role="button" tabindex="0" title="Tap for the full text of its attacks"><span class="k">Moveset</span>${(def.attacks || []).map((a, k) => `<span class="bm${k === nx.idx ? ' next' : ''}"><b>${esc(a.name)}</b><i>⚡${a.cost == null ? 1 : a.cost}</i><em>${a.flips ? a.dmg + '×' : a.dmg || '–'}${a.bench ? '+' : ''}</em></span>`).join('')}${nx.charge > 0 ? `<span class="bm ec"><b>Energy Charge</b><i>+${nx.charge}⚡</i><em>–</em></span>` : ''}</div>`;
   // laid out like an opposing player: its Energy along the far edge (its Bench), the Colossal Pokémon in front of it in the middle
-  const slots = Array.from({ length: Math.max(nx.max, p.bench.length) }, (_, k) => (p.bench[k] ? `<div class="eslot${p.bench[k].flags.charged !== false ? ' on' : ''}"><div class="ecard">${p.bench[k].flags.charged !== false ? PT.cardHTML(C(p.bench[k].c).en, scPart * 0.8) : ''}</div>${monHTML(p.bench[k], seat, false, false, scPart)}</div>` : `<div class="eslot gone"><div class="ecard"></div><div class="slot" style="--s:${scPart}">forms next turn</div></div>`)).join('');
+  // a lit crystal (it holds an Energy) is on its Bench and can be attacked; a dark one is out of play; a broken one forms again next turn
+  const crys = bossCrystals(g);
+  const slots = Array.from({ length: Math.max(nx.max, crys.length) }, (_, k) => { const cr = crys[k];
+    if (!cr) return `<div class="eslot gone"><div class="ecard"></div><div class="slot" style="--s:${scPart}">forms next turn</div></div>`;
+    if (cr.lit) return `<div class="eslot on"><div class="ecard">${PT.cardHTML(C(cr.x.c).en, scPart * 0.8)}</div>${monHTML(cr.x, seat, false, false, scPart)}</div>`;
+    return `<div class="eslot dark" title="No Energy in this crystal: it is out of play until it lights up"><div class="ecard"></div><div class="dimc">${PT.cardHTML(cr.x.c, scPart)}${cr.x.dmg ? `<span class="dimd">${cr.x.dmg}</span>` : ''}</div></div>`; }).join('');
   return `<div class="side boss ${live ? 'live' : (g.phase === 'main' && !g.winner ? 'idle' : '')}${rage ? ' raging' : ''}">
     <div class="pname"><span>${esc(g.seats[seat].name)}</span>${turnNow ? '<span class="chip">Its turn</span>' : ''}${g.winner === seat ? '<span class="chip">Winner</span>' : ''}</div>
-    <div class="bossbench" title="It gains Energy every turn and its attacks use it up. Each Energy sits behind an Energy Crystal. Knock a crystal Out and the Energy behind it is destroyed; the crystal forms again on its next turn."><span class="k">Energy ${nx.have} / ${nx.max}</span><div class="bp-row">${slots}</div></div>
+    <div class="bossbench" title="It gains Energy every turn and its attacks use it up. Each Energy lights up an Energy Crystal. Only a lit crystal can be attacked: Knock it Out and its Energy is destroyed; the crystal forms again on its next turn."><span class="k">Energy ${nx.have} / ${nx.max}</span><div class="bp-row">${slots}</div></div>
     <div class="bossfield">
       <div class="bossleft">${m ? `<div class="bossnext${coming ? '' : ' rest'}"><span class="k">${!nx.atk || coming ? (turnNow ? 'This turn' : 'Next turn') : 'Charging'}</span>${nextHTML}${jabHTML}</div>` : ''}${lastHTML}</div>
       <div class="bossmid"><div class="bossfig" data-active-slot="${seat}"><div class="bossbody">${fig}${m ? moves : ''}</div></div>

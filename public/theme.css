@@ -970,7 +970,8 @@ table.lgt tr.lead td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
 .eslot .ecard{min-height:6px;margin-bottom:-14px;opacity:.95;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
 .eslot .ecard:empty{height:0;margin:0}
 .eslot .mon{margin:0;position:relative;z-index:1}
-.eslot:not(.on) .mon .cd{filter:saturate(.25) brightness(.75)} /* an empty crystal is dull; a charged one glows */
+.eslot.dark .dimc{position:relative;line-height:0;opacity:.55;filter:saturate(.15) brightness(.7)} /* a dark crystal: no Energy, out of play */
+.eslot.dark .dimd{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 3px;border-radius:999px;display:grid;place-items:center;font-size:10px;font-weight:800;line-height:1;color:#fff;background:#7a2a24}
 .eslot.on .mon .cd{box-shadow:0 0 0 2px rgba(255,203,5,.7),0 0 10px rgba(255,203,5,.55)}
 .eslot.gone .slot{font-size:8px;line-height:1.1;opacity:.6}
 .eslot .ecard.epop{animation:epop .85s cubic-bezier(.2,1.5,.4,1)}

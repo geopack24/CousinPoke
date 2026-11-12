@@ -768,10 +768,11 @@ function bossGame(n, a, over) {
   return g;
 }
 const bossMon = (g) => g.p.b.active;
-/** How much Energy the boss has: the crystals on its Bench that hold one. */
-const nrg = (g) => g.p.b.bench.filter((x) => x.flags.charged !== false).length;
-/** Hand the boss n Energy the way the engine does: into empty crystals from the left, with an Energy card attached to it for each. */
-function giveEnergy(g, n) { const pc = DB[g.boss.cid].part; let k = 0; for (const x of g.p.b.bench) { if (k >= n) break; if (x.flags.charged) continue; x.flags.charged = true; g.p.b.active.en.push({ id: 'e' + (++ids).toString(36), c: DB[pc].en }); k++; } return g; }
+/** How much Energy the boss has: its lit crystals, which are the cards on its Bench. */
+const nrg = (g) => g.p.b.bench.length;
+const dark = (g) => g.boss.dim || [];
+/** Hand the boss n Energy the way the engine does: its lowest dark crystals light up and join its Bench, with an Energy card attached to it for each. */
+function giveEnergy(g, n) { const pc = DB[g.boss.cid].part; for (let k = 0; k < n && dark(g).length; k++) { g.boss.dim.sort((x, y) => x.flags.slot - y.flags.slot); const x = g.boss.dim.shift(); g.p.b.bench.push(x); g.p.b.active.en.push({ id: 'e' + (++ids).toString(36), c: DB[pc].en }); } return g; }
 /** Run an action, answering every prompt with its first option. */
 function actAuto(g, action, seat = 'a') { let a = { seat, seed: 1, answers: [], ...action }; for (let i = 0; i < 10; i++) { const r = apply(g, a, DB); if (r.error) throw new Error('rule error: ' + r.error); if (!r.prompt) return r.state; a = { ...a, answers: [...a.answers, r.prompt.options.slice(0, Math.max(1, r.prompt.min)).map((o) => o.key)] }; } throw new Error('too many prompts'); }
 /** The boss takes its turn the way the table drives it: its pattern attack if it has one, otherwise it ends the turn. */
@@ -779,7 +780,7 @@ function bossTurn(g, seed = 1) { const l = legalActions(g, 'b', DB); const a = l
 
 test('a Colossal Pokémon starts with no Energy, gains one a turn, spends it on the attacks of its pattern, and uses Energy Charge when it is short', () => {
   let g = bossGame(98, { active: N['Chansey'] });
-  assert.equal(DB[bossMon(g).c].name, 'Colossal Testzilla'); assert.equal(nrg(g), 0); assert.equal(g.p.b.bench.length, 5, 'five empty Energy Crystals');
+  assert.equal(DB[bossMon(g).c].name, 'Colossal Testzilla'); assert.equal(nrg(g), 0); assert.equal(dark(g).length, 5, 'five dark Energy Crystals, none of them on its Bench');
   assert.equal(g.p.b.deck.length + g.p.b.hand.length + g.p.b.prizes.length, 0); assert.equal(g.first, 'a');
   assert.deepEqual([nextBossAttack(g, DB).atk.name, nextBossAttack(g, DB).ready, nextBossAttack(g, DB).soon], ['Stomp', false, true]);
   g = act(g, { type: 'endTurn' });
@@ -797,35 +798,34 @@ test('a Colossal Pokémon starts with no Energy, gains one a turn, spends it on 
   assert.equal(nrg(g), 2, '3 + 1 for the turn, less the 2 Roar used up'); assert.equal(nextBossAttack(g, DB).atk.name, 'Stomp', 'the pattern starts again');
 });
 
-test('Colossal Pokémon: an Energy Crystal that is Knocked Out takes its Energy with it and forms again next turn; damage on a crystal stays', () => {
-  // five crystals from the start, none holding Energy
+test('Colossal Pokémon: only a lit Energy Crystal is on its Bench; Knocked Out, it takes its Energy with it and forms again next turn; damage on a crystal stays', () => {
+  // five crystals from the start, all dark: nothing on its Bench to attack or count
   let g = bossGame(98, { active: N['Chansey'] });
-  assert.equal(g.p.b.bench.length, 5); assert.equal(nrg(g), 0); assert.equal(DB[g.p.b.bench[0].c].name, 'Energy Crystal'); assert.equal(DB[g.p.b.bench[0].c].hp, 20);
-  // a Bench attack breaks a crystal that holds an Energy: the Energy is gone, no Prize, no damage to the boss
+  assert.equal(g.p.b.bench.length, 0); assert.equal(dark(g).length, 5); assert.equal(DB[dark(g)[0].c].name, 'Energy Crystal'); assert.equal(DB[dark(g)[0].c].hp, 20);
+  // with 2 Energy, 2 crystals are lit: those two are its Benched Pokémon
   g = giveEnergy(bossGame(98, { active: { c: cardId('Hitmonlee', 'base3'), en: [N['Fighting Energy'], N['Fighting Energy'], N['Fighting Energy']] } }), 2);
+  assert.equal(g.p.b.bench.length, 2); assert.equal(dark(g).length, 3);
+  const pr = apply(g, { type: 'attack', index: 0, seat: 'a', seed: 1, answers: [] }, DB); assert.equal(pr.prompt.options.length, 2, 'Stretch Kick can only pick a lit crystal');
+  // a Bench attack breaks a lit crystal: its Energy is gone, no Prize, no damage to the boss
   const hit = g.p.b.bench[0].id; const shattered = (x) => x.log.filter((l) => /Energy Crystal shatters/.test(l.m)).length;
   const r = actWith(g, { type: 'attack', index: 0 }, [hit]); // Stretch Kick: 20 to a Benched Pokémon
-  assert.equal(shattered(r.state), 1); assert.ok(r.state.log.some((l) => /loses that Energy/.test(l.m))); assert.ok(!r.state.p.b.bench.some((x) => x.id === hit));
+  assert.equal(shattered(r.state), 1); assert.ok(r.state.log.some((l) => /loses that Energy/.test(l.m))); assert.ok(![...r.state.p.b.bench, ...dark(r.state)].some((x) => x.id === hit));
   assert.equal(bossMon(r.state).dmg, 0); assert.equal(r.state.pending.length, 0);
-  // ...and as the boss's turn starts the crystal has formed again (empty, undamaged) and it gains its Energy for the turn
-  assert.equal(r.state.turn, 'b'); assert.equal(r.state.p.b.bench.length, 5); assert.ok(r.state.log.some((l) => /An Energy Crystal forms again/.test(l.m)));
+  // ...and as the boss's turn starts the crystal has formed again (dark, undamaged) and it gains its Energy for the turn
+  assert.equal(r.state.turn, 'b'); assert.equal(r.state.p.b.bench.length + dark(r.state).length, 5); assert.ok(r.state.log.some((l) => /An Energy Crystal forms again/.test(l.m)));
   assert.equal(nrg(r.state), 2, 'the one it kept, plus the one for this turn'); assert.equal(bossMon(r.state).en.length, 2);
-  // breaking an empty crystal costs it nothing
-  g = giveEnergy(bossGame(98, { active: { c: cardId('Hitmonlee', 'base3'), en: [N['Fighting Energy'], N['Fighting Energy'], N['Fighting Energy']] } }), 1);
-  const r2 = actWith(g, { type: 'attack', index: 0 }, [g.p.b.bench[4].id]);
-  assert.ok(r2.state.log.some((l) => /it held no Energy/.test(l.m))); assert.equal(nrg(r2.state), 2);
-  // damage on a crystal stays when the boss spends its Energy and gains more: it can't reset its Bench by attacking
+  // damage on a crystal stays when the boss spends that Energy and later gains it back: it can't reset its Bench by attacking
   g = giveEnergy(bossGame(98, { active: N['Chansey'] }), 1); g.p.b.bench[0].dmg = 10; const worn = g.p.b.bench[0].id;
-  g = act(g, { type: 'endTurn' }); g = bossTurn(g); // gains 1 (2 Energy), Stomp uses 1
-  assert.equal(g.p.b.bench.find((x) => x.id === worn).dmg, 10); assert.equal(nrg(g), 1); assert.ok(g.p.b.bench.find((x) => x.id === worn).flags.charged, 'Energy is used up from the right, so the worn crystal on the left still holds one');
-  // "20 to each Benched Pokémon" breaks every crystal
+  g = act(g, { type: 'endTurn' }); g = bossTurn(g); // gains 1 (2 Energy), Stomp uses 1: the higher crystal goes dark
+  assert.equal(nrg(g), 1); assert.equal(g.p.b.bench[0].id, worn); assert.equal(g.p.b.bench[0].dmg, 10, 'the worn crystal on the left still holds its Energy and its damage');
+  g = giveEnergy(bossGame(98, { active: N['Chansey'], hand: [N['Energy Removal']] }), 1); g.p.b.bench[0].dmg = 10; const w2 = g.p.b.bench[0].id;
+  g = actAuto(g, { type: 'playTrainer', card: g.p.a.hand[0].id }); // Energy Removal: the crystal goes dark, unbroken
+  assert.equal(bossMon(g).en.length, 0); assert.equal(nrg(g), 0); assert.equal(dark(g).find((x) => x.id === w2).dmg, 10, 'dark, but it keeps its damage');
+  g = act(g, { type: 'endTurn' }); assert.equal(g.p.b.bench[0].id, w2); assert.equal(g.p.b.bench[0].dmg, 10, 'the same crystal lights up again, still damaged');
+  // "20 to each Benched Pokémon" breaks every lit crystal and leaves the dark ones alone
   g = giveEnergy(bossGame(98, { active: { c: N['Magneton'], en: [N['Lightning Energy'], N['Lightning Energy'], N['Lightning Energy'], N['Lightning Energy']] }, bench: [N['Chansey']] }), 3);
   g = act(g, { type: 'attack', index: 1 }); // Selfdestruct: 80, and 20 to each Benched Pokémon
-  assert.equal(bossMon(g).dmg, 80); assert.equal(shattered(g), 5); assert.equal(g.p.b.bench.length, 0); assert.equal(bossMon(g).en.length, 0); // (Magneton went down too, so its turn hasn't started)
-  // Energy Removal empties a crystal without breaking it
-  g = giveEnergy(bossGame(98, { active: N['Chansey'], hand: [N['Energy Removal']] }), 2);
-  g = actAuto(g, { type: 'playTrainer', card: g.p.a.hand[0].id });
-  assert.equal(bossMon(g).en.length, 1); assert.equal(nrg(g), 1); assert.equal(g.p.b.bench.length, 5);
+  assert.equal(bossMon(g).dmg, 80); assert.equal(shattered(g), 3); assert.equal(g.p.b.bench.length, 0); assert.equal(dark(g).length, 2); assert.equal(bossMon(g).en.length, 0); // (Magneton went down too, so its turn hasn't started)
   // with its Energy gone it has to charge again
   g = giveEnergy(bossGame(98, { active: N['Chansey'], hand: [N['Energy Removal']] }), 1); g.boss.step = 1; // Roar (2 Energy) is next
   assert.ok(nextBossAttack(g, DB).soon);
@@ -833,7 +833,7 @@ test('Colossal Pokémon: an Energy Crystal that is Knocked Out takes its Energy 
   g = act(g, { type: 'endTurn' }); g = bossTurn(g); assert.equal(active(g, 'a').dmg, 0, 'no attack this turn');
   // it never holds more than its crystals
   g = giveEnergy(bossGame(98, { active: N['Chansey'] }), 5); g.boss.step = 1; g = act(g, { type: 'endTurn' });
-  assert.equal(nrg(g), 5); assert.equal(g.p.b.bench.length, 5);
+  assert.equal(nrg(g), 5); assert.equal(dark(g).length, 0);
 });
 
 test('Colossal Pokémon: the player takes a Prize for each sixth of its HP, wins by Knocking it Out, and loses after enough Knock Outs', () => {
