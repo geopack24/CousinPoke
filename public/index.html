@@ -664,7 +664,7 @@ async function sync(){
   if(document.hidden&&S.screen!=='game'&&!(LG()&&LG().liveDraft())){syncSoon(15000);return}
   syncing=true;let changed=false;
   try{
-    const d=await api('POST','sync',{pid:uid,lobby:S.screen!=='game',game:S.screen==='game'?S.gameId:null,gv:S.game?S.game.version:null,league:1,lid:LEAGUE_ID,lv:S.league?S.league.version:null,arena:S.screen!=='game'?1:0});
+    const d=await api('POST','sync',{pid:uid,lobby:S.screen!=='game',game:S.screen==='game'?S.gameId:null,gv:S.game?S.game.version:null,league:1,lid:LEAGUE_ID,lv:S.league?S.league.version:null,arena:(S.screen!=='game'||(S.game&&S.game.arena))?1:0});
     if(!S.online){S.online=true;changed=true;setOnline(true)}
     const sig=k=>JSON.stringify(d[k]);
     if(d.players&&sig('players')!==lastSig.players){lastSig.players=sig('players');S.players=d.players;changed=true}
@@ -904,7 +904,8 @@ async function joinGame(id){
     const ver=g.version;delete g.id;delete g.version;g.seats[seat]={uid,deckId:null,deckName:null};g.updatedAt=Date.now();pushLog(g,`${S.name||'A player'} sat down`);
     const r=await api('PUT','games/'+id,{data:g,ifVersion:ver});if(r&&r.conflict){toast('Someone else just took that seat. Try again.');return}
     openGame(id)}catch(e){toast('Could not join ('+(e.code||'error')+')')}}
-function confirmDeleteGame(id){showModal('Close this table?',`<p>The table and its log are removed for everyone.</p>`,`<button class="dng" id="dok" type="button">Close table</button>`,m=>{m.querySelector('#dok').onclick=async()=>{closeModal();try{await api('DELETE','games/'+id);if(S.gameId===id){S.gameId=null;S.game=null;if(S.screen==='game')go('lobby')}syncSoon(100)}catch(e){toast('Could not close ('+(e.code||'error')+')')}}})}
+function confirmDeleteGame(id){const cg=(S.game&&S.game.id===id)?S.game:S.games.find(x=>x.id===id);const arenaLive=cg&&cg.arena&&cg.arena.pid===uid&&!(cg.winner||(cg.state&&cg.state.winner));
+  showModal('Close this table?',`<p>The table and its log are removed for everyone.</p>${arenaLive?'<p class="notice" style="border-left-color:var(--danger)"><b>This Arena game isn\u2019t finished.</b> Closing it now counts as a loss for your run.</p>':''}`,`<button class="dng" id="dok" type="button">${arenaLive?'Close and take the loss':'Close table'}</button>`,m=>{m.querySelector('#dok').onclick=async()=>{closeModal();try{if(cg&&cg.arena&&AR()){const full=await api('GET','games/'+id);if(full&&!full.missing)await AR().closingTable(full)}await api('DELETE','games/'+id);if(S.gameId===id){S.gameId=null;S.game=null;if(S.screen==='game')go(cg&&cg.arena?'arena':'lobby')}syncSoon(100)}catch(e){toast('Could not close ('+(e.code||'error')+')')}}})}
 
 /* ---------- deck builder ---------- */
 const B={deckId:null,deck:null,q:'',sets:new Set(['base1','base2','base3','base5','gym1','gym2']),st:'',type:'',stage:'',dirty:false,paneOpen:false,inDeck:false,league:false};

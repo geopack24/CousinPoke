@@ -24,7 +24,7 @@ const goldIds = (d) => ((d && d.gold) || []).map((g) => g.cid);
 /** A card with the gold holographic finish. */
 const goldCard = (cid, s, attrs = '') => `<span class="goldcard" style="--s:${s}" ${attrs}>${PT.cardHTML(cid, s)}</span>`;
 
-export function installArena(bridge) { PT = bridge; return { render, noteGame, lobbyFeature, isArenaGame, heroCount }; }
+export function installArena(bridge) { PT = bridge; return { render, noteGame, closingTable, lobbyFeature, isArenaGame, heroCount }; }
 export const isArenaGame = (g) => !!(g && g.arena);
 function heroCount() { const r = run(); return r && r.status !== 'done' ? `${r.wins}–${r.losses}` : null; }
 
@@ -199,17 +199,40 @@ function chestReveal(r) {
   chest.onclick = open;
   setTimeout(() => chest.focus(), 700);
 }
-/** Called by the page whenever it has a fresh copy of a game. */
+/** This player's Arena document, fetched if the page hasn't synced it (the game screen may have been opened by a reload). */
+async function ensureMine() {
+  if (mine()) return mine();
+  try { const d = await PT.api('GET', 'arena/' + me()); if (d && !d.missing) { PT.S.arena = { ...docs(), [me()]: d }; return d; } } catch (e) { /* offline: try again on the next call */ }
+  return null;
+}
+const wonGame = (g) => g.state.winner === (g.seats.a.uid === me() ? 'a' : 'b');
+/** Called by the page whenever it has a fresh copy of a game: a finished Arena game is recorded against the run. */
+let noting = null;
 export function noteGame(g) {
   if (!g || !g.arena || g.arena.pid !== me() || !g.state || !g.state.winner) return;
-  const r = run(); if (!r || r.gameId !== g.id) return;
-  record(g.id, g.state.winner === (g.seats.a.uid === me() ? 'a' : 'b'));
+  if (V.noted.has(g.id) || noting === g.id) return;
+  noting = g.id;
+  ensureMine().then(() => { const r = run(); if (r && r.gameId === g.id) return record(g.id, wonGame(g)); if (r) V.noted.add(g.id); }).finally(() => { noting = null; });
+}
+/**
+ * Called before an Arena table is closed, with the full game: its result is recorded first, so closing a finished
+ * table can never lose a win. Closing a game that is still being played forfeits it (the page warns first).
+ */
+export async function closingTable(g) {
+  if (!g || !g.arena || g.arena.pid !== me()) return;
+  await ensureMine(); const r = run(); if (!r || r.gameId !== g.id) return;
+  await record(g.id, !!(g.state && g.state.winner) && wonGame(g));
 }
 /** The run's table may have finished while the player was elsewhere: check it when the Arena opens. */
 let checking = null;
 async function checkCurrent() {
   const r = run(); if (!r || !r.gameId || checking === r.gameId) return; checking = r.gameId;
-  try { const g = await PT.api('GET', 'games/' + r.gameId); if (!g || g.missing) await record(r.gameId, false); else noteGame(g); } catch (e) { /* try again next time */ }
+  try {
+    const g = await PT.api('GET', 'games/' + r.gameId);
+    if (g && !g.missing) noteGame(g);
+    // The table is gone and nothing was recorded: nobody can say who won, so the game doesn't count either way.
+    else { const gid = r.gameId; const ok = await mutate((d) => { if (!d.run || d.run.gameId !== gid) return false; d.run.gameId = null; }); if (ok) PT.toast("That game's table was closed before its result was saved, so it doesn't count. Play it again."); }
+  } catch (e) { /* try again next time */ }
   finally { checking = null; }
 }
 
