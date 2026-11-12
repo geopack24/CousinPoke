@@ -365,14 +365,25 @@ async function revealPlayed(items, doc) {
 /* ---------- a Colossal Pokémon's attacks ----------
    Its name and the attack's name slam onto the table, the giant rears up and lunges, and the table shakes when it lands. */
 const bossSpec = (doc, name) => { const c = C(doc.state.boss.cid); return ((c.boss && c.boss.attacks) || []).find((x) => x.name === name) || {}; };
-async function bossWindup(board, atk, doc) {
-  const a = bossSpec(doc, atk.name); const big = (a.cost || 0) >= 3 || (a.dmg || 0) >= 60;
+/** Announce the attack and hold it on screen: who is attacking, with what, and what it will do. Nothing on the table
+ *  has changed yet when this is shown (the computer's turn calls it before the move is applied). */
+async function bossAnnounce(atk, doc) {
+  const board = boardEl(); const a = bossSpec(doc, atk.name); const big = (a.cost || 0) >= 3 || (a.dmg || 0) >= 60;
   sfx.play(big ? 'boss.roar' : 'boss.growl');
-  if (!board || !fxEnabled()) return;
-  const fig = board.querySelector('.bossfig'); if (fig) { const cls = big ? 'strike-big' : 'strike'; fig.classList.add(cls); setTimeout(() => fig.classList.remove(cls), 1600); }
-  const el = document.createElement('div'); el.className = `boss-call t-${atk.type || 'Colorless'}${big ? ' big' : ''}`; el.innerHTML = `<small>${esc(C(doc.state.boss.cid).name)}</small><b>${esc(atk.name)}</b>`;
-  board.appendChild(el); setTimeout(() => el.remove(), big ? 1750 : 1350);
-  await new Promise((r) => setTimeout(r, big ? 950 : 600));
+  if (!board || !fxEnabled()) { await new Promise((r) => setTimeout(r, 600)); return; }
+  const hold = big ? 1900 : 1500; const life = hold + 1500;
+  const fig = board.querySelector('.bossfig'); if (fig) { fig.classList.add('rearing'); setTimeout(() => fig.classList.remove('rearing'), hold); }
+  const rc = board.getBoundingClientRect(); const what = [a.flips ? `${a.dmg} for each heads` : a.dmg ? `${a.dmg} damage` : '', a.bench ? `${a.bench} to your Bench` : ''].filter(Boolean).join(' · ');
+  const el = document.createElement('div'); el.className = `boss-call fixed t-${atk.type || 'Colorless'}${big ? ' big' : ''}`;
+  el.style.cssText = `left:${Math.round(rc.left + rc.width / 2)}px;top:${Math.round(innerHeight * 0.4)}px;animation-duration:${life}ms`;
+  el.innerHTML = `<small>${esc(C(doc.state.boss.cid).name)} uses</small><b>${esc(atk.name)}</b>${what ? `<i>${esc(what)}</i>` : ''}`;
+  document.body.appendChild(el); setTimeout(() => el.remove(), life);
+  await new Promise((r) => setTimeout(r, hold));
+}
+/** The lunge itself, as the attack's effect starts. */
+function bossLunge(doc, atk) {
+  const board = boardEl(); if (!board || !fxEnabled()) return; const a = bossSpec(doc, atk.name); const big = (a.cost || 0) >= 3 || (a.dmg || 0) >= 60;
+  const fig = board.querySelector('.bossfig'); if (fig) { const cls = big ? 'strike-big' : 'strike'; fig.classList.add(cls); setTimeout(() => fig.classList.remove(cls), 1200); }
 }
 function bossImpact(board, atk, events) {
   const dmg = Math.max(0, ...events.filter((e) => e.t === 'damage' && !e.self).map((e) => e.amount)); if (!dmg) return;
@@ -387,7 +398,7 @@ function bossBeats(events) {
   if (gained) { sfx.play('boss.energy'); const all = [...board.querySelectorAll('.bossbench .mon')]; all.slice(-gained).forEach((el, i) => setTimeout(() => flash(el, 'epop', 900), i * 140)); }
   if (events.some((e) => e.t === 'bosscharge')) { // Energy Charge is announced like an attack
     sfx.play('boss.charge', 150); flash(board.querySelector('.bossfig'), 'charging', 1300);
-    if (fxEnabled()) { const el = document.createElement('div'); el.className = 'boss-call t-Charge'; el.innerHTML = `<small>${esc(C(PT.S.game.state.boss.cid).name)}</small><b>Energy Charge</b>`; board.appendChild(el); setTimeout(() => el.remove(), 1350); }
+    if (fxEnabled()) { const k = events.find((e) => e.t === 'bosscharge').k || 0; const rc = board.getBoundingClientRect(); const el = document.createElement('div'); el.className = 'boss-call fixed t-Charge'; el.style.cssText = `left:${Math.round(rc.left + rc.width / 2)}px;top:${Math.round(innerHeight * 0.4)}px;animation-duration:2600ms`; el.innerHTML = `<small>${esc(C(PT.S.game.state.boss.cid).name)} uses</small><b>Energy Charge</b><i>gains ${k} Energy · no attack this turn</i>`; document.body.appendChild(el); setTimeout(() => el.remove(), 2600); }
   }
   if (events.some((e) => e.t === 'bossrest')) { sfx.play('boss.charge', 200); flash(board.querySelector('.bossfig'), 'charging', 1300); }
   if (events.some((e) => e.t === 'bossko')) flash(board.querySelector('.bosskos'), 'kpop', 900);
@@ -426,7 +437,8 @@ async function playEvents(events, doc, scene, opts = {}) {
   if (flips.length && !opts.coinsDone) { PT.toast(flips.map((e) => (e.heads ? 'Heads' : 'Tails')).join(', ')); const fb = boardEl(); if (fb) await wait(Math.round(playCoins(fb, flips.map((e) => e.heads)) * 0.7)); }
   let impact = 0; const board = boardEl();
   const bossAtk = !!(atk && doc.state && doc.state.boss && atk.attacker === doc.state.boss.id);
-  if (bossAtk) await bossWindup(board, atk, doc);
+  if (bossAtk && !opts.announced) await bossAnnounce(atk, doc);
+  if (bossAtk) bossLunge(doc, atk);
   if (atk && scene && board) { scene.fromEl = board.querySelector(`[data-mon="${atk.attacker}"]`); if (bossAtk) scene.boost = 1.5; impact = playAttack(board, scene).impact; }
   else if (atk) { const el = board && board.querySelector(`[data-mon="${atk.attacker}"]`); if (el) { el.classList.add('lunge'); setTimeout(() => el.classList.remove('lunge'), 500); } }
   await wait(impact);
@@ -619,6 +631,10 @@ function bossSideHTML(g, seat, compact, SC) {
     .filter(Boolean).map(([t, d]) => `<span class="btrait${/Enraged/.test(t) ? ' hot' : ''}" title="${esc(d)}">${esc(t)}</span>`).join('');
   const scBoss = compact ? .5 : .7; const scPart = compact ? .13 : .17; // the card is big enough for its Moveset to be read on it
   const fig = m ? monHTML({ ...m, en: [] }, seat, true, false, scBoss) : `<div class="bossdown">${PT.cardHTML(b.cid, scBoss)}<span>Defeated</span></div>`;
+  // what it did on its last turn, kept on screen so nothing is missed (from the game log)
+  const lastT = g.phase !== 'main' ? 0 : g.turn === seat ? g.turnNo - 2 : g.turnNo - 1;
+  const lastLines = lastT < 1 ? [] : (g.log || []).filter((e) => e.turn === lastT && e.k !== 'chat' && !/^Turn \d+:|^Coin flip|gains an Energy \(/.test(e.m)).map((e) => e.m.replace(/\s*\(now \d+\)/, '').split(g.seats[seat].name + ' ').join('').split(g.seats[other(seat)].name + "'s ").join('your ')).slice(0, 5);
+  const lastHTML = lastLines.length ? `<div class="bosslast"><span class="k">Its last turn</span>${lastLines.map((t) => `<span>${esc(t.charAt(0).toUpperCase() + t.slice(1))}</span>`).join('')}</div>` : '';
   // everything it can do, with the next one marked, laid over the printed attacks on its card; tap for the full card text
   const moves = `<div class="bossmoves" data-bosscard="${esc(b.cid)}" role="button" tabindex="0" title="Tap for the full text of its attacks"><span class="k">Moveset</span>${(def.attacks || []).map((a, k) => `<span class="bm${k === nx.idx ? ' next' : ''}"><b>${esc(a.name)}</b><i>⚡${a.cost == null ? 1 : a.cost}</i><em>${a.flips ? a.dmg + '×' : a.dmg || '–'}${a.bench ? '+' : ''}</em></span>`).join('')}${nx.charge > 0 ? `<span class="bm ec"><b>Energy Charge</b><i>+${nx.charge}⚡</i><em>–</em></span>` : ''}</div>`;
   // laid out like an opposing player: its Energy along the far edge (its Bench), the Colossal Pokémon in front of it in the middle
@@ -627,7 +643,7 @@ function bossSideHTML(g, seat, compact, SC) {
     <div class="pname"><span>${esc(g.seats[seat].name)}</span>${turnNow ? '<span class="chip">Its turn</span>' : ''}${g.winner === seat ? '<span class="chip">Winner</span>' : ''}</div>
     <div class="bossbench" title="It gains Energy every turn and its attacks use it up. Each Energy is a target on its Bench: Knock it Out or discard it to hold its attacks back."><span class="k">Energy ${p.bench.length} / ${nx.max}</span><div class="bp-row">${slots}</div></div>
     <div class="bossfield">
-      <div class="bossleft">${m ? `<div class="bossnext${coming ? '' : ' rest'}"><span class="k">${!nx.atk || coming ? (turnNow ? 'This turn' : 'Next turn') : 'Charging'}</span>${nextHTML}${jabHTML}</div>` : ''}</div>
+      <div class="bossleft">${m ? `<div class="bossnext${coming ? '' : ' rest'}"><span class="k">${!nx.atk || coming ? (turnNow ? 'This turn' : 'Next turn') : 'Charging'}</span>${nextHTML}${jabHTML}</div>` : ''}${lastHTML}</div>
       <div class="bossmid"><div class="bossfig" data-active-slot="${seat}"><div class="bossbody">${fig}${m ? moves : ''}</div></div>
         <div class="bosshp"><div class="bossbar ${frac <= .25 ? 'crit' : frac <= .5 ? 'hurt' : ''}" title="Each mark is a Prize for you."><i style="width:${(frac * 100).toFixed(1)}%"></i>${ticks}</div><div class="bosshpn"><b>${left}</b> / ${hp} HP</div></div></div>
       <div class="bossright"><div class="bosskos" title="It wins when it has Knocked Out ${b.r.kos} of your Pokémon."><span class="k">Knock Outs</span><span class="pips">${pips}</span><b>${b.kos} / ${b.r.kos}</b></div>
@@ -656,7 +672,7 @@ function monHTML(m, seat, active, promoteClick, scale) {
    When a seat belongs to the computer, the human opponent's browser makes its moves: one action per step with a short
    pause so the table animates, prompts answered by the bot module, parked prompts for the bot answered the same way. */
 const botSeat = (doc) => (doc.seats.a.uid === BOT_UID ? 'a' : doc.seats.b.uid === BOT_UID ? 'b' : null);
-let botTimer = null; const botSkip = new Set(); let botSkipTurn = -1;
+let botTimer = null; let botBusy = false; const botSkip = new Set(); let botSkipTurn = -1;
 function botNeedsToAct(doc, bs) {
   const g = doc.state; if (!g || g.winner) return false;
   if (doc.inflight) return doc.inflight.prompt && doc.inflight.prompt.seat === bs;
@@ -667,8 +683,8 @@ function botNeedsToAct(doc, bs) {
 function maybeRunBot(doc) {
   const bs = botSeat(doc); if (!bs || !doc.state) return;
   if (mySeat(doc) !== other(bs)) return;
-  if (!botNeedsToAct(doc, bs) || botTimer) return;
-  botTimer = setTimeout(() => { botTimer = null; botStep().catch((e) => console.warn('bot step failed', e)); }, doc.state.phase === 'setup' ? 400 : 900);
+  if (!botNeedsToAct(doc, bs) || botTimer || botBusy) return;
+  botTimer = setTimeout(() => { botTimer = null; botStep().catch((e) => console.warn('bot step failed', e)); }, doc.state.phase === 'setup' ? 400 : doc.state.boss ? 1500 : 900);
 }
 async function botStep() {
   const doc = PT.S.game; if (!doc || !doc.state) return; const bs = botSeat(doc); if (!bs || !botNeedsToAct(doc, bs)) return;
@@ -687,9 +703,12 @@ async function botStep() {
       if (r.prompt.seat === bs) { action = { ...action, answers: [...action.answers, botAnswer(r.prompt, doc.state, bs, PT.CARDS)] }; continue; }
       doc.inflight = { action, prompt: r.prompt }; await PT.saveGame(doc); PT.render(); return; // the human has to answer
     }
+    // a Colossal Pokémon's attack is announced first, while the table still shows how things stood
+    const batk = doc.state.boss && bs === doc.state.boss.seat ? r.events.find((e) => e.t === 'attack' && e.attacker === doc.state.boss.id) : null;
+    if (batk) { botBusy = true; try { await bossAnnounce(batk, doc); } finally { botBusy = false; } if (PT.S.game !== doc) return; }
     const scene = captureScene(r.events, doc.state);
     doc.prev = null; doc.undo = []; doc.state = r.state; doc.inflight = null; doc.status = r.state.status; if (r.state.winner) doc.winner = r.state.winner;
-    publishFx(doc, r.events); PT.render(); playEvents(r.events, doc, scene); await PT.saveGame(doc); return;
+    publishFx(doc, r.events); PT.render(); playEvents(r.events, doc, scene, { announced: !!batk }); await PT.saveGame(doc); return;
   }
   console.warn('computer: gave up on a prompt loop', action); botSkip.add(botKey(action)); maybeRunBot(doc);
 }
