@@ -1,7 +1,7 @@
 // The Arena: single-player runs. Draft a deck 1-of-3, then play the computer until 7 wins or 3 losses.
 // One document per player (arena/<pid>) holds the current run and the player's record; the page syncs everyone's
 // documents for the leaderboard. Arena games are ordinary auto-rules tables with the computer in seat B.
-import { ARENA, arenaPool, makeOffer, poolEntry, addPick, draftedCount, basicsIn, energySplit, finalDeck, botDraft, OPPONENTS, oppSkill, tierOf } from './arena-draft.js';
+import { ARENA, ARENA_REWARDS, arenaPool, makeOffer, poolEntry, addPick, draftedCount, basicsIn, energySplit, finalDeck, botDraft, OPPONENTS, oppSkill, tierOf, goldPool, pickGold } from './arena-draft.js';
 import { TIER_NAMES } from './arena-tiers.js';
 import { BOT_UID } from './bot.js';
 import { play as sfx } from './sfx.js';
@@ -17,6 +17,12 @@ const mine = () => docs()[me()] || null;
 const run = () => (mine() && mine().run) || null;
 const rid = () => Math.random().toString(36).slice(2, 10);
 const rules = () => clone(PT.rules());
+/** The currency Arena runs pay out (spent in the shop later). */
+const COIN = { name: 'Tokens', one: 'Token', icon: '🪙' };
+const coins = (n) => `${n} ${n === 1 ? COIN.one : COIN.name}`;
+const goldIds = (d) => ((d && d.gold) || []).map((g) => g.cid);
+/** A card with the gold holographic finish. */
+const goldCard = (cid, s, attrs = '') => `<span class="goldcard" style="--s:${s}" ${attrs}>${PT.cardHTML(cid, s)}</span>`;
 
 export function installArena(bridge) { PT = bridge; return { render, noteGame, lobbyFeature, isArenaGame, heroCount }; }
 export const isArenaGame = (g) => !!(g && g.arena);
@@ -59,7 +65,12 @@ const A = {
 function finishRun(d, retired) {
   const r = d.run; r.status = 'done'; r.endedAt = Date.now(); if (retired) r.retired = true;
   d.runs = (d.runs || 0) + 1; d.totalWins = (d.totalWins || 0) + r.wins; if (r.wins >= ARENA.wins) d.perfect = (d.perfect || 0) + 1;
-  const entry = { wins: r.wins, losses: r.losses, at: r.endedAt, top: topCards(r.cards, 3), retired: !!retired };
+  const tokens = ARENA_REWARDS[Math.min(r.wins, ARENA_REWARDS.length - 1)] || 0;
+  const gold = r.wins >= ARENA.wins ? pickGold(PT.CARDS, goldIds(d)) : null;
+  d.tokens = (d.tokens || 0) + tokens; d.earned = (d.earned || 0) + tokens;
+  if (gold) d.gold = [...(d.gold || []), { cid: gold, at: r.endedAt, run: r.id }];
+  r.reward = { tokens, gold };
+  const entry = { wins: r.wins, losses: r.losses, at: r.endedAt, top: topCards(r.cards, 3), retired: !!retired, tokens, gold };
   if (!d.best || r.wins > d.best.wins || (r.wins === d.best.wins && r.losses < d.best.losses)) d.best = entry;
   d.history = [entry, ...(d.history || [])].slice(0, 20);
 }
@@ -114,12 +125,76 @@ async function record(gid, won) {
   setTimeout(() => resultModal(after, won), PT.S.screen === 'game' ? 2600 : 0); // let the table's win celebration play first
 }
 function resultModal(r, won) {
-  const done = r.status === 'done';
-  const head = done ? (r.wins >= ARENA.wins ? 'Perfect run!' : 'Run complete') : won ? 'Victory!' : 'Defeat';
-  const body = done
-    ? `<p>Your run ended <b>${r.wins}–${r.losses}</b>.${r.wins >= ARENA.wins ? ' Seven straight-up wins. That goes on the board.' : ''}</p>`
-    : `<p>Arena record: <b>${r.wins}–${r.losses}</b>. ${won ? `Next up: <b>${esc(OPPONENTS[Math.min(r.wins, OPPONENTS.length - 1)])}</b>.` : `${ARENA.losses - r.losses} ${ARENA.losses - r.losses === 1 ? 'life' : 'lives'} left.`}</p>`;
-  PT.showModal(head, body, `<button class="pri" id="tarena" type="button">Back to the Arena</button>`, (m) => { m.querySelector('#tarena').onclick = () => { PT.closeModal(); PT.go('arena'); }; });
+  if (r.status === 'done') { PT.closeModal(); chestReveal(r); return; }
+  const body = `<p>Arena record: <b>${r.wins}–${r.losses}</b>. ${won ? `Next up: <b>${esc(OPPONENTS[Math.min(r.wins, OPPONENTS.length - 1)])}</b>.` : `${ARENA.losses - r.losses} ${ARENA.losses - r.losses === 1 ? 'life' : 'lives'} left.`}</p>`;
+  PT.showModal(won ? 'Victory!' : 'Defeat', body, `<button class="pri" id="tarena" type="button">Back to the Arena</button>`, (m) => { m.querySelector('#tarena').onclick = () => { PT.closeModal(); PT.go('arena'); }; });
+}
+/* ---------- the prize chest ----------
+   A run ends with a chest: it drops in, you click it, the lid swings back, light pours out, the Tokens fly up and
+   count, and after a perfect run the gold card rises out of it. The chest is drawn here (SVG), better with more wins. */
+const CHESTS = [
+  { min: 7, name: "Champion's chest", body: ['#ffd95e', '#e89a1f'], band: ['#fff6cf', '#f3c64a'], trim: '#7a4a05', gem: '#ff5a7a' },
+  { min: 6, name: 'Royal chest', body: ['#9a5cf0', '#5a2aa8'], band: ['#ffe08a', '#e0a02a'], trim: '#2a1250', gem: '#5fe0ff' },
+  { min: 3, name: 'Silver chest', body: ['#4f86d8', '#2a4f96'], band: ['#f2f6ff', '#a9b6d2'], trim: '#15264d', gem: '#ffd95e' },
+  { min: 0, name: 'Wooden chest', body: ['#a8713a', '#6e431c'], band: ['#c9ced9', '#7f8798'], trim: '#3a2209', gem: '#c9ced9' },
+];
+function chestSVG(k) {
+  const id = 'ch' + Math.random().toString(36).slice(2, 7);
+  const defs = `<defs><linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${k.body[0]}"/><stop offset="1" stop-color="${k.body[1]}"/></linearGradient>
+    <linearGradient id="${id}m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${k.band[0]}"/><stop offset="1" stop-color="${k.band[1]}"/></linearGradient></defs>`;
+  const planks = (y0, y1) => [70, 120, 170].map((x) => `<line x1="${x}" y1="${y0}" x2="${x}" y2="${y1}" stroke="${k.trim}" stroke-opacity=".28" stroke-width="2"/>`).join('');
+  const body = `<svg class="chest-body" viewBox="0 0 240 110" aria-hidden="true">${defs}
+    <rect x="22" y="4" width="196" height="100" rx="10" fill="url(#${id}b)" stroke="${k.trim}" stroke-width="5"/>${planks(8, 100)}
+    <rect x="22" y="4" width="196" height="16" fill="url(#${id}m)" stroke="${k.trim}" stroke-width="4"/>
+    <rect x="40" y="4" width="20" height="100" fill="url(#${id}m)" stroke="${k.trim}" stroke-width="4"/><rect x="180" y="4" width="20" height="100" fill="url(#${id}m)" stroke="${k.trim}" stroke-width="4"/>
+    <rect x="22" y="88" width="196" height="16" rx="6" fill="url(#${id}m)" stroke="${k.trim}" stroke-width="4"/>
+    <rect x="102" y="10" width="36" height="42" rx="7" fill="url(#${id}m)" stroke="${k.trim}" stroke-width="4"/><circle cx="120" cy="27" r="6" fill="${k.trim}"/><rect x="117" y="27" width="6" height="14" rx="2" fill="${k.trim}"/>
+    ${[50, 190].map((x) => [36, 60].map((y) => `<circle cx="${x}" cy="${y}" r="3" fill="${k.trim}" fill-opacity=".55"/>`).join('')).join('')}</svg>`;
+  const lid = `<svg class="chest-lid" viewBox="0 0 240 84" aria-hidden="true">${defs}
+    <path d="M22 80 V52 Q22 8 120 8 Q218 8 218 52 V80 Z" fill="url(#${id}b)" stroke="${k.trim}" stroke-width="5" stroke-linejoin="round"/>${planks(16, 78)}
+    <path d="M40 80 V40 Q42 22 60 16 V80 Z" fill="url(#${id}m)" stroke="${k.trim}" stroke-width="4" stroke-linejoin="round"/><path d="M200 80 V40 Q198 22 180 16 V80 Z" fill="url(#${id}m)" stroke="${k.trim}" stroke-width="4" stroke-linejoin="round"/>
+    <rect x="22" y="66" width="196" height="14" fill="url(#${id}m)" stroke="${k.trim}" stroke-width="4"/>
+    <circle cx="120" cy="40" r="13" fill="${k.gem}" stroke="${k.trim}" stroke-width="4"/><circle cx="115" cy="35" r="4" fill="#fff" fill-opacity=".75"/></svg>`;
+  return { body, lid };
+}
+function chestReveal(r) {
+  if (!r || document.querySelector('.chest-ov')) return;
+  const rw = r.reward || { tokens: 0, gold: null }; const perfect = r.wins >= ARENA.wins;
+  const k = CHESTS.find((c) => r.wins >= c.min); const art = chestSVG(k);
+  const coinsN = Math.min(22, 4 + Math.round(rw.tokens / 12));
+  const coinEls = rw.tokens ? Array.from({ length: coinsN }, (_, i) => { const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.9; const d = 110 + Math.random() * 150; return `<i class="chest-coin" style="--dx:${Math.round(Math.cos(a) * d)}px;--dy:${Math.round(Math.sin(a) * d)}px;--d:${(i * 0.035).toFixed(2)}s;--r:${Math.round(Math.random() * 720 - 360)}deg"></i>`; }).join('') : '';
+  const ov = document.createElement('div'); ov.className = `chest-ov w${Math.min(r.wins, 7)}${perfect ? ' perfect' : ''}${rw.gold ? ' hascard' : ''}`; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', 'Your Arena prize');
+  ov.innerHTML = `<div class="chest-wrap">
+    <div class="chest-head"><span class="kicker">${perfect ? 'Perfect run' : r.retired ? 'Run ended' : 'Run complete'}</span><h2>${r.wins}–${r.losses}</h2><p class="chest-name">${esc(k.name)}</p></div>
+    <div class="chest-stage">
+      <div class="chest-rays" aria-hidden="true"></div>
+      ${rw.gold ? `<div class="chest-card">${goldCard(rw.gold, 0.72)}<b>${esc(C(rw.gold).name)}</b><span>Gold card unlocked</span></div>` : ''}
+      <button type="button" class="chest" aria-label="Open the chest"><span class="chest-glow" aria-hidden="true"></span>${art.lid}<span class="chest-in" aria-hidden="true"></span>${art.body}<span class="chest-coins" aria-hidden="true">${coinEls}</span></button>
+    </div>
+    <p class="chest-hint">Click the chest to open it</p>
+    <div class="chest-prize" aria-live="polite"><div class="ar-prize-coins"><span aria-hidden="true">${COIN.icon}</span><b class="chest-count">+0</b><em>${COIN.name}</em></div>
+      ${perfect && !rw.gold ? '<p class="small muted">You already own every gold card. Incredible.</p>' : !rw.tokens ? '<p class="small muted">No wins this time. The next chest is waiting.</p>' : ''}</div>
+    <button class="pri cta chest-done" type="button">Back to the Arena</button></div>`;
+  document.body.appendChild(ov);
+  const chest = ov.querySelector('.chest'); const count = ov.querySelector('.chest-count');
+  const close = () => { ov.classList.add('out'); setTimeout(() => ov.remove(), 260); PT.go('arena'); };
+  ov.querySelector('.chest-done').onclick = close;
+  sfx('chest.drop', 380);
+  let opened = false;
+  const open = () => {
+    if (opened) return; opened = true; ov.classList.add('shake'); sfx('chest.rattle', 0);
+    setTimeout(() => {
+      ov.classList.remove('shake'); ov.classList.add('open'); sfx('chest.open', 0);
+      if (rw.tokens) sfx('chest.coins', 250, coinsN);
+      if (rw.gold) sfx('arena.legendary', 700);
+      const t0 = performance.now(); const dur = 500 + Math.min(900, rw.tokens * 5);
+      const tick = (t) => { const p = Math.min(1, (t - t0 - 300) / dur); count.textContent = '+' + Math.round(rw.tokens * Math.max(0, p) ** 0.7); if (p < 1 && ov.isConnected) requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+      setTimeout(() => { ov.classList.add('done'); const b = ov.querySelector('.chest-done'); if (b) b.focus(); }, rw.gold ? 2400 : 1500);
+    }, 620);
+  };
+  chest.onclick = open;
+  setTimeout(() => chest.focus(), 700);
 }
 /** Called by the page whenever it has a fresh copy of a game. */
 export function noteGame(g) {
@@ -138,7 +213,8 @@ async function checkCurrent() {
 /* ---------- views ---------- */
 const TCOL = { Fire: '#f08030', Water: '#6890f0', Grass: '#78c850', Lightning: '#f8d030', Psychic: '#f85888', Fighting: '#c03028', Colorless: '#a8a878' };
 function header(r) {
-  const rec = r && r.status !== 'done' ? `<div class="ar-record">${recordHTML(r)}</div>` : '';
+  const d = mine(); const wallet = `<div class="ar-wallet" title="Arena winnings. A shop to spend them is coming."><span aria-hidden="true">${COIN.icon}</span><b>${(d && d.tokens) || 0}</b><em>${COIN.name}</em></div>`;
+  const rec = `<div class="ar-headside">${wallet}${r && r.status !== 'done' ? `<div class="ar-record">${recordHTML(r)}</div>` : ''}</div>`;
   return `<header class="arhead${r && r.status === 'draft' ? ' slim' : ''}"><div class="ar-copy"><span class="kicker">Single player</span><h1>The Arena</h1><div class="ornate" aria-hidden="true"></div>
     <p class="small muted">Draft a deck one pick at a time, then take on the computer. Seven wins is a perfect run; three losses and you're out.</p></div>${rec}</header>`;
 }
@@ -239,25 +315,35 @@ function playView(r) {
 function startView(d) {
   const last = d && d.run && d.run.status === 'done' ? d.run : null;
   const lastHTML = last ? `<section class="panel ar-last"><span class="kicker">Last run</span><h2>${last.wins}–${last.losses}${last.wins >= ARENA.wins ? ' <span class="ar-perfect">Perfect</span>' : ''}${last.retired ? ' <span class="pill">Ended early</span>' : ''}</h2>
-      <div class="ar-tops">${topCards(last.cards, 3).map((cid) => PT.cardHTML(cid, 0.36, `data-view="${esc(cid)}"`)).join('')}</div></section>` : '';
+      <div class="ar-tops">${topCards(last.cards, 3).map((cid) => PT.cardHTML(cid, 0.36, `data-view="${esc(cid)}"`)).join('')}</div>
+      ${last.reward ? `<p class="ar-lastprize">${COIN.icon} <b>+${last.reward.tokens}</b> ${COIN.name}${last.reward.gold ? ` · gold <b>${esc(C(last.reward.gold).name)}</b>` : ''}</p>` : ''}</section>` : '';
   return `<div class="ar-start">
     <section class="panel ar-begin"><h2>${last ? 'Ready for another run?' : 'Enter the Arena'}</h2>
       <ol class="ar-steps"><li><b>Draft.</b> Pick 1 of 3 cards until you have ${ARENA.picksTo}. Only the top of each evolution line is offered, and an evolved Pokémon brings its whole line (2 of each card).</li>
         <li><b>Energy.</b> ${ARENA.energy} basic Energy are added for your Pokémon's types.</li>
         <li><b>Battle.</b> Play the computer under the league's standard rules. ${ARENA.wins} wins is a perfect run; ${ARENA.losses} losses ends it.</li></ol>
-      <button class="pri cta" type="button" data-start="1">✦ Start a run</button></section>${lastHTML}</div>`;
+      <button class="pri cta" type="button" data-start="1">✦ Start a run</button></section>
+    <div class="ar-startside">${lastHTML}<section class="panel ar-prizes"><span class="kicker">Prizes</span><h2>What a run pays</h2>
+      <ol class="ar-ptable">${ARENA_REWARDS.map((t, w) => `<li class="${w >= ARENA.wins ? 'top' : ''}"><span>${w} ${w === 1 ? 'win' : 'wins'}</span><b>${COIN.icon} ${t}</b>${w >= ARENA.wins ? '<em>+ a gold card</em>' : ''}</li>`).join('')}</ol>
+      <p class="small muted">A perfect run also unlocks a gold holographic version of a random Pokémon you don't have in gold yet.</p></section></div></div>`;
 }
 function boardHTML() {
   const rows = Object.values(docs()).filter((d) => d && (d.runs || (d.run && d.run.status !== 'done')));
   if (!rows.length) return '';
   rows.sort((a, b) => ((b.best || {}).wins || 0) - ((a.best || {}).wins || 0) || (b.perfect || 0) - (a.perfect || 0) || (b.totalWins || 0) / Math.max(1, b.runs || 0) - (a.totalWins || 0) / Math.max(1, a.runs || 0));
   const tr = rows.map((d) => { const r = d.run && d.run.status !== 'done' ? d.run : null; const avg = d.runs ? (d.totalWins / d.runs).toFixed(1) : '–';
-    return `<tr class="${d.owner === me() ? 'me' : ''}"><td>${esc(PT.nameOf(d.owner))}</td><td>${d.best ? `<b>${d.best.wins}–${d.best.losses}</b>` : '–'}</td><td>${d.runs || 0}</td><td>${avg}</td><td>${d.perfect ? `<span class="ar-perfect">${d.perfect}</span>` : '0'}</td><td>${r ? (r.status === 'draft' ? 'Drafting' : `${r.wins}–${r.losses}`) : '–'}</td></tr>`; }).join('');
-  return `<section class="panel ar-board"><h2>Arena leaderboard</h2><div class="ar-tblwrap"><table class="dboard ar-table"><thead><tr><th>Player</th><th>Best run</th><th>Runs</th><th>Avg wins</th><th>Perfect</th><th>Now</th></tr></thead><tbody>${tr}</tbody></table></div></section>`;
+    return `<tr class="${d.owner === me() ? 'me' : ''}"><td>${esc(PT.nameOf(d.owner))}</td><td>${d.best ? `<b>${d.best.wins}–${d.best.losses}</b>` : '–'}</td><td>${d.runs || 0}</td><td>${avg}</td><td>${d.perfect ? `<span class="ar-perfect">${d.perfect}</span>` : '0'}</td><td>${(d.gold || []).length ? `<b class="ar-goldn">${d.gold.length}</b>` : '0'}</td><td>${r ? (r.status === 'draft' ? 'Drafting' : `${r.wins}–${r.losses}`) : '–'}</td></tr>`; }).join('');
+  return `<section class="panel ar-board"><h2>Arena leaderboard</h2><div class="ar-tblwrap"><table class="dboard ar-table"><thead><tr><th>Player</th><th>Best run</th><th>Runs</th><th>Avg wins</th><th>Perfect</th><th>Gold cards</th><th>Now</th></tr></thead><tbody>${tr}</tbody></table></div></section>`;
+}
+/** The player's gold cards, newest first. */
+function goldCaseHTML(d) {
+  const g = ((d && d.gold) || []).slice().reverse(); const total = goldPool(PT.CARDS).length;
+  return `<section class="panel ar-goldcase"><div class="ar-dhead"><h2>Gold cards</h2><span class="ar-count"><b>${g.length}</b>/${total}</span></div>
+    ${g.length ? `<div class="ar-golds">${g.map((x) => goldCard(x.cid, 0.5, `data-view="${esc(x.cid)}" title="${esc(C(x.cid).name)}"`)).join('')}</div>` : `<p class="muted">No gold cards yet. Win ${ARENA.wins} games in one run to unlock your first.</p>`}</section>`;
 }
 function historyHTML(d) {
   const h = (d && d.history) || []; if (!h.length) return '';
-  return `<section class="panel ar-hist"><h2>Your runs</h2><ul>${h.map((x) => `<li><b>${x.wins}–${x.losses}</b>${x.wins >= ARENA.wins ? ' <span class="ar-perfect">Perfect</span>' : ''}<span class="ar-hcards">${(x.top || []).map((cid) => esc(C(cid).name || '')).join(' · ')}</span><time>${new Date(x.at).toLocaleDateString()}</time></li>`).join('')}</ul></section>`;
+  return `<section class="panel ar-hist"><h2>Your runs</h2><ul>${h.map((x) => `<li><b>${x.wins}–${x.losses}</b>${x.wins >= ARENA.wins ? ' <span class="ar-perfect">Perfect</span>' : ''}<span class="ar-hcards">${(x.top || []).map((cid) => esc(C(cid).name || '')).join(' · ')}</span>${x.tokens != null ? `<span class="ar-hpay">${COIN.icon} ${x.tokens}${x.gold ? ' ★' : ''}</span>` : '<span></span>'}<time>${new Date(x.at).toLocaleDateString()}</time></li>`).join('')}</ul></section>`;
 }
 
 export function render(main) {
@@ -266,7 +352,7 @@ export function render(main) {
   const d = mine(); const r = run();
   if (r && r.gameId) checkCurrent();
   const body = !r || r.status === 'done' ? startView(d) : r.status === 'draft' ? draftView(r) : playView(r);
-  main.innerHTML = `<div class="arena">${header(r)}${body}<div class="ar-lower">${boardHTML()}${historyHTML(d)}</div></div>`;
+  main.innerHTML = `<div class="arena">${header(r)}${body}${r && r.status === 'draft' ? '' : goldCaseHTML(d)}<div class="ar-lower">${boardHTML()}${historyHTML(d)}</div></div>`;
   if (r && r.status === 'draft') afterDraft();
   main.onkeydown = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('ar-choice')) { e.preventDefault(); pickAnimated(e.target); } };
   main.onclick = (e) => {
@@ -278,7 +364,7 @@ export function render(main) {
     else if (b.dataset.battle) battle();
     else if (b.dataset.forfeit) forfeit();
     else if (b.dataset.savedeck) saveDeck();
-    else if (b.dataset.retire) PT.showModal('End this run?', `<p>The run ends with its current record${r ? ` (${r.wins}–${r.losses})` : ''}. This can't be undone.</p>`, '<button class="dng" id="rtok" type="button">End run</button>', (m) => { m.querySelector('#rtok').onclick = async () => { PT.closeModal(); const gid = r && r.gameId; await A.retire(); if (gid) PT.api('DELETE', 'games/' + gid).catch(() => {}); }; });
+    else if (b.dataset.retire) PT.showModal('End this run?', `<p>The run ends with its current record${r ? ` (${r.wins}–${r.losses})` : ''} and pays ${coins(ARENA_REWARDS[Math.min(r ? r.wins : 0, ARENA_REWARDS.length - 1)] || 0)}. This can't be undone.</p>`, '<button class="dng" id="rtok" type="button">End run</button>', (m) => { m.querySelector('#rtok').onclick = async () => { PT.closeModal(); const gid = r && r.gameId; const ok = await A.retire(); if (gid) PT.api('DELETE', 'games/' + gid).catch(() => {}); if (ok && run() && run().status === 'done') chestReveal(run()); }; });
   };
 }
 async function saveDeck() {
@@ -296,7 +382,8 @@ export function lobbyFeature() {
     : r.status === 'draft'
       ? `<p class="ar-lobby-line">Drafting: <b>${draftedCount(r.cards)}</b> / ${ARENA.picksTo} cards</p><button class="pri" type="button" data-arena="1">Keep drafting</button>`
       : `<div class="ar-mini">${recordHTML(r)}</div><button class="pri" type="button" data-arena="1">${r.gameId ? '▶ Resume game' : '⚔ Next battle'}</button>`;
+  const purse = d && (d.tokens || (d.gold || []).length) ? `<p class="small ar-lobby-best">${COIN.icon} <b>${d.tokens || 0}</b> ${COIN.name}${(d.gold || []).length ? ` · <b class="ar-goldn">${d.gold.length}</b> gold ${d.gold.length === 1 ? 'card' : 'cards'}` : ''}</p>` : '';
   const leader = Object.values(docs()).filter((x) => x && x.best).sort((a, b) => b.best.wins - a.best.wins || a.best.losses - b.best.losses)[0];
   return `<section class="realm realm-arena"><header class="realm-head arena"><div class="rh-copy"><span class="kicker">Single player</span><h2>The Arena</h2></div></header>
-    <div class="realm-body">${status}${leader ? `<p class="small muted ar-lobby-best">Best run so far: <b>${esc(PT.nameOf(leader.owner))}</b> ${leader.best.wins}–${leader.best.losses}</p>` : ''}</div></section>`;
+    <div class="realm-body">${status}${purse}${leader ? `<p class="small muted ar-lobby-best">Best run so far: <b>${esc(PT.nameOf(leader.owner))}</b> ${leader.best.wins}–${leader.best.losses}</p>` : ''}</div></section>`;
 }

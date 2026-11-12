@@ -83,6 +83,16 @@ const FX = {
     for (let i = 0; i < 16; i++) tone(t + 1.1 + i * 0.07, { type: 'sine', f: rnd(2400, 5200), dur: 0.14, g: 0.03 });
     noise(t + 0.75, { dur: 0.5, type: 'highpass', f: 5000, g: 0.08, a: 0.005 });
   },
+  // the prize chest: it lands, rattles, creaks open in a wash of light, and the coins pour out
+  'chest.drop': (t) => { noise(t, { dur: 0.22, type: 'lowpass', f: 420, to: 90, g: 0.5, a: 0.003 }); tone(t, { type: 'sine', f: 130, to: 48, dur: 0.3, g: 0.4 }); for (let i = 0; i < 3; i++) tone(t + 0.02 + i * 0.03, { type: 'square', f: rnd(1400, 2600), dur: 0.04, g: 0.04 }); },
+  'chest.rattle': (t) => { for (let i = 0; i < 7; i++) { noise(t + i * 0.085, { dur: 0.05, type: 'bandpass', f: rnd(900, 2200), q: 3, g: 0.2, a: 0.002 }); tone(t + i * 0.085, { type: 'sine', f: rnd(90, 140), to: 60, dur: 0.07, g: 0.16 }); } },
+  'chest.open': (t) => {
+    tone(t, { type: 'sawtooth', f: 70, to: 210, dur: 0.5, g: 0.09, filter: { f: 900 }, hold: 0.7, lfo: { f: 31, depth: 14 } }); // the hinge
+    noise(t + 0.1, { dur: 0.9, type: 'bandpass', f: 700, to: 6500, q: 1.4, g: 0.12, a: 0.35, hold: 0.8 }); // light pouring out
+    for (const f of [523, 659, 784, 1047]) tone(t + 0.3, { type: 'triangle', f, dur: 1.3, g: 0.085, a: 0.02, hold: 0.4 });
+    for (let i = 0; i < 10; i++) tone(t + 0.45 + i * 0.06, { type: 'sine', f: rnd(2000, 4600), dur: 0.13, g: 0.03 });
+  },
+  'chest.coins': (t, n = 10) => { for (let i = 0; i < n; i++) { const f = rnd(1900, 3400), at = t + i * 0.045 + rnd(0, 0.02); tone(at, { type: 'sine', f, dur: 0.16, g: 0.075, a: 0.002, hold: 0.05 }); tone(at, { type: 'triangle', f: f * 1.5, dur: 0.09, g: 0.03, a: 0.002, hold: 0.05 }); } },
   'arena.pick': (t, tier) => { noise(t, { dur: 0.12, type: 'lowpass', f: 700, g: 0.3, a: 0.003 }); tone(t, { type: 'sine', f: 180, to: 90, dur: 0.16, g: 0.22 }); const up = tier === 'L' ? [784, 1175, 1568] : tier === 'E' ? [698, 1047] : [880]; up.forEach((f, i) => tone(t + 0.05 + i * 0.07, { type: 'triangle', f, dur: 0.35, g: 0.1, a: 0.004, hold: 0.06 })); },
   // Charizard's Fire Spin: charge, roar, stream, tornado, blast
   // Zapdos's Thunderbolt: storm rumble, far thunder, a rising charge, the giant crack

@@ -640,3 +640,95 @@ table.lgt tr.lead td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
 .ar-hcards{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ar-hist time{font-size:12px;color:var(--muted)}
 @media (max-width:600px){.arhead{padding:18px 16px;min-height:0;background-size:auto 100%}.ar-record{min-width:0;width:100%}.ar-w{width:13px;height:13px}.ar-l{width:11px;height:11px}.ar-wins,.ar-losses{grid-template-columns:52px 1fr 22px;gap:6px;padding:6px 10px}}
+
+/* ---- Arena prizes: the wallet, the prize table, gold cards ---- */
+.ar-headside{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.ar-wallet{display:inline-flex;align-items:baseline;gap:7px;padding:6px 14px;border-radius:999px;background:rgba(10,8,22,.7);border:1px solid rgba(255,200,61,.55);box-shadow:0 0 14px rgba(255,200,61,.18)}
+.ar-wallet b{font-family:var(--display);font-weight:400;font-size:20px;color:var(--gold)}
+.ar-wallet em{font-style:normal;font:900 10.5px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:#e9dcb8}
+.arhead.slim .ar-headside{flex-direction:row;align-items:center}
+.arhead.slim .ar-wallet b{font-size:16px}.arhead.slim .ar-wallet{padding:4px 12px}
+@media (max-width:600px){.ar-headside{align-items:stretch;width:100%}.ar-wallet{align-self:flex-start}.arhead.slim .ar-headside{width:auto}.arhead.slim .ar-wallet em{display:none}}
+.ar-startside{display:flex;flex-direction:column;gap:18px}
+.ar-prizes h2{margin:2px 0 10px}
+.ar-ptable{list-style:none;margin:0 0 10px;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 12px}
+.ar-ptable li{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:5px 10px;border-radius:9px;background:var(--well);border:1px solid var(--well-line);font-size:13px}
+.ar-ptable li b{color:var(--gold);white-space:nowrap}
+.ar-ptable li.top{grid-column:1/-1;background:linear-gradient(105deg,rgba(255,198,61,.2),rgba(255,130,76,.14));border-color:rgba(255,200,61,.7)}
+.ar-ptable li.top em{font-style:normal;font-weight:800;color:var(--gold-2);margin-left:auto;padding-left:10px}
+.ar-ptable li.top b{order:2}.ar-ptable li.top em{order:3}
+.ar-lastprize{margin:10px 0 0}
+.ar-hist li{grid-template-columns:auto 1fr auto auto}
+.ar-hpay{font-size:12.5px;font-weight:800;color:var(--gold-2);white-space:nowrap}
+.ar-goldn{color:var(--gold);text-shadow:0 0 8px rgba(255,200,61,.6)}
+.ar-prize{display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:6px}
+.ar-prize-coins{display:flex;align-items:baseline;gap:8px;padding:8px 20px;border-radius:999px;background:linear-gradient(105deg,rgba(255,198,61,.22),rgba(255,130,76,.16));border:1px solid rgba(255,200,61,.7);font-size:18px;animation:arpop .5s cubic-bezier(.2,1.4,.4,1) both}
+.ar-prize-coins b{font-family:var(--display);font-weight:400;font-size:30px;color:var(--gold)}
+.ar-prize-coins em{font-style:normal;font-weight:900;letter-spacing:.1em;text-transform:uppercase;font-size:12px;color:#e9dcb8}
+.ar-prize-gold{display:flex;flex-direction:column;align-items:center;gap:8px;animation:arpop .7s cubic-bezier(.2,1.3,.4,1) .25s both}
+.ar-prize-gold>b{font-family:var(--display);font-weight:400;font-size:20px;color:var(--gold)}
+@keyframes arpop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+.ar-goldcase{margin-top:18px}
+.ar-goldcase h2{margin:0}
+.ar-golds{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px}
+.ar-golds .goldcard{cursor:zoom-in}
+/* the gold holographic finish: a gold wash over the card, a moving foil sheen, a gold rim */
+.goldcard{position:relative;display:inline-block;line-height:0;isolation:isolate;overflow:hidden;border-radius:calc(11px*var(--s));box-shadow:0 0 0 2px #ffd76a,0 0 calc(26px*var(--s) + 6px) rgba(255,180,50,.7),0 10px 22px rgba(0,0,0,.55)}
+.goldcard .cd{box-shadow:none;display:block}
+.goldcard::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(135deg,#ffe07a,#f2a530 45%,#ffe9a8 70%,#e89a1f);mix-blend-mode:color;opacity:.82}
+.goldcard::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(115deg,transparent 28%,rgba(255,255,255,.85) 42%,rgba(255,225,120,.7) 49%,rgba(255,120,220,.35) 55%,transparent 66%);background-size:300% 300%;mix-blend-mode:soft-light;animation:goldfoil 3.2s linear infinite}
+@keyframes goldfoil{from{background-position:120% 120%}to{background-position:-20% -20%}}
+@media (prefers-reduced-motion:reduce){.goldcard::after{animation:none;background-position:40% 40%}.ar-prize-coins,.ar-prize-gold{animation:none}}
+
+/* ---- the prize chest at the end of an Arena run ---- */
+.chest-ov{position:fixed;inset:0;z-index:3000;display:grid;place-items:center;overflow:auto;padding:16px;background:radial-gradient(80% 70% at 50% 55%,rgba(34,22,70,.97),rgba(5,6,16,.99));animation:chestfade .3s ease both}
+.chest-ov.out{animation:chestfade .26s ease reverse both}
+@keyframes chestfade{from{opacity:0}to{opacity:1}}
+.chest-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;max-width:100%}
+.chest-head .kicker{margin:0 0 2px}
+.chest-head h2{margin:0;font-size:clamp(40px,7vw,64px);line-height:1;color:var(--gold);text-shadow:0 4px 0 #3d2475,0 0 30px rgba(255,200,61,.45)}
+.chest-name{margin:6px 0 0;font:900 12px/1 var(--body);letter-spacing:.18em;text-transform:uppercase;color:#d9ccff}
+.chest-stage{position:relative;width:300px;height:230px;transition:height .5s ease}
+.chest-ov.hascard.open .chest-stage{height:470px}
+.chest-rays{position:absolute;left:50%;bottom:20px;width:620px;aspect-ratio:1;transform:translate(-50%,50%);border-radius:50%;pointer-events:none;opacity:0;transition:opacity .6s ease .15s;
+  background:repeating-conic-gradient(from 0deg,rgba(255,215,110,.30) 0 8deg,transparent 8deg 22deg);-webkit-mask-image:radial-gradient(closest-side,#000 18%,transparent 72%);mask-image:radial-gradient(closest-side,#000 18%,transparent 72%);animation:arrays 16s linear infinite}
+.chest-ov.open .chest-rays{opacity:1}
+.chest{position:absolute;left:50%;bottom:0;width:240px;height:186px;margin-left:-120px;padding:0;border:0;background:none;box-shadow:none;border-radius:0;cursor:pointer;perspective:620px;animation:chestdrop .75s cubic-bezier(.3,0,.6,1) both;-webkit-tap-highlight-color:transparent}
+.chest:hover,.chest:focus-visible{background:none;box-shadow:none;outline:0}
+.chest-ov:not(.open):not(.shake) .chest:hover .chest-lid,.chest-ov:not(.open):not(.shake) .chest:focus-visible .chest-lid{transform:translateY(-5px) rotateX(10deg)}
+.chest-ov.open .chest{cursor:default}
+.chest svg{position:absolute;left:0;width:240px;display:block;overflow:visible;filter:drop-shadow(0 10px 14px rgba(0,0,0,.55))}
+.chest-lid{top:0;height:84px;z-index:3;transform-origin:50% 100%;transition:transform .55s cubic-bezier(.3,1.5,.5,1)}
+.chest-body{top:76px;height:110px;z-index:2}
+.chest-in{position:absolute;left:26px;top:34px;width:188px;height:58px;z-index:1;border-radius:50%;background:#150c06;opacity:0;transition:opacity .2s}
+.chest-ov.open .chest-lid{transform:translateY(-62px) rotateX(-34deg) scale(.94)}
+.chest-ov.open .chest-in{opacity:1;background:radial-gradient(closest-side,#fff8d6,#ffd65c 55%,#d97a12);box-shadow:0 0 40px 14px rgba(255,210,90,.8)}
+.chest-glow{position:absolute;left:50%;top:70px;width:420px;height:420px;margin:-210px 0 0 -210px;z-index:0;border-radius:50%;pointer-events:none;opacity:0;background:radial-gradient(closest-side,rgba(255,244,190,.95),rgba(255,200,70,.45) 40%,transparent 72%)}
+.chest-ov.open .chest-glow{animation:chestburst 1.4s ease-out both}
+.chest-ov.shake .chest{animation:chestshake .62s ease-in-out both}
+@keyframes chestdrop{0%{transform:translateY(-120vh)}55%{transform:translateY(0) scale(1.08,.86)}72%{transform:translateY(-22px) scale(.97,1.05)}86%{transform:translateY(0) scale(1.03,.96)}100%{transform:none}}
+@keyframes chestshake{0%,100%{transform:rotate(0)}12%{transform:rotate(-7deg) translateY(-4px)}26%{transform:rotate(6deg)}40%{transform:rotate(-6deg) translateY(-6px)}54%{transform:rotate(5deg)}68%{transform:rotate(-4deg) translateY(-3px)}84%{transform:rotate(3deg) scale(1.05)}}
+@keyframes chestburst{0%{opacity:0;transform:scale(.3)}25%{opacity:1;transform:scale(1.25)}100%{opacity:.6;transform:scale(1)}}
+.chest-coins{position:absolute;left:50%;top:72px;z-index:5;width:0;height:0}
+.chest-coin{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;opacity:0;background:radial-gradient(circle at 35% 30%,#fff6c8,#ffcf4a 45%,#d98a16);border:2px solid #a8660c;box-shadow:0 0 8px rgba(255,210,90,.8)}
+.chest-ov.open .chest-coin{animation:chestcoin 1.25s cubic-bezier(.2,.7,.4,1) both;animation-delay:calc(.18s + var(--d))}
+@keyframes chestcoin{0%{opacity:0;transform:translate(0,0) scale(.3)}12%{opacity:1}60%{opacity:1;transform:translate(var(--dx),var(--dy)) rotate(var(--r)) scale(1)}100%{opacity:0;transform:translate(calc(var(--dx)*1.2),calc(var(--dy) + 150px)) rotate(var(--r)) scale(.8)}}
+.chest-card{position:absolute;left:50%;bottom:118px;z-index:6;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;opacity:0;transform:translate(-50%,150px) scale(.12);transform-origin:50% 100%}
+.chest-ov.open .chest-card{animation:chestcard 1.5s cubic-bezier(.2,1.2,.4,1) .75s both}
+.chest-card>b{font-family:var(--display);font-weight:400;font-size:20px;color:var(--gold);text-shadow:0 2px 0 rgba(0,0,0,.6)}
+.chest-card>span{font:900 10.5px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--gold-2)}
+@keyframes chestcard{0%{opacity:0;transform:translate(-50%,150px) scale(.12) rotate(-14deg)}35%{opacity:1}70%{transform:translate(-50%,-14px) scale(1.06) rotate(2deg)}100%{opacity:1;transform:translate(-50%,0) scale(1)}}
+.chest-hint{margin:6px 0 0;font-weight:800;color:#e8e2ff;animation:chesthint 1.3s ease-in-out infinite}
+.chest-ov.shake .chest-hint,.chest-ov.open .chest-hint{visibility:hidden;animation:none}
+@keyframes chesthint{0%,100%{opacity:.55}50%{opacity:1}}
+.chest-prize{display:flex;flex-direction:column;align-items:center;gap:6px;opacity:0;transform:translateY(10px);transition:opacity .4s ease .35s,transform .4s ease .35s}
+.chest-prize .ar-prize-coins{animation:none}
+.chest-ov.open .chest-prize{opacity:1;transform:none}
+.chest-done{visibility:hidden;opacity:0;transition:opacity .35s ease}
+.chest-ov.done .chest-done{visibility:visible;opacity:1}
+/* better chests glow before they open */
+.chest-ov.w6 .chest-body,.chest-ov.w6 .chest-lid{filter:drop-shadow(0 10px 14px rgba(0,0,0,.55)) drop-shadow(0 0 14px rgba(180,92,255,.7))}
+.chest-ov.w7 .chest-body,.chest-ov.w7 .chest-lid{filter:drop-shadow(0 10px 14px rgba(0,0,0,.55)) drop-shadow(0 0 18px rgba(255,190,60,.85))}
+@media (max-height:820px){.chest-wrap{zoom:.86}}
+@media (max-height:680px){.chest-wrap{zoom:.72}}
+@media (prefers-reduced-motion:reduce){.chest,.chest-ov.shake .chest,.chest-rays,.chest-hint{animation:none}.chest-ov.open .chest-coin{animation:none}.chest-ov.open .chest-card{animation:none;opacity:1;transform:translate(-50%,0)}.chest-ov.open .chest-glow{animation:none;opacity:.6}}

@@ -6,7 +6,8 @@ import { apply, legalActions, canPay, energyUnits } from '../public/js/engine/en
 import { mulberry32 } from '../public/js/engine/rng.js';
 import { validateDeck } from '../public/js/engine/rules.js';
 import { automationReport } from '../public/js/engine/cards/index.js';
-import { arenaPool, botDraft, ARENA } from '../public/js/arena-draft.js';
+import { arenaPool, botDraft, ARENA, ARENA_REWARDS, goldPool, pickGold, makeOffer, tierOf } from '../public/js/arena-draft.js';
+import { TIER_WEIGHTS } from '../public/js/arena-tiers.js';
 import { DEFAULT_RULES } from '../public/js/engine/rules.js';
 
 const DATA = JSON.parse(readFileSync(new URL('../public/cards.json', import.meta.url), 'utf8'));
@@ -651,4 +652,21 @@ test('the Arena draft never offers banned cards, Stadiums, promos or Rainbow Ene
     assert.equal(Object.values(d).reduce((a, b) => a + b, 0), ARENA.picksTo + ARENA.energy);
     assert.deepEqual(validateDeck({ cards: d }, DEFAULT_RULES, DB).filter((x) => x.bad), []);
   }
+});
+
+test('Arena prizes: more wins pay more Tokens, and a gold card is always one the player does not own', () => {
+  assert.equal(ARENA_REWARDS.length, ARENA.wins + 1);
+  for (let w = 1; w <= ARENA.wins; w++) assert.ok(ARENA_REWARDS[w] > ARENA_REWARDS[w - 1]);
+  const pool = goldPool(DB);
+  assert.ok(pool.length > 300 && pool.every((id) => DB[id].st === 'Pokémon' && !id.startsWith('basep')));
+  const owned = pool.slice(0, pool.length - 1);
+  for (let i = 0; i < 20; i++) assert.equal(pickGold(DB, owned), pool[pool.length - 1]);
+  assert.equal(pickGold(DB, pool), null);
+});
+
+test('Arena tiers come up as often as their weights say, whatever the size of the tier', () => {
+  const seen = { C: 0, U: 0, R: 0, E: 0, L: 0 }; let n = 0;
+  for (let seed = 1; seed <= 3000; seed++) for (const k of makeOffer(DB, seed * 97, 0, {}, DEFAULT_RULES)) { seen[tierOf(k)]++; n++; }
+  const total = Object.values(TIER_WEIGHTS).reduce((a, b) => a + b, 0);
+  for (const t of Object.keys(seen)) assert.ok(Math.abs(seen[t] / n - TIER_WEIGHTS[t] / total) < 0.02, `${t}: ${(seen[t] / n).toFixed(3)} vs ${(TIER_WEIGHTS[t] / total).toFixed(3)}`);
 });

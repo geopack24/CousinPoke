@@ -7,6 +7,8 @@ import { R } from './engine/rules.js';
 import { TIERS, TIER_WEIGHTS } from './arena-tiers.js';
 
 export const ARENA = { picksTo: 42, energy: 18, wins: 7, losses: 3, lineCopies: 2 };
+/** Prize for a finished run, by wins: Tokens (index = wins). A perfect run also wins a gold card. */
+export const ARENA_REWARDS = [0, 15, 30, 50, 75, 100, 150, 250];
 const SETS = ['base1', 'base2', 'base3', 'base5', 'gym1', 'gym2']; // no promos
 const BASIC_TYPES = ['Fire', 'Water', 'Grass', 'Lightning', 'Psychic', 'Fighting'];
 // Not offered in the draft. Rainbow Energy: under the house rules any Energy already pays any cost.
@@ -157,6 +159,18 @@ export function botDraft(db, seed, skill, rules) {
     cards = addPick(db, cards, pick.key, rules); round++;
   }
   return finalDeck(db, cards);
+}
+
+/** Every card that can come in gold: each distinct Pokémon in the six sets (one printing of each). */
+export function goldPool(db) {
+  const seen = new Set(); const out = [];
+  for (const c of Object.values(db).filter((x) => SETS.includes(x.set) && x.st === 'Pokémon').sort((a, b) => ord(a) - ord(b))) { const k = sig(c); if (seen.has(k)) continue; seen.add(k); out.push(c.id); }
+  return out;
+}
+/** A random gold card the player doesn't own yet (null once they own them all). */
+export function pickGold(db, owned, rnd = Math.random) {
+  const have = new Set(owned || []); const left = goldPool(db).filter((id) => !have.has(id));
+  return left.length ? left[Math.floor(rnd() * left.length)] : null;
 }
 
 /** Opponent titles by how many wins the run has. */
