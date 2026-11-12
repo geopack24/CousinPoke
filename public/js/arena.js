@@ -7,7 +7,7 @@ import { BOT_UID } from './bot.js';
 import { play as sfx } from './sfx.js';
 
 let PT = null;
-const V = { busy: false, noted: new Set(), revealed: null, offer: null, picking: false };
+const V = { busy: false, noted: new Set(), revealed: null, offer: null, picking: false, peek: null, noClick: false };
 const esc = (s) => PT.esc(s);
 const me = () => PT.uid();
 const C = (cid) => PT.CARDS[cid] || {};
@@ -266,14 +266,14 @@ function draftView(r) {
     const line = e.kind === 'line' ? `<div class="ar-line">${e.line.map((cid) => `${ARENA.lineCopies}× ${esc(C(cid).name)}`).join(' › ')}</div>` : '';
     return `<div class="ar-choice ${e.kind} t-${t}${first ? ' enter' : ''}" style="--i:${i}" data-pick="${esc(k)}" data-tier="${t}" role="button" tabindex="0" aria-label="Draft ${esc(c.name)} (${TIER_NAMES[t]})">
       <div class="ar-card"><span class="ar-aura" aria-hidden="true"></span>${PT.cardHTML(e.cid, 1).replace(/ data-cid="[^"]*"/, '')}${e.kind === 'line' ? `<span class="ar-stack" aria-hidden="true">×${e.size}</span>` : ''}
-        <button type="button" class="ar-zoom" data-view="${esc(e.cid)}" title="Read ${esc(c.name)}" aria-label="Read ${esc(c.name)}">🔍</button></div>
+        <button type="button" class="ar-zoom" data-view="${esc(e.cid)}" title="Read ${esc(c.name)} (or hold the card down)" aria-label="Read ${esc(c.name)}">🔍</button></div>
       <div class="ar-gem">${TIER_NAMES[t]}</div><div class="ar-tag">${esc(tag)}</div>${line}</div>`;
   };
   return `<div class="ar-draft">
     <section class="ar-stage"><div class="ar-stagehead"><div><span class="kicker">Pick ${r.round + 1}</span><h2>Choose a card</h2></div>
       <div class="ar-bar" title="${n} of ${ARENA.picksTo} cards"><i style="width:${Math.round((n / ARENA.picksTo) * 100)}%"></i></div></div>
       <div class="ar-offer">${offer.map(choice).join('')}</div>
-      <p class="small muted ar-hint">Click a card to draft it, or 🔍 to read it first. Evolved Pokémon bring their whole line, 2 of each card. Your deck already has ${ARENA.bills} Bills.</p>
+      <p class="small muted ar-hint"><b>Click</b> a card to draft it. <b>Hold</b> it down to read it up close. Evolved Pokémon bring their whole line, 2 of each card. Your deck already has ${ARENA.bills} Bills.</p>
       <button class="sm ghost ar-abandon" type="button" data-retire="1">Abandon this run</button></section>
     ${deckPanel(r, 'Your deck')}</div>`;
 }
@@ -300,6 +300,53 @@ function pickAnimated(el) {
   document.querySelectorAll('.ar-choice').forEach((x) => { x.classList.remove('enter'); x.classList.add(x === el ? 'chosen' : 'passed'); });
   sfx('arena.pick', 0, el.dataset.tier);
   setTimeout(async () => { try { await A.pick(el.dataset.pick); } finally { V.picking = false; } }, 430);
+}
+/* ---------- hold a card to read it ----------
+   Press and hold a draft card: a large copy appears with everything on it written out in plain text (the card art is
+   small, so the print on it is hard to read). Let go and it closes; holding never drafts the card. */
+const HOLD_MS = 260;
+const costText = (a) => { const n = (a.c || []).length; return n ? `${n} Energy` : 'Free'; };
+function cardText(cid, small) {
+  const c = C(cid); const pw = Array.isArray(c.pw) ? c.pw : c.pw ? [c.pw] : [];
+  const meta = [c.st === 'Pokémon' ? c.sub : c.st === 'Energy' ? 'Special Energy' : (c.sub || 'Trainer')]; if (c.hp) meta.push(`${c.hp} HP`); if (c.types && c.types.length) meta.push(c.types.join('/'));
+  const foot = []; if (c.wk && c.wk.length) foot.push('Weakness: ' + c.wk.join(', ')); if (c.rs && c.rs.length) foot.push('Resistance: ' + c.rs.join(', ')); if (c.st === 'Pokémon') foot.push(`Retreat: ${c.rc || 0}`);
+  return `<div class="pk-card${small ? ' small' : ''}"><div class="pk-name"><b>${esc(c.name)}</b><span>${esc(meta.join(' · '))}</span></div>
+    ${pw.map((p) => `<div class="pk-pw"><em>Pokémon Power</em> <b>${esc(p.n)}</b><p>${esc(p.t || '')}</p></div>`).join('')}
+    ${(c.atk || []).map((a) => `<div class="pk-atk"><div><span class="pk-cost">${(a.c || []).map((t) => `<i style="background:${TCOL[t] || '#999'}" title="${esc(t)}"></i>`).join('')}<small>${costText(a)}</small></span><b>${esc(a.n)}</b><strong>${esc(a.d || '')}</strong></div>${a.t ? `<p>${esc(a.t)}</p>` : ''}</div>`).join('')}
+    ${c.txt ? `<p class="pk-txt">${esc(c.txt)}</p>` : ''}${foot.length ? `<div class="pk-foot">${esc(foot.join(' · '))}</div>` : ''}</div>`;
+}
+function showPeek(key) {
+  hidePeek();
+  const e = poolEntry(PT.CARDS, key, rules()); if (!e) return;
+  const phone = window.innerWidth < 720;
+  const s = phone ? Math.min(1.25, (window.innerWidth - 40) / 240, (window.innerHeight * 0.42) / 330) : Math.min(1.7, (window.innerHeight - 80) / 330, (window.innerWidth - 520) / 240);
+  const pre = e.kind === 'line' ? e.line.slice(0, -1).reverse() : [];
+  const ov = document.createElement('div'); ov.className = `ar-peek t-${e.tier}`; ov.setAttribute('aria-hidden', 'true');
+  ov.innerHTML = `<div class="ar-peek-in"><div class="ar-peek-card"><span class="ar-aura"></span>${PT.cardHTML(e.cid, Math.max(0.6, s).toFixed(2)).replace(/ data-cid="[^"]*"/, '')}</div>
+    <div class="ar-peek-text"><span class="ar-gem">${TIER_NAMES[e.tier]}</span>${cardText(e.cid)}
+      ${pre.length ? `<div class="pk-with">Comes with ${ARENA.lineCopies} of each</div>${pre.map((cid) => cardText(cid, true)).join('')}` : ''}
+      <div class="pk-hint">Let go to close</div></div></div>`;
+  document.body.appendChild(ov); V.peek = ov;
+}
+function hidePeek() { if (V.peek) { V.peek.remove(); V.peek = null; } }
+let hold = null;
+function holdStart(e) {
+  if (e.button != null && e.button !== 0) return;
+  const ch = e.target.closest && e.target.closest('.ar-choice[data-pick]'); if (!ch || e.target.closest('button') || V.picking) return;
+  holdCancel();
+  hold = { x: e.clientX, y: e.clientY, shown: false, t: setTimeout(() => { if (hold) { hold.shown = true; showPeek(ch.dataset.pick); } }, HOLD_MS) };
+}
+function holdMove(e) { if (hold && !hold.shown && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 12) holdCancel(); }
+function holdCancel() { if (hold) { clearTimeout(hold.t); hold = null; } }
+function holdEnd() {
+  if (!hold) return; const shown = hold.shown; holdCancel(); hidePeek();
+  if (shown) { V.noClick = true; setTimeout(() => { V.noClick = false; }, 350); } // the click that follows a hold must not draft
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('pointerup', holdEnd); window.addEventListener('pointercancel', () => { holdCancel(); hidePeek(); });
+  window.addEventListener('pointermove', holdMove, { passive: true });
+  window.addEventListener('blur', () => { holdCancel(); hidePeek(); });
+  window.addEventListener('contextmenu', (e) => { if (e.target.closest && e.target.closest('.ar-choice, .ar-peek')) e.preventDefault(); });
 }
 function playView(r) {
   const title = OPPONENTS[Math.min(r.wins, OPPONENTS.length - 1)];
@@ -355,7 +402,9 @@ export function render(main) {
   main.innerHTML = `<div class="arena">${header(r)}${body}${r && r.status === 'draft' ? '' : goldCaseHTML(d)}<div class="ar-lower">${boardHTML()}${historyHTML(d)}</div></div>`;
   if (r && r.status === 'draft') afterDraft();
   main.onkeydown = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('ar-choice')) { e.preventDefault(); pickAnimated(e.target); } };
+  main.onpointerdown = holdStart;
   main.onclick = (e) => {
+    if (V.noClick) { V.noClick = false; return; }
     const b = e.target.closest('button');
     const v = e.target.closest('[data-view]'); if (v && (!b || b === v)) { PT.viewCard(v.dataset.view); return; }
     const ch = e.target.closest('.ar-choice[data-pick]'); if (ch && !b) { pickAnimated(ch); return; }
