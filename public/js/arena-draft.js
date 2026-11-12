@@ -5,7 +5,7 @@
 import { mulberry32 } from './engine/rng.js';
 import { R } from './engine/rules.js';
 import { baseSpecies } from './engine/engine.js';
-import { TIERS, TIER_WEIGHTS } from './arena-tiers.js';
+import { TIERS, TIER_WEIGHTS, TIER_BOOST } from './arena-tiers.js';
 
 export const ARENA = { picksTo: 40, bills: 4, oaks: 1, energy: 15, deck: 60, wins: 7, losses: 1, lineCopies: 2 }; // no lives: the first loss ends the run
 /** The pick key for "take a basic Energy instead of one of the three cards". */
@@ -24,7 +24,8 @@ const NOT_IN_DRAFT = new Set(['Rainbow Energy', 'Bill',
   // Pokémon George took out as too strong against one huge Pokémon (Clefable takes its Clefairy with it)
   'Mr. Mime', 'Clefable', "Sabrina's Jynx", 'Jynx', "Sabrina's Hypno", // (the last two: damage for every damage counter on the Defending Pokémon)
   // Trainers that hinge on the opponent's choice, which a boss can't sensibly make
-  'Challenge!', "Lt. Surge's Treaty", "Misty's Wish"]);
+  'Challenge!', "Lt. Surge's Treaty", "Misty's Wish",
+  'Devolution Spray']); // (marked "remove" in George's rarity sheet)
 
 /** Card signature: reprints (same name, HP, attacks, powers) count as one card. */
 const sig = (c) => JSON.stringify([c.name, c.hp, c.sub, (c.atk || []).map((a) => [a.n, a.d, (a.c || []).length]), c.pw ? c.pw.n : null]);
@@ -69,9 +70,11 @@ function needsOf(c) { if (c.st !== 'Trainer') return null; const w = [...new Set
 function entry(top, kind, line, copies) {
   const cards = {}; const names = {};
   for (const c of line) { cards[c.id] = (cards[c.id] || 0) + copies; names[c.name] = (names[c.name] || 0) + copies; }
-  return { key: top.id, cid: top.id, kind, tier: TIERS[top.id] || 'C', needs: needsOf(top), cards, names, size: line.length * copies, line: line.map((c) => c.id) };
+  return { key: top.id, cid: top.id, kind, tier: TIERS[top.id] || 'C', w: (TIER_BOOST || {})[top.id] || 1, needs: needsOf(top), cards, names, size: line.length * copies, line: line.map((c) => c.id) };
 }
 
+/** One entry from a list, each with a chance in proportion to its weight (1 unless the tiers sheet says otherwise). */
+function weighted(list, rng) { let roll = rng() * list.reduce((a, e) => a + (e.w || 1), 0); for (const e of list) { roll -= e.w || 1; if (roll < 0) return e; } return list[list.length - 1]; }
 /** Copies of each name already in the drafted cards (basic Energy doesn't count). */
 function nameCounts(cards, db) { const o = {}; for (const [cid, k] of Object.entries(cards || {})) { const c = db[cid]; if (c && !(c.st === 'Energy' && c.sub === 'Basic')) o[c.name] = (o[c.name] || 0) + k; } return o; }
 export const draftedCount = (cards) => Object.values(cards || {}).reduce((a, b) => a + b, 0);
@@ -113,7 +116,7 @@ export function makeOffer(db, seed, round, cards, rules) {
     let roll = rng() * tiers.reduce((a, t) => a + TIER_WEIGHTS[t], 0); let tier = tiers[tiers.length - 1];
     for (const t of tiers) { roll -= TIER_WEIGHTS[t]; if (roll < 0) { tier = t; break; } }
     const kind = by[tier].filter((e) => isMon(e) === wantMon); const from = kind.length ? kind : by[tier];
-    const e = from[Math.floor(rng() * from.length)]; used.add(e.key); return e;
+    const e = weighted(from, rng); used.add(e.key); return e;
   };
   for (let i = 0; i < 3; i++) {
     const wantMon = needMons || (i === 0 && monCards < 18) || rng() < pMon;
@@ -182,7 +185,7 @@ export function makeSwapOffer(db, seed, n, cards, rules) {
     const tiers = Object.keys(by).filter((t) => (TIER_WEIGHTS[t] || 0) > 0).sort(); if (!tiers.length) break;
     let roll = rng() * tiers.reduce((a, t) => a + TIER_WEIGHTS[t], 0); let tier = tiers[tiers.length - 1];
     for (const t of tiers) { roll -= TIER_WEIGHTS[t]; if (roll < 0) { tier = t; break; } }
-    const e = by[tier][Math.floor(rng() * by[tier].length)]; used.add(e.key); out.push(e.key);
+    const e = weighted(by[tier], rng); used.add(e.key); out.push(e.key);
   }
   return out;
 }

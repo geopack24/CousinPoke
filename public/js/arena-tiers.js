@@ -66,7 +66,6 @@ export const TIERS = {
   'base5-45': 'R', // Dark Vaporeon
   'base3-3': 'R', // Ditto
   'base2-34': 'R', // Dodrio
-  'base1-96': 'R', // Double Colorless Energy
   'base1-20': 'R', // Electabuzz
   'base1-92': 'R', // Energy Removal
   'gym1-4': 'R', // Erika's Dragonair
@@ -162,4 +161,8 @@ export const TIERS = {
   'base2-13': 'U', // Venomoth
   'gym2-126': 'U', // Warp Point
   'base3-45': 'U', // Weezing
+};
+// How much more often a card comes up than the other cards of its tier (from the sheet's Weight column; 1 when not listed).
+export const TIER_BOOST = {
+  'base1-96': 4, // Double Colorless Energy
 };
