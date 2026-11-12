@@ -8,10 +8,11 @@ import { mulberry32 } from './rng.js';
 
 export { BOSSES, BOSS_RULES };
 const CRYSTAL = { Fire: '#ff7a2e', Water: '#45b4ff', Grass: '#6fdc6f', Lightning: '#ffd83d', Psychic: '#cf7bff', Fighting: '#e0935a', Colorless: '#d9dde6' };
-/** The picture of an Energy Crystal in a boss's colour, as a CSS background (original artwork: a faceted gem on a dark card). */
+/** The picture of an Energy Crystal in a colour, as a CSS background: a bare faceted gem with nothing behind it
+ *  (original artwork). It is drawn in front of the Energy card it holds. */
 function crystalArt(type) {
   const c = CRYSTAL[type] || CRYSTAL.Colorless;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 245 342"><rect width="245" height="342" rx="14" fill="#151029"/><rect x="7" y="7" width="231" height="328" rx="10" fill="none" stroke="${c}" stroke-width="4" opacity=".7"/><g stroke="#151029" stroke-width="3" stroke-linejoin="round"><polygon points="122,40 190,120 122,300 54,120" fill="${c}"/><polygon points="122,40 190,120 122,150" fill="#ffffff" opacity=".45"/><polygon points="122,40 54,120 122,150" fill="#ffffff" opacity=".2"/><polygon points="54,120 122,150 122,300" fill="#000000" opacity=".28"/><polygon points="190,120 122,150 122,300" fill="#000000" opacity=".1"/></g></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 330"><g stroke="#151029" stroke-width="7" stroke-linejoin="round"><polygon points="120,14 222,122 120,316 18,122" fill="${c}"/></g><g stroke="#151029" stroke-width="3" stroke-linejoin="round"><polygon points="120,14 222,122 120,160" fill="#ffffff" opacity=".5"/><polygon points="120,14 18,122 120,160" fill="#ffffff" opacity=".22"/><polygon points="18,122 120,160 120,316" fill="#000000" opacity=".3"/><polygon points="222,122 120,160 120,316" fill="#000000" opacity=".1"/></g></svg>`;
   return `url('data:image/svg+xml,${encodeURIComponent(svg)}')`;
 }
 export const bossId = (n) => 'boss-' + n;
@@ -57,14 +58,15 @@ export function bossCards(db) {
   for (const b of BOSSES) {
     const src = db[b.card] || {};
     const art = { set: src.set, i: src.i }; const type = b.type || (src.types || ['Colorless'])[0];
-    // its Energy cards are the basic Energy of its type (a Double Colorless for a Colorless boss); each sits behind an Energy Crystal
-    const all = Object.values(db); const ec = all.find((c) => c.st === 'Energy' && c.set === 'base1' && c.name === type + ' Energy') || all.find((c) => c.st === 'Energy' && c.name === 'Double Colorless Energy') || {};
+    // its Energy cards are basic Energy (of its type unless the sheet says otherwise); each sits behind the Energy Crystal it lights up
+    const etype = b.energy || (type === 'Colorless' ? 'Lightning' : type); // a Colorless boss still uses a basic Energy (a Double Colorless reads as 2)
+    const all = Object.values(db); const ec = all.find((c) => c.st === 'Energy' && c.set === 'base1' && c.name === etype + ' Energy') || all.find((c) => c.st === 'Energy' && c.sub === 'Basic') || {};
     db[bossId(b.n)] = {
       id: bossId(b.n), set: 'boss', art, name: 'Colossal ' + b.name, st: 'Pokémon', sub: 'Basic', hp: b.hp, types: [type], part: partId(b.n),
       atk: b.attacks.map((a) => ({ n: a.name, c: Array(costOf(a)).fill('Colorless'), d: dmgLabel(a), t: `${costOf(a) ? `Uses up ${costOf(a)} Energy.` : 'Costs no Energy: it uses this on every turn it is still charging.'} ${attackText(a)}`.trim() })), pw: [{ n: 'Colossal', t: colossalText(b) }],
       wk: BOSS_RULES.wr && b.wk ? [b.wk] : null, rs: BOSS_RULES.wr && b.rs ? [b.rs] : null, rc: 0, rar: 'Colossal', boss: b,
     };
-    db[partId(b.n)] = { id: partId(b.n), set: 'boss', bg: crystalArt(type), name: 'Energy Crystal', st: 'Pokémon', sub: 'Basic', hp: rule(BOSS_RULES, 'energyHP', 20), types: ['Colorless'], atk: [], pw: null, wk: null, rs: null, rc: 0, rar: 'Colossal', bossPart: b.n, en: ec.id, etype: type,
+    db[partId(b.n)] = { id: partId(b.n), set: 'boss', bg: crystalArt(etype), gem: true, name: 'Energy Crystal', st: 'Pokémon', sub: 'Basic', hp: rule(BOSS_RULES, 'energyHP', 20), types: ['Colorless'], atk: [], pw: null, wk: null, rs: null, rc: 0, rar: 'Colossal', bossPart: b.n, en: ec.id, etype,
       txt: `One of Colossal ${b.name}'s Energy Crystals. It is on the Bench only while it holds an Energy. Knock it Out and that Energy is destroyed with it. The crystal forms again at the start of Colossal ${b.name}'s next turn.` };
   }
   return db;

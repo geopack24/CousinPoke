@@ -838,7 +838,6 @@ table.lgt tr.lead td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
 .side.boss .k{font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;opacity:.72;white-space:nowrap;color:var(--felt-fg,#fff)}
 .bossbench{display:flex;flex-direction:column;align-items:center;gap:4px}
 .bossbench .bp-row{display:flex;gap:8px;justify-content:center;align-items:flex-end}
-.bossbench .mon .cd{box-shadow:0 0 0 2px rgba(255,203,5,.55)}
 .bossfield{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:16px;align-items:center;color:var(--felt-fg,#fff)}
 .bossmid{display:flex;flex-direction:column;align-items:center;gap:6px}
 .bossfig{filter:drop-shadow(0 10px 22px rgba(0,0,0,.55))}
@@ -964,15 +963,20 @@ table.lgt tr.lead td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
 @media (max-width:700px){.boss-call.fixed{padding:10px 16px}.boss-call i{font-size:12.5px}.bosslast{margin-top:5px;padding:4px 6px;font-size:10.5px}}
 @media (prefers-reduced-motion:reduce){.bossfig.rearing .bossbody{animation:none}}
 
-/* the boss's Bench: a row of Energy Crystals, each with the Energy it holds shown behind it (toward the far edge) */
-.bossbench .bp-row{padding:6px 0 10px;align-items:flex-end}
-.eslot{display:flex;flex-direction:column;align-items:center;line-height:0}
-.eslot .ecard{min-height:6px;margin-bottom:-14px;opacity:.95;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
-.eslot .ecard:empty{height:0;margin:0}
-.eslot .mon{margin:0;position:relative;z-index:1}
-.eslot.dark .dimc{position:relative;line-height:0;opacity:.55;filter:saturate(.15) brightness(.7)} /* a dark crystal: no Energy, out of play */
-.eslot.dark .dimd{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 3px;border-radius:999px;display:grid;place-items:center;font-size:10px;font-weight:800;line-height:1;color:#fff;background:#7a2a24}
-.eslot.on .mon .cd{box-shadow:0 0 0 2px rgba(255,203,5,.7),0 0 10px rgba(255,203,5,.55)}
-.eslot.gone .slot{font-size:8px;line-height:1.1;opacity:.6}
+/* the boss's Bench: each Energy is a basic Energy card with its crystal standing in front of it. The crystal is a bare
+   gem (no card frame) and is the thing you attack; a crystal with no Energy is grey and out of play. */
+.bossbench .bp-row{padding:4px 0 14px;align-items:flex-end}
+.eslot{--es:.19;--ec:#d9dde6;display:flex;flex-direction:column;align-items:center;line-height:0;width:calc(240px*var(--es))}
+.eslot.t-Fire{--ec:#ff7a2e}.eslot.t-Water{--ec:#45b4ff}.eslot.t-Grass{--ec:#6fdc6f}.eslot.t-Lightning{--ec:#ffd83d}.eslot.t-Psychic{--ec:#cf7bff}.eslot.t-Fighting{--ec:#e0935a}
+.eslot .ecard{height:calc(330px*var(--es));filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+.eslot.dark .ecard,.eslot.gone .ecard{height:calc(175px*var(--es));filter:none}
+.eslot .mon{margin:calc(-155px*var(--es)) 0 0;position:relative;z-index:1}
+.eslot .mon .cd,.eslot .dimc .cd{background-color:transparent;box-shadow:none;border-radius:0}
+.eslot.on .mon .cd{filter:drop-shadow(0 0 5px var(--ec)) drop-shadow(0 2px 3px rgba(0,0,0,.65))}
+.eslot .mon .hp{left:50%;top:auto;bottom:-11px;transform:translateX(-50%);font-size:9px;padding:0 4px;white-space:nowrap}
+.eslot .mon .dmg{display:none}
+.eslot.dark .dimc{position:relative;line-height:0;opacity:.5;filter:saturate(0) brightness(.85)}
+.eslot.dark .dimd{position:absolute;top:-4px;right:-8px;min-width:16px;height:16px;padding:0 3px;border-radius:999px;display:grid;place-items:center;font-size:10px;font-weight:800;line-height:1;color:#fff;background:#7a2a24}
+.eslot.gone .egap{box-sizing:border-box;width:86%;height:calc(238px*var(--es));display:grid;place-items:center;text-align:center;font-size:8px;line-height:1.1;opacity:.55;border:1px dashed rgba(255,255,255,.35);border-radius:6px}
 .eslot .ecard.epop{animation:epop .85s cubic-bezier(.2,1.5,.4,1)}
-@media (max-width:700px){.eslot .ecard{margin-bottom:-10px}}
+@media (max-width:700px){.eslot .mon .hp{font-size:8px;padding:0 3px;bottom:-10px}.eslot.gone .egap{font-size:7px}}

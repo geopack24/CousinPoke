@@ -13,20 +13,20 @@ export const BOSS_RULES = {
   conditions: { PSN: 2, BRN: 2, CNF: 2, SLP: 1, PAR: 1 }, // how many of its own turns a Special Condition lasts on it (0 = immune)
 };
 export const BOSSES = [
-  { n: 1, stage: 1, name: "Raticate", card: "base1-40", hp: 200, type: "Colorless", wk: "", rs: "", armor: 0, thorns: 0, enrage: 0, pattern: [1, 1, 2],
+  { n: 1, stage: 1, name: "Raticate", card: "base1-40", hp: 200, type: "Colorless", wk: "", rs: "", armor: 0, thorns: 0, enrage: 0, pattern: [1, 1, 2], energy: "Fighting",
     attacks: [{ name: "Bite", cost: 1, dmg: 20 }, { name: "Hyper Fang", cost: 4, dmg: 40 }] },
-  { n: 2, stage: 2, name: "Arbok", card: "base3-31", hp: 220, type: "Grass", wk: "", rs: "", armor: 0, thorns: 0, enrage: 0, pattern: [1, 2, 3],
+  { n: 2, stage: 2, name: "Arbok", card: "base3-31", hp: 220, type: "Grass", wk: "", rs: "", armor: 0, thorns: 0, enrage: 0, pattern: [1, 2, 3], energy: "Grass",
     attacks: [{ name: "Poison Fang", cost: 1, dmg: 20, effect: "PSN", chance: "flip" }, { name: "Terror Strike", cost: 2, dmg: 20, effect: "switch" }, { name: "Acid", cost: 3, dmg: 30, bench: 10 }] },
-  { n: 3, stage: 3, name: "Onix", card: "base1-56", hp: 200, type: "Fighting", wk: "", rs: "", armor: 10, thorns: 0, enrage: 0, pattern: [1, 2, 3],
+  { n: 3, stage: 3, name: "Onix", card: "base1-56", hp: 200, type: "Fighting", wk: "", rs: "", armor: 10, thorns: 0, enrage: 0, pattern: [1, 2, 3], energy: "Fighting",
     attacks: [{ name: "Rock Throw", cost: 1, dmg: 30 }, { name: "Rock Slide", cost: 2, dmg: 20, bench: 10 }, { name: "Earthquake", cost: 3, dmg: 50 }] },
-  { n: 8, stage: 3, name: "Hitmonlee", card: "base3-7", hp: 240, type: "Fighting", wk: "", rs: "", armor: 0, thorns: 0, enrage: 0, pattern: [1, 2, 3],
+  { n: 8, stage: 3, name: "Hitmonlee", card: "base3-7", hp: 240, type: "Fighting", wk: "", rs: "", armor: 0, thorns: 0, enrage: 0, pattern: [1, 2, 3], energy: "Fighting",
     attacks: [{ name: "Low Kick", cost: 1, dmg: 20 }, { name: "Stretch Kick", cost: 2, dmg: 20, bench: 10 }, { name: "High Jump Kick", cost: 3, dmg: 50 }] },
-  { n: 4, stage: 4, name: "Machamp", card: "base1-8", hp: 260, type: "Fighting", wk: "", rs: "", armor: 0, thorns: 10, enrage: 0, pattern: [1, 2, 1, 3],
+  { n: 4, stage: 4, name: "Machamp", card: "base1-8", hp: 260, type: "Fighting", wk: "", rs: "", armor: 0, thorns: 10, enrage: 0, pattern: [1, 2, 1, 3], energy: "Fighting",
     attacks: [{ name: "Karate Chop", cost: 1, dmg: 20 }, { name: "Seismic Toss", cost: 2, dmg: 40 }, { name: "Submission", cost: 4, dmg: 60 }] },
-  { n: 5, stage: 5, name: "Gyarados", card: "base1-6", hp: 320, type: "Water", wk: "", rs: "", armor: 0, thorns: 0, enrage: 0, pattern: [1, 2, 3],
+  { n: 5, stage: 5, name: "Gyarados", card: "base1-6", hp: 320, type: "Water", wk: "", rs: "", armor: 0, thorns: 0, enrage: 0, pattern: [1, 2, 3], energy: "Water",
     attacks: [{ name: "Dragon Rage", cost: 2, dmg: 30 }, { name: "Bubblebeam", cost: 2, dmg: 30, effect: "PAR", chance: "flip" }, { name: "Hydro Pump", cost: 3, dmg: 60, bench: 10 }] },
-  { n: 6, stage: 6, name: "Dragonite", card: "base3-4", hp: 360, type: "Colorless", wk: "", rs: "", armor: 0, thorns: 0, enrage: 0, pattern: [1, 2, 3],
+  { n: 6, stage: 6, name: "Dragonite", card: "base3-4", hp: 360, type: "Colorless", wk: "", rs: "", armor: 0, thorns: 0, enrage: 0, pattern: [1, 2, 3], energy: "Lightning",
     attacks: [{ name: "Slam", cost: 2, dmg: 30, flips: 2 }, { name: "Twister", cost: 2, dmg: 20, bench: 20 }, { name: "Hyper Beam", cost: 3, dmg: 60, effect: "energy" }] },
-  { n: 7, stage: 7, name: "Charizard", card: "base1-4", hp: 400, type: "Fire", wk: "", rs: "", armor: 0, thorns: 0, enrage: 10, pattern: [1, 2, 3],
+  { n: 7, stage: 7, name: "Charizard", card: "base1-4", hp: 400, type: "Fire", wk: "", rs: "", armor: 0, thorns: 0, enrage: 10, pattern: [1, 2, 3], energy: "Fire",
     attacks: [{ name: "Flamethrower", cost: 2, dmg: 40 }, { name: "Heat Wave", cost: 2, dmg: 20, bench: 10, effect: "BRN" }, { name: "Fire Spin", cost: 4, dmg: 80 }] },
 ];

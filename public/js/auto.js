@@ -639,11 +639,11 @@ function bossSideHTML(g, seat, compact, SC) {
   const moves = `<div class="bossmoves" data-bosscard="${esc(b.cid)}" role="button" tabindex="0" title="Tap for the full text of its attacks"><span class="k">Moveset</span>${(def.attacks || []).map((a, k) => `<span class="bm${k === nx.idx ? ' next' : ''}"><b>${esc(a.name)}</b><i>⚡${a.cost == null ? 1 : a.cost}</i><em>${a.flips ? a.dmg + '×' : a.dmg || '–'}${a.bench ? '+' : ''}</em></span>`).join('')}${nx.charge > 0 ? `<span class="bm ec"><b>Energy Charge</b><i>+${nx.charge}⚡</i><em>–</em></span>` : ''}</div>`;
   // laid out like an opposing player: its Energy along the far edge (its Bench), the Colossal Pokémon in front of it in the middle
   // a lit crystal (it holds an Energy) is on its Bench and can be attacked; a dark one is out of play; a broken one forms again next turn
-  const crys = bossCrystals(g);
+  const crys = bossCrystals(g); const et = esc(C(C(b.cid).part).etype || 'Colorless'); const scGem = scPart * 0.72;
   const slots = Array.from({ length: Math.max(nx.max, crys.length) }, (_, k) => { const cr = crys[k];
-    if (!cr) return `<div class="eslot gone"><div class="ecard"></div><div class="slot" style="--s:${scPart}">forms next turn</div></div>`;
-    if (cr.lit) return `<div class="eslot on"><div class="ecard">${PT.cardHTML(C(cr.x.c).en, scPart * 0.8)}</div>${monHTML(cr.x, seat, false, false, scPart)}</div>`;
-    return `<div class="eslot dark" title="No Energy in this crystal: it is out of play until it lights up"><div class="ecard"></div><div class="dimc">${PT.cardHTML(cr.x.c, scPart)}${cr.x.dmg ? `<span class="dimd">${cr.x.dmg}</span>` : ''}</div></div>`; }).join('');
+    if (!cr) return `<div class="eslot gone" style="--es:${scPart}"><div class="ecard"></div><div class="egap">forms next turn</div></div>`;
+    if (cr.lit) return `<div class="eslot on t-${et}" style="--es:${scPart}"><div class="ecard">${PT.cardHTML(C(cr.x.c).en, scPart)}</div>${monHTML(cr.x, seat, false, false, scGem)}</div>`;
+    return `<div class="eslot dark" style="--es:${scPart}" title="No Energy in this crystal: it is out of play until it lights up"><div class="ecard"></div><div class="dimc">${PT.cardHTML(cr.x.c, scGem)}${cr.x.dmg ? `<span class="dimd">${cr.x.dmg}</span>` : ''}</div></div>`; }).join('');
   return `<div class="side boss ${live ? 'live' : (g.phase === 'main' && !g.winner ? 'idle' : '')}${rage ? ' raging' : ''}">
     <div class="pname"><span>${esc(g.seats[seat].name)}</span>${turnNow ? '<span class="chip">Its turn</span>' : ''}${g.winner === seat ? '<span class="chip">Winner</span>' : ''}</div>
     <div class="bossbench" title="It gains Energy every turn and its attacks use it up. Each Energy lights up an Energy Crystal. Only a lit crystal can be attacked: Knock it Out and its Energy is destroyed; the crystal forms again on its next turn."><span class="k">Energy ${nx.have} / ${nx.max}</span><div class="bp-row">${slots}</div></div>

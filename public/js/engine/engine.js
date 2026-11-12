@@ -203,7 +203,7 @@ export function legalActions(g, seat, db) {
     if (isBasicLike(card) && p.bench.length < benchLimit(g)) out.push({ type: 'playBasic', card: c.id });
   }
   // house rule: pick an Energy up instead of attaching one
-  if (r.energyPickup && !p.attachedThisTurn) for (const m of mons(p)) for (const e of m.en) { if (db[e.c] && db[e.c].st === 'Energy' && !(r.dceNoReturn && db[e.c].name === 'Double Colorless Energy')) out.push({ type: 'pickupEnergy', target: m.id, card: e.id }); }
+  if (r.energyPickup && !p.attachedThisTurn && !bossSeat(g, seat)) for (const m of mons(p)) for (const e of m.en) { if (db[e.c] && db[e.c].st === 'Energy' && !(r.dceNoReturn && db[e.c].name === 'Double Colorless Energy')) out.push({ type: 'pickupEnergy', target: m.id, card: e.id }); }
   for (const c of p.hand) {
     const card = db[c.c]; if (!card) continue;
     if (card.st === 'Pokémon' && card.sub !== 'Baby' && (card.sub !== 'Basic' || mons(p).some((x) => db[x.c] && db[x.c].sub === 'Baby'))) for (const m of mons(p)) if (matchesEvolution(db, c.c, m, g.rules) && canEvolveTarget(g, m, r, db)) out.push({ type: 'evolve', card: c.id, target: m.id });
@@ -440,7 +440,7 @@ function runAction(ctx, a) {
   must(g.phase === 'main' && g.turn === seat, 'Not your turn');
   switch (a.type) {
     case 'pickupEnergy': {
-      must(r.energyPickup, 'Not allowed at this table'); must(!p.attachedThisTurn, 'Already attached (or picked up) Energy this turn');
+      must(r.energyPickup && !bossSeat(g, seat), 'Not allowed at this table'); must(!p.attachedThisTurn, 'Already attached (or picked up) Energy this turn');
       const f = findMon(g, a.target); must(f && f.seat === seat, 'Not your Pokémon'); const e = f.m.en.find((x) => x.id === a.card); must(e, 'That Energy is not on that Pokémon');
       must(!(r.dceNoReturn && db[e.c].name === 'Double Colorless Energy'), "A Double Colorless can't be picked up");
       pullCard(g, e.id); p.hand.push(e); p.attachedThisTurn = true; ctx.log(`${ctx.name(seat)} picked up ${nameOf(db, e.c)} from ${nameOf(db, f.m.c)}`); ctx.event({ t: 'pickup', target: f.m.id, card: e }); return;
