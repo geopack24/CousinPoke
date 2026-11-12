@@ -81,6 +81,8 @@ function dedupe(g, seat, db, legal) {
 export function botAction(g, seat, db, skip = new Set()) {
   const legal = legalActions(g, seat, db).filter((a) => !skip.has(key(a)));
   if (!legal.length) return null;
+  // a Colossal Pokémon doesn't think: it uses the next attack of its pattern
+  if (g.boss && seat === g.boss.seat) return legal.find((a) => a.type === 'attack') || legal.find((a) => a.type === 'endTurn') || legal[0];
   const p = P(g, seat);
   const has = (t) => legal.filter((a) => a.type === t);
   const handCard = (id) => card(db, p.hand.find((c) => c.id === id));
@@ -183,6 +185,7 @@ export function evalPos(g, seat, db) {
   v += sideValue(g, db, me, true) - sideValue(g, db, op, false);
   if (!op.active && !op.bench.length) v += 5000; if (!me.active && !me.bench.length) v -= 5000;
   v += finishThreat(g, seat, db);
+  if (g.boss) { const bm = P(g, g.boss.seat).active; v += (seat === g.boss.seat ? -1 : 1) * ((bm ? bm.dmg : 0) * 3 - g.boss.kos * W.prize); } // against a Colossal Pokémon: damage on it, and the Knock Outs it has
   return v;
 }
 function findM(g, id) { for (const s of ['a', 'b']) for (const m of mons(P(g, s))) if (m.id === id) return m; return null; }

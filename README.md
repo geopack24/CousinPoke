@@ -42,9 +42,22 @@ New table → "Practice against the computer" puts a computer opponent in seat B
 
 ## The Arena (single player)
 
-Arena → Start a run. Make 40 picks, each 1 of 3 cards or a basic Energy instead: only the top of each evolution line is offered, and an evolved Pokémon brings its whole line (2 of each card). Every deck is also given 4 Bills (Bill is not in the draft), 1 Professor Oak and 15 basic Energy for its Pokémon's types, making 60. Then play the computer under the standard rules until 7 wins or 3 losses; each opponent drafts its own deck and drafts better as your wins climb. Runs and the leaderboard live in the `arena` collection (one document per player). `public/js/arena-draft.js` is the draft (pure, shared with the simulator); `public/js/arena.js` is the screen.
+Arena → Start a run. Make 40 picks, each 1 of 3 cards or a basic Energy instead: only the top of each evolution line is offered, and an evolved Pokémon brings its whole line (2 of each card). Every deck is also given 4 Bills (Bill is not in the draft), 1 Professor Oak and 15 basic Energy for its Pokémon's types, making 60. Then fight the Colossal Pokémon, one per win, until 7 wins or 3 losses (see below). Runs and the leaderboard live in the `arena` collection (one document per player). `public/js/arena-draft.js` is the draft (pure, shared with the simulator); `public/js/arena.js` is the screen.
 
 A Trainer whose text needs a Pokémon "with X in its name" (Brock's Training Method, Koga, The Boss's Way…) is only offered once the deck has a matching Pokémon. Every draftable card has a rarity tier (Common, Uncommon, Rare, Epic, Legendary). Each slot rolls a tier by its weight first, then a random card from that tier, so a tier's size never changes how often it comes up. Rare, Epic and Legendary cards glow blue, purple and orange when they are dealt, with a sound for each. A finished run pays Cousin Tokens by wins (`ARENA_REWARDS`: 0, 15, 30, 50, 75, 100, 150, 250), shown by opening a prize chest; a 7-win run also unlocks a gold holographic version of a random Pokémon the player doesn't have in gold yet. The balance and gold cards live in the player's `arena` document (`tokens`, `gold`). The tiers and weights come from a spreadsheet: `python tools/arena_tiers.py "Arena rarity tiers.xlsx"` rewrites `public/js/arena-tiers.js`.
+
+### Colossal Pokémon (the Arena's bosses)
+
+Each Arena game is against one Colossal Pokémon: a single giant with a large HP pool in seat B, no deck, hand or Prizes. `public/js/engine/boss.js` builds the game (`newBossGame`) and the boss cards; the rules live in `engine.js` behind `g.boss`.
+
+- **Winning and losing.** Knock it Out to win. It wins when it has Knocked Out 6 of your Pokémon (Clefairy Doll and Mysterious Fossil don't count). You take a Prize for each sixth of its HP you knock off.
+- **Its turn.** It follows a fixed attack pattern, which may include rest turns; the table always shows what it will do next. Its attacks cost no Energy and get past Pokémon Powers that prevent damage (Invisible Wall).
+- **Weak points.** Its Bench holds weak points. Damage done to one is done to the boss (ignoring Weakness, Resistance and armor), so attacks that hit the Bench still matter.
+- **Special Conditions.** Poison, Burn and Confusion wear off after 2 of its turns. It can't be Asleep or Paralyzed, and effects that stop it attacking, move it, copy it or return it to hand do nothing.
+- **Limits.** No single move takes more than 150 off it. Super Fang, Life Drain and Destiny Bond do a fixed 40 instead.
+- **Traits.** A boss may have armor (less damage from each attack), strike back (damage to whatever hits it) and an enrage bonus at half HP.
+
+The bosses, their attacks and the shared settings come from a spreadsheet: `python tools/arena_bosses.py "Arena bosses.xlsx"` rewrites `public/js/arena-bosses.js`. Trainers that do nothing against a boss (Energy Removal, Sleep!, Pokémon Flute…) are left out of the draft.
 
 ## Ranked league
 

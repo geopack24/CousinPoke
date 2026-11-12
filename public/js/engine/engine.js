@@ -10,9 +10,15 @@ import { R, isBasicLike } from './rules.js';
 import { mulberry32, shuffleWith } from './rng.js';
 import { P, other, mons, allMons, findMon, toMon, monCards, pullCard, removeMon, replaceMon, instId } from './state.js';
 import { CARD_SCRIPTS } from './cards/index.js';
+import { nextBossAttack } from './boss.js';
 
 export const STATUS_NAMES = { SLP: 'Asleep', CNF: 'Confused', PAR: 'Paralyzed', PSN: 'Poisoned', BRN: 'Burned' };
 const TYPES = ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting', 'Colorless'];
+
+/* Colossal Pokémon (the Arena's bosses, see boss.js): g.boss describes the one in play. */
+export const isBoss = (g, m) => !!(g && g.boss && m && m.id === g.boss.id);
+export const isBossPart = (db, m) => !!(m && db[m.c] && db[m.c].bossPart);
+const bossSeat = (g, seat) => !!(g.boss && g.boss.seat === seat);
 
 class NeedInput { constructor(prompt) { this.prompt = prompt; } }
 class RuleError extends Error {}
@@ -84,7 +90,7 @@ export function effectiveCard(g, db, m) {
     const owner = findMon(g, m.id); if (owner) { const atk = [...(c.atk || [])]; const atkSrc = {}; for (const x of mons(owner.p)) { if (x.id === m.id) continue; const xc = db[x.c]; if ((xc.types || []).includes('Psychic')) for (const a of xc.atk || []) if (!atk.some((y) => y.n === a.n)) { atk.push(a); atkSrc[a.n] = x.c; } } return { ...c, atk, atkSrc }; }
   }
   if (s.passive && s.passive.transform && !conditioned(m) && powersActive(g, db)) {
-    const owner = findMon(g, m.id); if (owner && owner.p.active && owner.p.active.id === m.id) { const d = P(g, other(owner.seat)).active; if (d && db[d.c] && db[d.c].st === 'Pokémon') return { ...db[d.c], id: db[d.c].id, name: c.name + ' (as ' + db[d.c].name + ')', sub: c.sub, ev: undefined }; }
+    const owner = findMon(g, m.id); if (owner && owner.p.active && owner.p.active.id === m.id) { const d = P(g, other(owner.seat)).active; if (d && db[d.c] && db[d.c].st === 'Pokémon' && !db[d.c].boss) return { ...db[d.c], id: db[d.c].id, name: c.name + ' (as ' + db[d.c].name + ')', sub: c.sub, ev: undefined }; }
   }
   return c;
 }
@@ -151,8 +157,9 @@ export function canAttack(g, seat, idx, db, srcCid) {
   if (m.st.includes('SLP')) return { ok: false, why: 'Asleep' };
   if (m.st.includes('PAR')) return { ok: false, why: 'Paralyzed' };
   const c = srcCid ? db[srcCid] : effectiveCard(g, db, m); const atk = (c.atk || [])[idx]; if (!atk) return { ok: false, why: 'No such attack' };
+  if (isBoss(g, m) && nextBossAttack(g, db).idx !== idx) return { ok: false, why: 'Not its next attack' };
   if (!canPay(db, g.rules, m, atk.c)) return { ok: false, why: 'Not enough energy' };
-  if (fxOf(m, 'noAttack').some((f) => f.attack === atk.n || !f.attack)) return { ok: false, why: `Can't use ${atk.n} this turn` };
+  if (!isBoss(g, m) && fxOf(m, 'noAttack').some((f) => f.attack === atk.n || !f.attack)) return { ok: false, why: `Can't use ${atk.n} this turn` };
   if (m.flags['used:' + atk.n] && attackScript(c.id, atk.n) && attackScript(c.id, atk.n).oncePerLife) return { ok: false, why: 'Already used' };
   const s = attackScript(c.id, atk.n);
   if (s && s.canUse) { const why = s.canUse({ g, db, seat, m, atk }); if (why) return { ok: false, why }; }
@@ -215,7 +222,7 @@ export function legalActions(g, seat, db) {
   if (p.active && isDollLike(db, p.active) && scriptOf(p.active.c).asPokemon && scriptOf(p.active.c).asPokemon.canDiscard) out.push({ type: 'discardDoll', pokemon: p.active.id });
   for (const m of p.bench) if (isDollLike(db, m) && scriptOf(m.c).asPokemon && scriptOf(m.c).asPokemon.canDiscard) out.push({ type: 'discardDoll', pokemon: m.id });
   // retreat
-  if (p.active && p.bench.length && !p.retreatedThisTurn && !isDollLike(db, p.active) && !p.active.st.includes('SLP') && !p.active.st.includes('PAR')) {
+  if (p.active && p.bench.length && !bossSeat(g, seat) && !p.retreatedThisTurn && !isDollLike(db, p.active) && !p.active.st.includes('SLP') && !p.active.st.includes('PAR')) {
     const rc = retreatCost(g, db, seat, p.active);
     if (energyUnits(db, p.active) >= rc && !hasFx(p.active, 'noRetreat') && !retreatBlocked(g, db, seat)) for (const m of p.bench) out.push({ type: 'retreat', target: m.id });
   }
@@ -278,7 +285,7 @@ function makeCtx(g, db, rng, events, seat, nextAnswer, action) {
       return ctx.choose({ id: opts.id || 'cards', title, options, min: opts.min == null ? 1 : opts.min, max: opts.max == null ? 1 : opts.max, seat: opts.seat, hidden: opts.hidden, ordered: opts.ordered });
     },
     /* --- zones --- */
-    draw(s, n) { const p = P(g, s); let k = 0; for (let i = 0; i < n; i++) { const c = p.deck.shift(); if (!c) break; p.hand.push(c); k++; } events.push({ t: 'draw', seat: s, n: k }); ctx.log(`${ctx.name(s)} drew ${k} card${k === 1 ? '' : 's'}`); return k; },
+    draw(s, n) { if (bossSeat(g, s)) return 0; const p = P(g, s); let k = 0; for (let i = 0; i < n; i++) { const c = p.deck.shift(); if (!c) break; p.hand.push(c); k++; } events.push({ t: 'draw', seat: s, n: k }); ctx.log(`${ctx.name(s)} drew ${k} card${k === 1 ? '' : 's'}`); return k; },
     shuffle(s) { shuffleWith(rng, P(g, s).deck); events.push({ t: 'shuffle', seat: s }); },
     discardFromHand(s, iid) { const c = pullCard(g, iid); P(g, s).discard.push(c); events.push({ t: 'discard', seat: s, card: c }); return c; },
     discardHand(s) { const p = P(g, s); const n = p.hand.length; p.discard.push(...p.hand); p.hand = []; ctx.log(`${ctx.name(s)} discarded ${n} card${n === 1 ? '' : 's'}`); },
@@ -312,6 +319,7 @@ function makeCtx(g, db, rng, events, seat, nextAnswer, action) {
     /* --- switching --- */
     switchActive(s, benchId, why) {
       const p = P(g, s); const i = p.bench.findIndex((x) => x.id === benchId); if (i < 0 || !p.active) return;
+      if (bossSeat(g, s)) { ctx.log(`${ctx.name(s)} can't be moved`); return; }
       const old = p.active; p.active = p.bench[i]; p.bench[i] = old;
       if (!R(g.rules).conditionsPersist) { old.st = []; delete old.flags.toxic; }
       old.fx = old.fx.filter((f) => !f.benchClears); for (const t of old.tools.slice()) if (scriptOf(t.c).discardOnBench) { pullCard(g, t.id); p.discard.push(t); }
@@ -365,24 +373,34 @@ function dealDamage(ctx, target, amount, opts = {}) {
     if (hasFx(target, 'preventAll') || hasFx(target, 'preventDamage')) { ctx.log(`${nameOf(db, target.c)}: damage prevented`); return 0; }
     if (hasFx(target, 'preventSmall') && dmg <= 30) { ctx.log(`${nameOf(db, target.c)}: damage prevented (Harden)`); return 0; }
     const ps = scriptOf(target.c).passive;
-    if (ps && ps.preventDamage && powersActive(g, db) && !conditioned(target) && ps.preventDamage({ ctx, target, amount: dmg, info })) { ctx.log(`${nameOf(db, target.c)}: damage prevented`); return 0; }
-    if (ps && ps.shieldFrom && src && src !== target && powersActive(g, db) && !conditioned(target) && ps.shieldFrom(g, db, src)) { ctx.log(`${nameOf(db, target.c)}: damage prevented`); return 0; }
+    if (ps && ps.preventDamage && !isBoss(g, src) && powersActive(g, db) && !conditioned(target) && ps.preventDamage({ ctx, target, amount: dmg, info })) { ctx.log(`${nameOf(db, target.c)}: damage prevented`); return 0; }
+    if (ps && ps.shieldFrom && src && src !== target && !isBoss(g, src) && powersActive(g, db) && !conditioned(target) && ps.shieldFrom(g, db, src)) { ctx.log(`${nameOf(db, target.c)}: damage prevented`); return 0; }
   }
   if (src && src.st.includes('CNF')) { const ss = scriptOf(src.c).passive; if (ss && ss.confusedBonus && powersActive(g, db)) dmg += ss.confusedBonus; }
+  if (isBoss(g, target) && !opts.self) { const bd = db[target.c].boss; if (bd.armor && src && dmg > 0) { dmg = Math.max(0, dmg - bd.armor); if (!dmg) ctx.log(`${nameOf(db, target.c)}'s armor stops it`); } if (g.boss.r.maxHit) dmg = Math.min(dmg, g.boss.r.maxHit); }
+  if (isBossPart(db, target) && g.boss && g.boss.r.partBonus && dmg > 0) dmg += g.boss.r.partBonus;
   if (dmg <= 0) return 0;
   target.dmg += dmg; target.flags.lastHit = { amount: dmg, turn: g.turnNo };
   events.push({ t: 'damage', target: target.id, amount: dmg, wr: info.wr, self: !!opts.self });
-  const owner = findMon(g, target.id); ctx.log(`${dmg} damage to ${owner ? ctx.name(owner.seat) + "'s " : ''}${nameOf(db, target.c)}${info.wr === 'weak' ? ' (weakness)' : info.wr === 'resist' ? ' (resistance)' : ''} (now ${target.dmg})`);
+  const owner = findMon(g, target.id); ctx.log(`${dmg} damage to ${owner && !bossSeat(g, owner.seat) ? ctx.name(owner.seat) + "'s " : ''}${nameOf(db, target.c)}${info.wr === 'weak' ? ' (weakness)' : info.wr === 'resist' ? ' (resistance)' : ''} (now ${target.dmg})`);
   // Machamp-style counter damage
   const ps = scriptOf(target.c).passive;
   if (ps && ps.onDamaged && src && !opts.self && !opts.bench && powersActive(g, db) && (ps.alwaysOn || !conditioned(target))) ps.onDamaged({ ctx, target, source: src, amount: dmg });
   if (ps && ps.onAnyDamage && powersActive(g, db)) ps.onAnyDamage({ ctx, target, source: src, amount: dmg, self: !!opts.self });
+  if (isBoss(g, target) && src && src !== target && !opts.self && !opts.bench && !opts.mirrored && db[target.c].boss.thorns && findMon(g, src.id)) { ctx.log(`${nameOf(db, target.c)} strikes back`); dealDamage(ctx, src, db[target.c].boss.thorns, { noWR: true, mirrored: true }); }
   if (hasFx(target, 'mirrorShell') && src && !opts.self && !opts.bench && !opts.mirrored) { ctx.log('Mirror Shell strikes back'); dealDamage(ctx, src, dmg, { source: target, mirrored: true }); }
   return dmg;
 }
 function applyStatus(ctx, target, code) {
   const { db } = ctx;
   if (isDollLike(db, target) && scriptOf(target.c).asPokemon && scriptOf(target.c).asPokemon.noConditions) return false;
+  if (isBossPart(db, target)) return false;
+  if (isBoss(ctx.g, target)) {
+    const g = ctx.g; const turns = (g.boss.r.conditions || {})[code] || 0;
+    if (!turns) { ctx.log(`${nameOf(db, target.c)} can't be ${STATUS_NAMES[code]}`); return false; }
+    if (target.st.includes(code)) return false; // already has it: the clock isn't restarted
+    target.flags.stEnd = { ...(target.flags.stEnd || {}), [code]: g.turnNo + 2 * turns - (g.turn === g.boss.seat ? 0 : 1) };
+  }
   if (hasFx(target, 'preventAll')) return false;
   { const ps = scriptOf(target.c).passive; if (ps && ps.shieldFrom && ctx.attacker && ctx.attacker !== target && powersActive(ctx.g, db) && !conditioned(target) && ps.shieldFrom(ctx.g, db, ctx.attacker)) { ctx.log(`${nameOf(db, target.c)} is shielded from that`); return false; } }
   { const ps = scriptOf(target.c).passive; if (ps && ps.immuneConditions && powersActive(ctx.g, db) && !conditioned(target)) { ctx.log(`${nameOf(db, target.c)} can't be ${STATUS_NAMES[code]}`); return false; } }
@@ -476,12 +494,12 @@ function runAction(ctx, a) {
       if (a.src) must(p.active && p.active.flags.recallTurn === g.turnNo && p.active.un.some((u) => u.c === a.src), 'Recall is not in effect');
       const chk = canAttack(g, seat, a.index, db, a.src); must(chk.ok, chk.why);
       const m = p.active; const ec = a.src ? db[a.src] : effectiveCard(g, db, m); const atk = ec.atk[a.index]; ctx.attacker = m; ctx.defender = ctx.opp.active; ctx.attackName = atk.n; ctx.attackCard = ec.id;
-      ctx.log(`${ctx.name(seat)}'s ${nameOf(db, m.c)} used ${atk.n}`); ctx.event({ t: 'attack', attacker: m.id, name: atk.n, type: typeOf(g, db, m) });
-      g.attacked = true; g.lastAttack = { seat, attacker: m.id, name: atk.n, turn: g.turnNo };
+      ctx.log(`${isBoss(g, m) ? nameOf(db, m.c) : ctx.name(seat) + "'s " + nameOf(db, m.c)} used ${atk.n}`); ctx.event({ t: 'attack', attacker: m.id, name: atk.n, type: typeOf(g, db, m) });
+      g.attacked = true; g.lastAttack = { seat, attacker: m.id, name: atk.n, turn: g.turnNo }; if (isBoss(g, m)) g.boss.step++;
       let proceed = true;
       if (m.st.includes('CNF')) { if (!ctx.flip('confusion')) { ctx.event({ t: 'confused', attacker: m.id }); ctx.log(`${nameOf(db, m.c)} is Confused and hurt itself`); dealDamage(ctx, m, R(g.rules).confusionSelfDamage, { noWR: true, self: true }); proceed = false; } }
       if (proceed && ctx.defender && db[ctx.defender.c] && db[ctx.defender.c].sub === 'Baby' && !ctx.copying) { if (!ctx.flip('Baby Rule')) { ctx.log(`Baby Rule: tails, the attack on ${nameOf(db, ctx.defender.c)} does nothing`); proceed = false; } }
-      if (proceed && hasFx(m, 'sandAttack')) { if (!ctx.flip('Sand-attack')) { ctx.log('The attack does nothing (Sand-attack)'); proceed = false; } }
+      if (proceed && hasFx(m, 'sandAttack') && !isBoss(g, m)) { if (!ctx.flip('Sand-attack')) { ctx.log('The attack does nothing (Sand-attack)'); proceed = false; } }
       if (proceed) { const bs = scriptOf(m.c).passive; if (bs && bs.beforeAttack && powersActive(g, db) && bs.beforeAttack(ctx, m) === false) proceed = false; }
       if (proceed && ctx.defender) { const ps = scriptOf(ctx.defender.c).passive; if (ps && ps.onTargeted && powersActive(g, db) && !conditioned(ctx.defender)) ps.onTargeted(ctx, ctx.defender); }
       if (proceed && ctx.defender && ctx.defender.tools.some((t) => scriptOf(t.c).ninjaTrick) && ctx.opp.bench.length) { const k = ctx.chooseMon("Koga's Ninja Trick: switch before the attack? (or none)", ctx.opp.bench, { seat: other(seat), id: 'ninja', min: 0 }); if (k.length) { const tool = ctx.defender.tools.find((t) => scriptOf(t.c).ninjaTrick); ctx.switchActive(other(seat), k[0], "Koga's Ninja Trick"); pullCard(g, tool.id); ctx.opp.discard.push(tool); ctx.defender = ctx.opp.active; } }
@@ -491,7 +509,11 @@ function runAction(ctx, a) {
       if (proceed && ctx.defender && playerFx(g, seat, 'koga') && nameHas(db, m, "Koga's") && ctx.defender.flags.lastHit && ctx.defender.flags.lastHit.turn === g.turnNo && findMon(g, ctx.defender.id)) applyStatus(ctx, ctx.defender, 'PSN');
       checkKOs(ctx); finishTurnIfClear(ctx); return;
     }
-    case 'endTurn': { ctx.log(`${ctx.name(seat)} ended the turn`); finishTurnIfClear(ctx, true); return; }
+    case 'endTurn': {
+      if (bossSeat(g, seat) && !g.attacked && nextBossAttack(g, db).idx < 0) { g.boss.step++; ctx.log(`${ctx.name(seat)} gathers its strength`); ctx.event({ t: 'bossrest' }); }
+      else ctx.log(`${ctx.name(seat)} ended the turn`);
+      finishTurnIfClear(ctx, true); return;
+    }
     default: ctx.fail(`Unknown action ${a.type}`);
   }
 }
@@ -555,7 +577,7 @@ function runSetup(ctx, a) {
 }
 function startMain(ctx) {
   const { g, db } = ctx; g.phase = 'main'; g.status = 'playing'; g.turnNo = 1; g.turn = g.first;
-  for (const s of ['a', 'b']) { const p = P(g, s); ctx.log(`${ctx.name(s)} reveals: ${mons(p).map((m) => nameOf(db, m.c)).join(', ')}`); }
+  for (const s of ['a', 'b']) { const p = P(g, s); if (!bossSeat(g, s)) ctx.log(`${ctx.name(s)} reveals: ${mons(p).map((m) => nameOf(db, m.c)).join(', ')}`); }
   for (const s of ['a', 'b']) { const p = P(g, s); if (p.mulliganCredits > 0) { g.pending.push({ t: 'mulliganDraw', seat: s, n: p.mulliganCredits }); p.mulliganCredits = 0; } }
   beginTurn(ctx, g.first);
 }
@@ -563,7 +585,7 @@ function beginTurn(ctx, seat) {
   const { g, db } = ctx; const r = R(g.rules); const p = P(g, seat);
   g.turn = seat; g.attacked = false; p.attachedThisTurn = false; p.retreatedThisTurn = false;
   ctx.log(`Turn ${g.turnNo}: ${ctx.name(seat)}`); ctx.event({ t: 'turn', seat, turnNo: g.turnNo });
-  if (r.autoDraw) {
+  if (r.autoDraw && !bossSeat(g, seat)) {
     if (p.deck.length) ctx.draw(seat, 1);
     else if (r.deckOutDamage) { if (p.active) { p.active.dmg += 10; ctx.log(`${ctx.name(seat)} has no cards to draw: 10 damage on ${nameOf(db, p.active.c)} (now ${p.active.dmg})`); ctx.event({ t: 'damage', target: p.active.id, amount: 10 }); checkKOs(ctx); } }
     else { g.winner = other(seat); g.status = 'done'; ctx.log(`${ctx.name(seat)} cannot draw a card. ${ctx.name(other(seat))} wins.`); }
@@ -606,6 +628,8 @@ function endTurn(ctx) {
     if (!m.st.includes('SLP')) continue;
     if (ctx.flip('sleep', { seat: s, mon: m.id, name: nameOf(db, m.c) })) { m.st = m.st.filter((x) => x !== 'SLP'); ctx.log(`${ctx.name(s)}'s benched ${nameOf(db, m.c)} woke up`); } else ctx.log(`${ctx.name(s)}'s benched ${nameOf(db, m.c)} is still Asleep`);
   }
+  // a Colossal Pokémon shakes its conditions off once their turns are up
+  if (g.boss) { const bm = P(g, g.boss.seat).active; if (bm && bm.flags.stEnd) for (const [code, end] of Object.entries(bm.flags.stEnd)) { if (end > T) continue; delete bm.flags.stEnd[code]; if (!bm.st.includes(code)) continue; bm.st = bm.st.filter((x) => x !== code); if (code === 'PSN') delete bm.flags.toxic; ctx.log(`${nameOf(db, bm.c)} shakes off being ${STATUS_NAMES[code]}`); } }
   // expire effects
   if (g.fx) g.fx = g.fx.filter((f) => !(f.until != null && f.until <= T));
   for (const s of ['a', 'b']) { const p = P(g, s); if (p.fx) p.fx = p.fx.filter((f) => !(f.until != null && f.until <= T)); }
@@ -620,8 +644,20 @@ function endTurn(ctx) {
 }
 
 /* ---------- knockouts, prizes, win ---------- */
+/** Colossal Pokémon upkeep: weak-point damage carries through, no move takes more than the cap, and the player
+ *  takes a Prize for each sixth of its HP knocked off (the last sixth is the Knock Out itself). */
+function bossSync(ctx) {
+  const { g, db } = ctx; const b = g.boss; const p = P(g, b.seat); const m = p.active; if (!m || m.id !== b.id) return;
+  for (const part of p.bench) { if (part.dmg > 0) { m.dmg += part.dmg; ctx.log(`Weak point hit: ${part.dmg} damage to ${nameOf(db, m.c)} (now ${m.dmg})`); ctx.event({ t: 'damage', target: m.id, amount: part.dmg }); part.dmg = 0; } part.st = []; part.fx = []; }
+  const cap = b.r.maxHit || 0; if (cap && m.dmg - b.seen > cap) { m.dmg = b.seen + cap; ctx.log(`${nameOf(db, m.c)} can't lose more than ${cap} HP to one move (now ${m.dmg})`); }
+  b.seen = m.dmg;
+  const hp = monHP(db, m, g); const n = R(g.rules).prizes; const you = other(b.seat);
+  const due = Math.min(n - 1, Math.floor(m.dmg * n / hp)); const give = Math.min(due - b.given, P(g, you).prizes.length);
+  if (m.dmg < hp && give > 0) { g.pending.push({ t: 'prize', seat: you, n: give }); b.given = due; ctx.log(`${nameOf(db, m.c)} is down to ${hp - m.dmg} HP: ${ctx.name(you)} takes ${give === 1 ? 'a Prize' : give + ' Prizes'}`); }
+}
 function checkKOs(ctx) {
   const { g, db } = ctx;
+  if (g.boss) bossSync(ctx);
   for (const s of ['a', 'b']) {
     const p = P(g, s);
     for (const m of mons(p)) {
@@ -634,13 +670,15 @@ function checkKOs(ctx) {
         removeMon(g, m.id); const rebirth = (scriptOf(m.c).passive || {}).rebirth && !conditioned(m) && powersActive(g, db);
         for (const c of monCards(m)) { if (rebirth && c.id === m.id) p.hand.push(c); else p.discard.push(c); }
         if (rebirth) ctx.log(`Rebirth: ${nameOf(db, m.c)} returns to hand`);
-        ctx.log(`${ctx.name(s)}'s ${nameOf(db, m.c)} was Knocked Out`); ctx.event({ t: 'ko', id: m.id, seat: s });
-        if (!doll) g.pending.push({ t: 'prize', seat: other(s), n: 1 });
+        ctx.log(`${isBoss(g, m) ? '' : ctx.name(s) + "'s "}${nameOf(db, m.c)} was Knocked Out`); ctx.event({ t: 'ko', id: m.id, seat: s });
+        if (isBoss(g, m)) p.bench = []; // its weak points go with it
+        else if (!doll && bossSeat(g, other(s))) { g.boss.kos++; ctx.log(`${ctx.name(other(s))} has Knocked Out ${g.boss.kos} of the ${g.boss.r.kos} Pokémon it needs`); ctx.event({ t: 'bossko', n: g.boss.kos, of: g.boss.r.kos }); }
+        else if (!doll) g.pending.push({ t: 'prize', seat: other(s), n: 1 });
         // Destiny Bond
-        if (hasFx(m, 'destinyBond') && g.lastAttack && g.lastAttack.seat === other(s)) { const att = findMon(g, g.lastAttack.attacker); if (att && att.m.dmg < monHP(db, att.m)) { att.m.dmg = monHP(db, att.m); ctx.log(`Destiny Bond: ${nameOf(db, att.m.c)} is Knocked Out too`); } }
+        if (hasFx(m, 'destinyBond') && g.lastAttack && g.lastAttack.seat === other(s)) { const att = findMon(g, g.lastAttack.attacker); if (att && isBoss(g, att.m)) { att.m.dmg += g.boss.r.percentHit || 0; ctx.log(`Destiny Bond: ${g.boss.r.percentHit || 0} damage to ${nameOf(db, att.m.c)} (now ${att.m.dmg})`); } else if (att && att.m.dmg < monHP(db, att.m)) { att.m.dmg = monHP(db, att.m); ctx.log(`Destiny Bond: ${nameOf(db, att.m.c)} is Knocked Out too`); } }
       }
     }
-    if (!p.active && !g.pending.some((t) => t.t === 'promote' && t.seat === s)) g.pending.push({ t: 'promote', seat: s });
+    if (!p.active && !bossSeat(g, s) && !g.pending.some((t) => t.t === 'promote' && t.seat === s)) g.pending.push({ t: 'promote', seat: s });
   }
   // keep prizes before promotions
   g.pending.sort((x, y) => (x.t === 'prize' ? 0 : 1) - (y.t === 'prize' ? 0 : 1));
@@ -652,6 +690,11 @@ function checkKOs(ctx) {
 }
 function checkWin(ctx) {
   const { g } = ctx; if (g.winner) return;
+  if (g.boss && g.phase === 'main') {
+    const bs = g.boss.seat; const you = other(bs); const bp = P(g, bs); const end = (w, m) => { g.winner = w; g.status = 'done'; ctx.log(m); ctx.event({ t: 'win', seat: w }); g.pending = []; };
+    if (!bp.active || bp.active.id !== g.boss.id) return end(you, `${ctx.name(bs)} has fallen. ${ctx.name(you)} wins!`);
+    if (g.boss.kos >= g.boss.r.kos) return end(bs, `${ctx.name(bs)} has Knocked Out ${g.boss.kos} of ${ctx.name(you)}'s Pokémon and wins.`);
+  }
   for (const s of ['a', 'b']) {
     const p = P(g, s);
     if (p.prizes.length === 0 && p.prizesTaken >= R(g.rules).prizes && !g.pending.some((t) => t.t === 'prize' && t.seat === s)) { g.winner = s; g.status = 'done'; ctx.log(`${ctx.name(s)} took the last prize and wins!`); ctx.event({ t: 'win', seat: s }); g.pending = []; return; }
@@ -672,7 +715,7 @@ function benchRescue(ctx, s) {
   p.active = toMon(basic, g.turnNo); g.pending = g.pending.filter((t) => !(t.t === 'promote' && t.seat === s));
   ctx.log(`${ctx.name(s)} had no Pokémon left: drew ${drawn.length} card${drawn.length === 1 ? '' : 's'} and put ${nameOf(db, basic.c)} in as Active`);
   ctx.event({ t: 'play', id: p.active.id, seat: s });
-  const n = ctx.draw(other(s), drawn.length); ctx.log(`${ctx.name(other(s))} draws ${n} card${n === 1 ? '' : 's'} as well`);
+  const n = ctx.draw(other(s), drawn.length); if (!bossSeat(g, other(s))) ctx.log(`${ctx.name(other(s))} draws ${n} card${n === 1 ? '' : 's'} as well`);
   return true;
 }
 

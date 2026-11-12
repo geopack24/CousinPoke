@@ -9,6 +9,7 @@ import { playAttack, playKO, playHeal, playSelfHit, playCoins, playWin, playTurn
 import { playBattleIntro, playPokemonMusic, playEventMusic, warmMusic } from './music.js';
 import * as sfx from './sfx.js';
 import { BOT_UID, BOT_DECKS, botDeckCards, botAction, botAnswer, key as botKey } from './bot.js';
+import { nextBossAttack } from './engine/boss.js';
 
 let PT = null;           // bridge from index.html
 let promptOpen = null;   // id of the prompt modal currently shown
@@ -431,6 +432,7 @@ export function render(main, doc) {
   const pileHTML = (seat, z, label, count, faceUp) => `<div class="z"><span class="zlbl">${label}</span><div class="pile" data-pile="${z}" data-seat="${seat}">${count ? (faceUp ? PT.cardHTML(faceUp, SC.pile) : PT.backHTML(SC.pile)) : `<div class="slot">empty</div>`}${count ? `<span class="n">${count}</span>` : ''}</div></div>`;
   const sideHTML = (seat, isTop) => {
     const p = g.p[seat]; const own = seat === me;
+    if (g.boss && seat === g.boss.seat) return bossSideHTML(g, seat, compact, SC);
     const prizeClick = pending && pending.t === 'prize' && pending.seat === seat && own;
     const promoteClick = pending && pending.t === 'promote' && pending.seat === seat && own;
     const scB = compact && !own ? SC.opp * 0.85 : SC.bench; const scA = compact && !own ? SC.opp : SC.active;
@@ -558,6 +560,36 @@ const BOOSTS = {
   plusPower: { cls: 'pp', icon: '⚔', sign: '+', amt: 10, label: 'PlusPower', what: 'its attack does more damage this turn' },
   defender: { cls: 'df', icon: '🛡', sign: '−', amt: 20, label: 'Defender', what: 'attacks do less damage to it until the end of the opponent’s next turn' },
 };
+/* A Colossal Pokémon's side of the table: the giant itself, its HP bar (marked where each Prize is earned), what it
+   will do next, the Knock Outs it has, and its weak points. It has no deck, hand or Prizes to show. */
+function bossSideHTML(g, seat, compact, SC) {
+  const b = g.boss; const p = g.p[seat]; const m = p.active && p.active.id === b.id ? p.active : null; const c = C(b.cid); const def = c.boss || {};
+  const hp = c.hp || 1; const left = m ? Math.max(0, hp - m.dmg) : 0; const frac = left / hp;
+  const turnNow = g.phase === 'main' && !g.winner && !g.pending.length && g.turn === seat;
+  const live = g.phase === 'main' && !g.winner && ((g.pending[0] && g.pending[0].seat === seat) || (!g.pending.length && g.turn === seat));
+  const nx = nextBossAttack(g, PT.CARDS); const rage = def.enrage && m && m.dmg * 2 >= hp ? def.enrage : 0;
+  const nextHTML = !m ? '' : nx.atk
+    ? `<b>${esc(nx.atk.name)}</b>${nx.atk.dmg ? `<span class="bn-d">${nx.atk.flips ? nx.atk.dmg + rage + '×' : nx.atk.dmg + rage}</span>` : ''}<span class="bn-t">${esc(nx.card.t || '')}</span>`
+    : `<b>Gathering strength</b><span class="bn-t">No attack ${turnNow ? 'this' : 'on its next'} turn.</span>`;
+  const pips = Array.from({ length: b.r.kos }, (_, i) => `<i class="${i < b.kos ? 'on' : ''}"></i>`).join('');
+  const ticks = [1, 2, 3, 4, 5].map((i) => `<s class="${i <= b.given ? 'got' : ''}" style="left:${(100 - i / 6 * 100).toFixed(2)}%"></s>`).join('');
+  const traits = [def.armor ? [`🛡 Armor ${def.armor}`, `Takes ${def.armor} less damage from each attack. Hits on a weak point ignore it.`] : null,
+    def.thorns ? [`✊ Strikes back ${def.thorns}`, `Any Pokémon that damages it with an attack takes ${def.thorns}.`] : null,
+    def.enrage ? [`${rage ? '🔥 Enraged' : '🔥 Enrages at half HP'} +${def.enrage}`, `At half HP or less its attacks do ${def.enrage} more damage.`] : null]
+    .filter(Boolean).map(([t, d]) => `<span class="btrait${/Enraged/.test(t) ? ' hot' : ''}" title="${esc(d)}">${esc(t)}</span>`).join('');
+  const scBoss = compact ? .36 : .6; const scPart = compact ? .13 : .17;
+  const fig = m ? monHTML(m, seat, true, false, scBoss) : `<div class="bossdown">${PT.cardHTML(b.cid, scBoss)}<span>Defeated</span></div>`;
+  const parts = p.bench.length ? `<div class="bossparts"><span class="k" title="Damage done to a weak point is done to ${esc(c.name)}. Attacks that hit the Bench hit these.">Weak points</span><div class="bp-row">${p.bench.map((x) => monHTML(x, seat, false, false, scPart)).join('')}</div></div>` : '';
+  return `<div class="side boss ${live ? 'live' : (g.phase === 'main' && !g.winner ? 'idle' : '')}${rage ? ' raging' : ''}">
+    <div class="pname"><span>${esc(g.seats[seat].name)}</span>${turnNow ? '<span class="chip">Its turn</span>' : ''}${g.winner === seat ? '<span class="chip">Winner</span>' : ''}</div>
+    <div class="bossrow"><div class="bossfig" data-active-slot="${seat}">${fig}</div>
+      <div class="bossinfo">
+        <div class="bosshp"><div class="bossbar ${frac <= .25 ? 'crit' : frac <= .5 ? 'hurt' : ''}" title="Each mark is a Prize for you."><i style="width:${(frac * 100).toFixed(1)}%"></i>${ticks}</div><div class="bosshpn"><b>${left}</b> / ${hp} HP</div></div>
+        ${m ? `<div class="bossnext${nx.atk ? '' : ' rest'}"><span class="k">${turnNow ? 'This turn' : 'Next turn'}</span>${nextHTML}</div>` : ''}
+        <div class="bosskos" title="It wins when it has Knocked Out ${b.r.kos} of your Pokémon."><span class="k">Knock Outs</span><span class="pips">${pips}</span><b>${b.kos} / ${b.r.kos}</b></div>
+        ${traits ? `<div class="bosstraits">${traits}</div>` : ''}${parts}
+      </div></div></div>`;
+}
 function monHTML(m, seat, active, promoteClick, scale) {
   const c = C(m.c); const hp = c.hp; const sc = scale || (active ? .42 : .34); const compact = isCompact(); const step = Math.round(330 * sc * (compact ? 0.12 : 0.13));
   // PlusPower and Defender sit beside the Pokémon (a rail next to the Active, badges on the bench) instead of in the attached stack

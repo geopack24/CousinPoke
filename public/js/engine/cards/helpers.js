@@ -43,7 +43,7 @@ export const callFor = (label, filter) => ({
 });
 export const rage = (base) => ({ effect: (ctx, m) => ctx.damage(base + 10 * countersOn(m)) });
 export const metronome = { effect: (ctx, m) => {
-  const d = ctx.opp.active; if (!d) return; const atks = ctx.cardFor(d).atk || []; if (!atks.length) { ctx.log('Nothing to copy'); return; }
+  const d = ctx.opp.active; if (!d) return; const atks = ctx.db[d.c].boss ? [] : ctx.cardFor(d).atk || []; if (!atks.length) { ctx.log('Nothing to copy'); return; }
   const k = ctx.choose({ id: 'metronome', title: 'Copy which attack?', options: atks.map((a) => ({ key: a.n, label: `${a.n} ${a.d || ''}` })) })[0];
   const atk = atks.find((a) => a.n === k); ctx.log(`Metronome copies ${atk.n}`);
   const was = ctx.copying; ctx.copying = true; try { ctx.runAttack(m, atk, ctx.cardFor(d).id); } finally { ctx.copying = was; }

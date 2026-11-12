@@ -828,3 +828,45 @@ table.lgt tr.lead td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
   #modal .mf button{flex:1 1 0;min-height:44px}
   #modal .mf .pri{flex:1 1 100%;order:-1;min-height:48px;font-size:16px} /* the main button gets its own full-width row */
 }
+
+/* ---------- Colossal Pokémon (the Arena's bosses) ---------- */
+.board .side.boss{padding:8px 10px;background:radial-gradient(120% 140% at 20% 0%,rgba(120,20,30,.34),rgba(0,0,0,.18) 60%);border:1px solid rgba(255,255,255,.08)}
+.board .side.boss.raging{background:radial-gradient(120% 140% at 20% 0%,rgba(200,50,20,.5),rgba(0,0,0,.2) 60%)}
+.side.boss .pname span:first-child{font-size:17px;letter-spacing:.04em;text-transform:uppercase}
+.bossrow{display:flex;gap:16px;align-items:flex-start}
+.bossfig{flex:none;filter:drop-shadow(0 10px 22px rgba(0,0,0,.55))}
+.bossfig .mon.active{margin:0}
+.bossdown{position:relative;opacity:.45;filter:grayscale(1)}.bossdown span{position:absolute;inset:auto 0 42% 0;text-align:center;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#fff;text-shadow:0 2px 6px #000}
+.bossinfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:9px;color:var(--felt-fg,#fff)}
+.bossinfo .k{font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;opacity:.72;margin-right:8px;white-space:nowrap}
+.bossbar{position:relative;height:20px;border-radius:10px;background:rgba(0,0,0,.5);box-shadow:inset 0 0 0 2px rgba(255,255,255,.16);overflow:hidden}
+.bossbar i{position:absolute;inset:0 auto 0 0;border-radius:10px;background:linear-gradient(180deg,#7be29a,#2fae5f);transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.bossbar.hurt i{background:linear-gradient(180deg,#ffe066,#e0a800)}.bossbar.crit i{background:linear-gradient(180deg,#ff8a7a,#d63a2c)}
+.bossbar s{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:rgba(255,255,255,.75);text-decoration:none}.bossbar s.got{background:rgba(0,0,0,.35)}
+.bosshpn{margin-top:3px;font-size:13px;font-variant-numeric:tabular-nums}.bosshpn b{font-size:20px}
+.bossnext{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:7px 10px;border-radius:10px;background:rgba(0,0,0,.34);border-left:4px solid #ff6b57}
+.bossnext.rest{border-left-color:#7fb6ff}
+.bossnext b{font-size:15px}.bossnext .bn-d{font-weight:900;font-size:16px;color:#ffb3a8}.bossnext .bn-t{flex-basis:100%;font-size:12px;opacity:.86;line-height:1.3}
+.bossnext .bn-t:empty{display:none}
+.bosskos{display:flex;align-items:center;gap:6px;font-size:13px}
+.bosskos .pips{display:inline-flex;gap:4px}.bosskos .pips i{width:13px;height:13px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(255,255,255,.5)}.bosskos .pips i.on{background:#ff5a4e;box-shadow:0 0 8px rgba(255,90,78,.8)}
+.bosstraits{display:flex;flex-wrap:wrap;gap:6px}.btrait{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,.34);border:1px solid rgba(255,255,255,.16);cursor:help}.btrait.hot{background:rgba(214,58,44,.6);border-color:#ff8a7a}
+.bossparts{display:flex;align-items:center;gap:4px}.bp-row{display:flex;gap:8px}.bp-row .mon{opacity:.9}.bp-row .mon .cd{box-shadow:0 0 0 2px rgba(255,203,5,.55)}
+@media (max-width:700px){
+  .board .side.boss{padding:5px 6px}.bossrow{gap:9px}.bossinfo{gap:5px}
+  .side.boss .pname span:first-child{font-size:14px}
+  .bossbar{height:15px}.bosshpn{font-size:11.5px;margin-top:1px}.bosshpn b{font-size:16px}
+  .bossnext{padding:4px 7px}.bossnext b{font-size:13px}.bossnext .bn-d{font-size:14px}.bossnext .bn-t{font-size:11px}
+  .bosskos{font-size:12px}.bosskos .pips i{width:10px;height:10px}.btrait{font-size:10.5px;padding:2px 7px}
+  .bossinfo .k{font-size:9.5px;margin-right:5px}
+}
+/* the ladder of bosses on the Arena page */
+.ar-ladder{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin:10px 0 14px}
+.ar-boss{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:10px;background:var(--well);border:1px solid var(--well-line);text-align:center;min-width:0}
+.ar-boss:hover,.ar-boss:focus-visible{border-color:var(--accent)}
+.ar-boss .ab-card{position:relative;display:block;line-height:0}.ar-boss .cd{--s:.24}
+.ar-boss b{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.ar-boss small{font-size:11px;opacity:.7}
+.ar-boss.beaten .cd{filter:grayscale(1) brightness(.6)}.ar-boss.beaten b,.ar-boss.beaten small{opacity:.5}
+.ar-boss .ab-tick{position:absolute;inset:0;display:grid;place-items:center;font-size:26px;font-weight:900;color:#5fe08a;text-shadow:0 2px 6px #000;line-height:1}
+.ar-boss.now{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent),0 0 16px rgba(255,203,5,.35)}
+@media (max-width:700px){.ar-ladder{grid-template-columns:repeat(4,minmax(0,1fr))}}

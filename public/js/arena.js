@@ -1,9 +1,10 @@
-// The Arena: single-player runs. Draft a deck 1-of-3, then play the computer until 7 wins or 3 losses.
+// The Arena: single-player runs. Draft a deck 1-of-3, then fight the Colossal Pokémon (one per win) until 7 wins or 3 losses.
 // One document per player (arena/<pid>) holds the current run and the player's record; the page syncs everyone's
-// documents for the leaderboard. Arena games are ordinary auto-rules tables with the computer in seat B.
-import { ARENA, ARENA_REWARDS, ENERGY_PICK, addEnergyPick, energyTaken, arenaPool, makeOffer, poolEntry, addPick, draftedCount, basicsIn, energySplit, finalDeck, botDraft, OPPONENTS, oppSkill, tierOf, goldPool, pickGold } from './arena-draft.js';
+// documents for the leaderboard. Arena games are auto-rules tables with a Colossal Pokémon (engine/boss.js) in seat B.
+import { ARENA, ARENA_REWARDS, ENERGY_PICK, addEnergyPick, energyTaken, arenaPool, makeOffer, poolEntry, addPick, draftedCount, basicsIn, energySplit, finalDeck, tierOf, goldPool, pickGold } from './arena-draft.js';
 import { TIER_NAMES } from './arena-tiers.js';
 import { BOT_UID } from './bot.js';
+import { BOSSES, BOSS_RULES, bossId, newBossGame } from './engine/boss.js';
 import { play as sfx } from './sfx.js';
 
 let PT = null;
@@ -83,22 +84,28 @@ function topCards(cards, n) {
   return Object.keys(cards || {}).filter((cid) => C(cid).st === 'Pokémon').sort((a, b) => rank(b) - rank(a)).slice(0, n);
 }
 
-/** Start (or resume) the next game of the run: a table with the computer, already dealt. */
+/** The Colossal Pokémon a run faces next: one for each win so far. */
+const bossAt = (wins) => BOSSES[Math.min(wins, BOSSES.length - 1)];
+const bossName = (wins) => 'Colossal ' + bossAt(wins).name;
+/** The ladder of bosses, with the ones already beaten ticked off. Tap one to read its attacks. */
+function ladderHTML(wins, playing) {
+  return `<div class="ar-ladder">${BOSSES.map((b, i) => `<button type="button" class="ar-boss ${i < wins ? 'beaten' : i === wins && playing ? 'now' : ''}" data-view="${bossId(b.n)}" title="Colossal ${esc(b.name)}: ${b.hp} HP">
+      <span class="ab-card">${PT.cardHTML(bossId(b.n), 0.24)}${i < wins ? '<span class="ab-tick">✓</span>' : ''}</span><b>${esc(b.name)}</b><small>${b.hp} HP</small></button>`).join('')}</div>`;
+}
+/** Start (or resume) the next game of the run: a table against the next Colossal Pokémon, already dealt. */
 async function battle() {
   const r = run(); if (!r || r.status !== 'play') return;
   if (r.gameId) { PT.openGame(r.gameId); return; }
   if (V.busy) return;
-  const n = r.games.length + 1; const title = OPPONENTS[Math.min(r.wins, OPPONENTS.length - 1)];
-  const oppSeed = ((r.seed ^ Math.imul(n, 40503)) >>> 0) || 1;
-  const oppCards = botDraft(PT.CARDS, oppSeed, oppSkill(r.wins), rules());
+  const n = r.games.length + 1; const boss = bossAt(r.wins); const title = bossName(r.wins);
   const myCards = finalDeck(PT.CARDS, r.cards, r.energy);
   const id = 'ar' + rid() + rid();
   try { await PT.api('PUT', 'players/' + BOT_UID, { data: { name: 'Computer', updatedAt: Date.now() } }); } catch (e) { /* the name is cosmetic */ }
-  const doc = { name: `Arena · Game ${n} vs ${title}`, mode: 'auto', host: me(), createdAt: Date.now(), updatedAt: Date.now(), status: 'lobby', rules: rules(),
-    seats: { a: { uid: me(), deckId: null, deckName: 'Arena deck' }, b: { uid: BOT_UID, deckId: null, deckName: `${title}'s deck` } },
-    arena: { pid: me(), run: r.id, n, title, oppSeed }, state: null, log: [], v: 0 };
-  doc.state = window.AUTO.startGame(doc, { a: { cards: myCards }, b: { cards: oppCards } });
-  doc.state.seats.b.name = title; doc.status = 'playing'; doc.startedAt = Date.now();
+  const doc = { name: `Arena · ${title}`, mode: 'auto', host: me(), createdAt: Date.now(), updatedAt: Date.now(), status: 'lobby', rules: rules(),
+    seats: { a: { uid: me(), deckId: null, deckName: 'Arena deck' }, b: { uid: BOT_UID, deckId: null, deckName: title } },
+    arena: { pid: me(), run: r.id, n, title, boss: boss.n }, state: null, log: [], v: 0 };
+  doc.state = newBossGame({ rules: doc.rules, player: { uid: me(), name: PT.nameOf(me()), cards: myCards }, n: boss.n, seed: (Math.random() * 0xFFFFFFFF) >>> 0 || 1, uid: BOT_UID });
+  doc.status = 'playing'; doc.startedAt = Date.now();
   try { await PT.api('PUT', 'games/' + id, { data: doc }); } catch (e) { PT.toast('Could not create the game (' + (e.code || 'error') + ')'); return; }
   const prev = (r.games[r.games.length - 1] || {}).id;
   const ok = await mutate((d) => { if (!d.run || d.run.id !== r.id || d.run.gameId) return false; d.run.gameId = id; });
@@ -119,7 +126,7 @@ async function record(gid, won) {
   let after = null;
   const ok = await mutate((d) => {
     const r = d.run; if (!r || r.status !== 'play' || r.gameId !== gid || r.games.some((x) => x.id === gid)) return false;
-    r.games.push({ id: gid, title: OPPONENTS[Math.min(r.wins, OPPONENTS.length - 1)], won, at: Date.now() });
+    r.games.push({ id: gid, title: bossName(r.wins), won, at: Date.now() });
     if (won) r.wins++; else r.losses++; r.gameId = null;
     if (r.wins >= ARENA.wins || r.losses >= ARENA.losses) finishRun(d);
     after = clone(r);
@@ -129,7 +136,7 @@ async function record(gid, won) {
 }
 function resultModal(r, won) {
   if (r.status === 'done') { PT.closeModal(); chestReveal(r); return; }
-  const body = `<p>Arena record: <b>${r.wins}–${r.losses}</b>. ${won ? `Next up: <b>${esc(OPPONENTS[Math.min(r.wins, OPPONENTS.length - 1)])}</b>.` : `${ARENA.losses - r.losses} ${ARENA.losses - r.losses === 1 ? 'life' : 'lives'} left.`}</p>`;
+  const body = `<p>Arena record: <b>${r.wins}–${r.losses}</b>. ${won ? `Next up: <b>${esc(bossName(r.wins))}</b>.` : `${ARENA.losses - r.losses} ${ARENA.losses - r.losses === 1 ? 'life' : 'lives'} left.`}</p>`;
   PT.showModal(won ? 'Victory!' : 'Defeat', body, `<button class="pri" id="tarena" type="button">Back to the Arena</button>`, (m) => { m.querySelector('#tarena').onclick = () => { PT.closeModal(); PT.go('arena'); }; });
 }
 /* ---------- the prize chest ----------
@@ -242,7 +249,7 @@ function header(r) {
   const d = mine(); const wallet = `<div class="ar-wallet" title="Arena winnings. A shop to spend them is coming."><span aria-hidden="true">${COIN.icon}</span><b>${(d && d.tokens) || 0}</b><em>${COIN.name}</em></div>`;
   const rec = `<div class="ar-headside">${wallet}${r && r.status !== 'done' ? `<div class="ar-record">${recordHTML(r)}</div>` : ''}</div>`;
   return `<header class="arhead${r && r.status === 'draft' ? ' slim' : ''}"><div class="ar-copy"><span class="kicker">Single player</span><h1>The Arena</h1><div class="ornate" aria-hidden="true"></div>
-    <p class="small muted">Draft a deck one pick at a time, then take on the computer. Seven wins is a perfect run; three losses and you're out.</p></div>${rec}</header>`;
+    <p class="small muted">Draft a deck one pick at a time, then take down seven Colossal Pokémon. Seven wins is a perfect run; three losses and you're out.</p></div>${rec}</header>`;
 }
 function recordHTML(r) {
   const w = Array.from({ length: ARENA.wins }, (_, i) => `<i class="ar-w${i < r.wins ? ' on' : ''}" title="Win ${i + 1}"></i>`).join('');
@@ -394,11 +401,12 @@ if (typeof window !== 'undefined') {
   window.addEventListener('contextmenu', (e) => { if (e.target.closest && e.target.closest('.ar-choice, .ar-peek')) e.preventDefault(); });
 }
 function playView(r) {
-  const title = OPPONENTS[Math.min(r.wins, OPPONENTS.length - 1)];
-  const games = r.games.map((x, i) => `<li class="${x.won ? 'w' : 'l'}"><b>${x.won ? 'W' : 'L'}</b> Game ${i + 1} vs ${esc(x.title)}</li>`).join('');
+  const boss = bossAt(r.wins); const title = bossName(r.wins);
+  const games = r.games.map((x) => `<li class="${x.won ? 'w' : 'l'}"><b>${x.won ? 'W' : 'L'}</b> ${esc(x.title)}</li>`).join('');
   return `<div class="ar-play">
-    <section class="panel ar-next"><span class="kicker">Game ${r.games.length + 1} of up to ${ARENA.wins + ARENA.losses - 1}</span><h2>${r.gameId ? 'Your game is waiting' : `Next opponent: ${esc(title)}`}</h2>
-      <p class="muted">${r.gameId ? 'Pick up where you left off.' : `The computer drafts its own deck for each game, and it drafts better as your wins climb.`}</p>
+    <section class="panel ar-next"><span class="kicker">Boss ${Math.min(r.wins + 1, BOSSES.length)} of ${BOSSES.length}</span><h2>${r.gameId ? `${esc(title)} is waiting` : `Next: ${esc(title)}`}</h2>
+      <p class="muted">${r.gameId ? 'Pick up where you left off.' : `${boss.hp} HP. Knock it Out before it Knocks Out ${BOSS_RULES.kos} of your Pokémon. Tap a boss to read its attacks.`}</p>
+      ${ladderHTML(r.wins, true)}
       <div class="ar-actions"><button class="pri cta" type="button" data-battle="1">${r.gameId ? '▶ Resume game' : '⚔ Battle!'}</button>${r.gameId ? '<button class="sec" type="button" data-forfeit="1">Forfeit this game</button>' : ''}</div>
       ${games ? `<ul class="ar-games">${games}</ul>` : ''}
       <div class="ar-foot"><button class="sm ghost" type="button" data-savedeck="1">Copy this deck to Your Decks</button><button class="sm ghost" type="button" data-retire="1">End this run now</button></div></section>
@@ -413,7 +421,8 @@ function startView(d) {
     <section class="panel ar-begin"><h2>${last ? 'Ready for another run?' : 'Enter the Arena'}</h2>
       <ol class="ar-steps"><li><b>Draft.</b> Make ${ARENA.picksTo} picks: 1 of 3 cards each time, or a basic Energy instead. Only the top of each evolution line is offered, and an evolved Pokémon brings its whole line (2 of each card).</li>
         <li><b>Free cards.</b> Every deck starts with ${ARENA.bills} Bills (so Bill is never in the draft), ${ARENA.oaks} Professor Oak and ${ARENA.energy} basic Energy for your Pokémon's types. Want more Energy? Take it with your picks. That makes 60.</li>
-        <li><b>Battle.</b> Play the computer under the league's standard rules. ${ARENA.wins} wins is a perfect run; ${ARENA.losses} losses ends it.</li></ol>
+        <li><b>Battle.</b> Take on ${BOSSES.length} Colossal Pokémon, one after another. Each is a single giant with a huge HP pool: Knock it Out before it Knocks Out ${BOSS_RULES.kos} of yours. ${ARENA.wins} wins is a perfect run; ${ARENA.losses} losses ends it.</li></ol>
+      <span class="kicker">The bosses, in order (tap one to read it)</span>${ladderHTML(0, false)}
       <button class="pri cta" type="button" data-start="1">✦ Start a run</button></section>
     <div class="ar-startside">${lastHTML}<section class="panel ar-prizes"><span class="kicker">Prizes</span><h2>What a run pays</h2>
       <ol class="ar-ptable">${ARENA_REWARDS.map((t, w) => `<li class="${w >= ARENA.wins ? 'top' : ''}"><span>${w} ${w === 1 ? 'win' : 'wins'}</span><b>${COIN.icon} ${t}</b>${w >= ARENA.wins ? '<em>+ a gold card</em>' : ''}</li>`).join('')}</ol>
@@ -475,7 +484,7 @@ async function saveDeck() {
 export function lobbyFeature() {
   const r = run(); const d = mine();
   const status = !r || r.status === 'done'
-    ? `<p class="ar-lobby-line">${d && d.best ? `Your best run: <b>${d.best.wins}–${d.best.losses}</b>` : 'Draft a deck from 3 choices at a time and take on the computer.'}</p><button class="pri" type="button" data-arena="1">⚔ Start a run</button>`
+    ? `<p class="ar-lobby-line">${d && d.best ? `Your best run: <b>${d.best.wins}–${d.best.losses}</b>` : 'Draft a deck from 3 choices at a time and take down seven Colossal Pokémon.'}</p><button class="pri" type="button" data-arena="1">⚔ Start a run</button>`
     : r.status === 'draft'
       ? `<p class="ar-lobby-line">Drafting: <b>${draftedCount(r.cards)}</b> / ${ARENA.picksTo} cards</p><button class="pri" type="button" data-arena="1">Keep drafting</button>`
       : `<div class="ar-mini">${recordHTML(r)}</div><button class="pri" type="button" data-arena="1">${r.gameId ? '▶ Resume game' : '⚔ Next battle'}</button>`;

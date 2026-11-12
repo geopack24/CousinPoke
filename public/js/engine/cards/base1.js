@@ -33,6 +33,7 @@ export const base1 = {
       use: (ctx) => {
         const from = ctx.chooseMon('Move 1 damage counter from…', ownPokemon(ctx).filter((m) => m.dmg > 0), { id: 'swapFrom' })[0];
         const to = ctx.chooseMon('…to which Pokémon?', ownPokemon(ctx).filter((m) => m.id !== from && m.dmg + 10 < monHP(ctx.db, m)), { id: 'swapTo' })[0];
+        if (!from || !to) ctx.fail('No Pokémon can take that damage');
         const a = findMon(ctx.g, from).m, b = findMon(ctx.g, to).m; a.dmg -= 10; b.dmg += 10;
         ctx.log(`Damage Swap: 10 from ${nameOf(ctx.db, a.c)} (now ${a.dmg}) to ${nameOf(ctx.db, b.c)} (now ${b.dmg})`); ctx.event({ t: 'swap', from, to });
       } } },
@@ -74,7 +75,7 @@ export const base1 = {
   'base1-5': { attacks: {
     Sing: flipStatus(0, 'SLP'),
     Metronome: { effect: (ctx, m) => {
-      const d = ctx.opp.active; if (!d) return; const atks = ctx.db[d.c].atk || []; if (!atks.length) { ctx.log('Nothing to copy'); return; }
+      const d = ctx.opp.active; if (!d) return; const atks = ctx.db[d.c].boss ? [] : ctx.db[d.c].atk || []; if (!atks.length) { ctx.log('Nothing to copy'); return; }
       const k = ctx.choose({ id: 'metronome', title: 'Copy which attack?', options: atks.map((a) => ({ key: a.n, label: `${a.n} ${a.d || ''}` })) })[0];
       const atk = atks.find((a) => a.n === k); ctx.log(`Metronome copies ${atk.n}`);
       const was = ctx.copying; ctx.copying = true; try { runAttack(ctx, m, atk, d.c); } finally { ctx.copying = was; }
@@ -148,7 +149,7 @@ export const base1 = {
     'Conversion 1': { effect: (ctx) => { const d = ctx.opp.active; if (!d || !(ctx.db[d.c].wk || []).length) { ctx.log('No Weakness to change'); return; } const t = ctx.choose({ id: 'conv1', title: 'Change its Weakness to…', options: ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting'].map((x) => ({ key: x, label: x })) })[0]; d.flags.wkOverride = t; ctx.log(`${nameOf(ctx.db, d.c)}'s Weakness is now ${t}`); } },
     'Conversion 2': { effect: (ctx, m) => { const t = ctx.choose({ id: 'conv2', title: 'Change Porygon\'s Resistance to…', options: ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting'].map((x) => ({ key: x, label: x })) })[0]; m.flags.rsOverride = t; ctx.log(`Porygon's Resistance is now ${t}`); } },
   } },
-  'base1-40': { attacks: { 'Super Fang': { effect: (ctx) => { const d = ctx.opp.active; if (!d) return; const left = monHP(ctx.db, d) - d.dmg; ctx.damage(Math.ceil(left / 20) * 10, { noWR: true }); } } } },
+  'base1-40': { attacks: { 'Super Fang': { effect: (ctx) => { const d = ctx.opp.active; if (!d) return; if (ctx.g.boss && d.id === ctx.g.boss.id) { ctx.damage(ctx.g.boss.r.percentHit, { noWR: true }); return; } const left = monHP(ctx.db, d) - d.dmg; ctx.damage(Math.ceil(left / 20) * 10, { noWR: true }); } } } },
   'base1-42': { attacks: { Withdraw: preventNext('preventDamage') } },
   'base1-43': { attacks: { Psyshock: flipStatus(10, 'PAR') } },
   'base1-44': { attacks: { 'Leech Seed': { effect: (ctx, m) => { const dealt = ctx.damage(20); if (dealt > 0) ctx.heal(m, 10); } } } },

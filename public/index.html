@@ -592,9 +592,10 @@ async function loadData(){
   const r=await fetch('cards.json');DATA=await r.json();
   SETS=DATA.sets;SETS.forEach(s=>{s.rows=Math.ceil(s.count/s.cols);SETIDX[s.id]=s});
   DATA.cards.forEach(c=>CARDS[c.id]=c);
+  if(window.__bossCards)window.__bossCards(CARDS); // the Arena's Colossal Pokémon
 }
 const C=id=>CARDS[id]||{name:'Unknown card',st:'',sub:'',set:'base1',i:0};
-function cardStyle(cid){const c=C(cid);const s=SETIDX[c.set]||{cols:12,rows:1};return `background-image:url(${c.set}.webp);--x:${c.i%s.cols};--y:${Math.floor(c.i/s.cols)};--rows1:${Math.max(1,s.rows-1)}`}
+function cardStyle(cid){const c0=C(cid);const c=c0.art?{...c0,...c0.art}:c0;const s=SETIDX[c.set]||{cols:12,rows:1};return `background-image:url(${c.set}.webp);--x:${c.i%s.cols};--y:${Math.floor(c.i/s.cols)};--rows1:${Math.max(1,s.rows-1)}`}
 function cardHTML(cid,scale,attrs='',cls=''){return `<div class="cd ${cls}${/Holo/.test(C(cid).rar||'')?' holo':''}" style="--s:${scale};${cardStyle(cid)}" data-cid="${esc(cid)}" ${attrs} role="img" aria-label="${esc(C(cid).name)}"></div>`}
 function backHTML(scale,attrs=''){return `<div class="cd back" style="--s:${scale}" ${attrs}></div>`}
 function energyType(c){if(c.st!=='Energy')return null;if(c.types&&c.types[0])return c.types[0];const t=TYPES.find(t=>c.name.startsWith(t));if(t)return t;if(/Colorless/.test(c.name))return 'Colorless';return 'Colorless'}
@@ -635,7 +636,7 @@ function viewCard(cid){
   const pw=(c.pw||[]).map(p=>`<div class="atk"><b>Pokémon Power: ${esc(p.n)}</b><div class="small">${esc(p.t)}</div></div>`).join('');
   const meta=[];if(c.hp)meta.push(`${c.hp} HP`);if(c.types)meta.push(c.types.join('/'));if(c.sub)meta.push(c.sub);if(c.ev)meta.push('Evolves from '+c.ev);
   const foot=[];if(c.wk)foot.push('Weakness: '+c.wk.join(', '));if(c.rs)foot.push('Resistance: '+c.rs.join(', '));if(c.st==='Pokémon')foot.push('Retreat: '+c.rc);
-  showModal(c.name,`<div class="detail">${cardHTML(cid,1.25)}<div><div class="lbl">${esc(setName(c.set))} · ${esc(c.n)}/${SETIDX[c.set]?SETIDX[c.set].count:''} · ${esc(c.rar||'')}</div><div class="muted small">${esc(meta.join(' · '))}</div>${pw}${atk}${c.txt?`<div class="atk">${esc(c.txt)}</div>`:''}<div class="muted small" style="margin-top:8px">${esc(foot.join(' · '))}</div></div></div>`);
+  showModal(c.name,`<div class="detail">${cardHTML(cid,1.25)}<div><div class="lbl">${c.boss||c.bossPart?'Colossal Pokémon of the Arena':`${esc(setName(c.set))} · ${esc(c.n)}/${SETIDX[c.set]?SETIDX[c.set].count:''} · ${esc(c.rar||'')}`}</div><div class="muted small">${esc(meta.join(' · '))}</div>${pw}${atk}${c.txt?`<div class="atk">${esc(c.txt)}</div>`:''}<div class="muted small" style="margin-top:8px">${esc(foot.join(' · '))}</div></div></div>`);
 }
 /* hover preview (desktop) */
 const hov=$('#hover');let hovT=null,hovSrc=null;
@@ -1340,6 +1341,8 @@ start();
 import { install } from './js/auto.js';
 import { installLeague } from './js/league.js';
 import { installArena } from './js/arena.js';
+import { bossCards } from './js/engine/boss.js';
+window.__bossCards = bossCards; if (Object.keys(window.PT.CARDS).length) bossCards(window.PT.CARDS);
 window.AUTO = install(window.PT);
 window.LEAGUE = installLeague(window.PT);
 window.ARENA = installArena(window.PT);

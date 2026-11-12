@@ -16,7 +16,9 @@ const SETS = ['base1', 'base2', 'base3', 'base5', 'gym1', 'gym2']; // no promos
 const BASIC_TYPES = ['Fire', 'Water', 'Grass', 'Lightning', 'Psychic', 'Fighting'];
 // Not offered in the draft. Rainbow Energy: under the house rules any Energy already pays any cost.
 // Bill: every Arena deck is given 4 of them, so nobody has to spend picks on card draw.
-const NOT_IN_DRAFT = new Set(['Rainbow Energy', 'Bill']);
+const NOT_IN_DRAFT = new Set(['Rainbow Energy', 'Bill',
+  // cards that do nothing against a Colossal Pokémon (it has no Energy, hand, deck or discard pile, and can't be put to sleep or moved)
+  'Energy Removal', 'Super Energy Removal', 'Pokémon Flute', "Rocket's Sneak Attack", "The Rocket's Trap", 'Sleep!', "Erika's Perfume", 'Minion of Team Rocket', 'Tickling Machine', "Sabrina's Psychic Control"]);
 
 /** Card signature: reprints (same name, HP, attacks, powers) count as one card. */
 const sig = (c) => JSON.stringify([c.name, c.hp, c.sub, (c.atk || []).map((a) => [a.n, a.d, (a.c || []).length]), c.pw ? c.pw.n : null]);

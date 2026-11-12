@@ -9,6 +9,8 @@ import { automationReport } from '../public/js/engine/cards/index.js';
 import { arenaPool, botDraft, ARENA, ARENA_REWARDS, goldPool, pickGold, makeOffer, tierOf, addEnergyPick, energyTaken, draftedCount, finalDeck, canOffer, addPick } from '../public/js/arena-draft.js';
 import { TIER_WEIGHTS } from '../public/js/arena-tiers.js';
 import { DEFAULT_RULES } from '../public/js/engine/rules.js';
+import { BOSSES, BOSS_RULES, bossCards, bossScript, newBossGame, nextBossAttack, bossId } from '../public/js/engine/boss.js';
+import { CARD_SCRIPTS } from '../public/js/engine/cards/index.js';
 
 const DATA = JSON.parse(readFileSync(new URL('../public/cards.json', import.meta.url), 'utf8'));
 const DB = Object.fromEntries(DATA.cards.map((c) => [c.id, c]));
@@ -720,4 +722,126 @@ test("Arena: a Trainer that needs \"X's\" Pokémon is only offered once the deck
   assert.equal(canOffer(DB, byName('Misty'), deck, DEFAULT_RULES), false, "a Brock's Pokémon doesn't unlock Misty");
   const dark = pool.find((e) => DB[e.cid].name === 'Dark Charizard');
   assert.equal(canOffer(DB, byName("The Boss's Way"), addPick(DB, {}, dark.key, DEFAULT_RULES), DEFAULT_RULES), true);
+});
+
+/* ---------- Colossal Pokémon (the Arena's bosses) ---------- */
+// two bosses of the tests' own, so the tests don't depend on what the spreadsheet says
+const cardId = (name, set) => DATA.cards.find((c) => c.name === name && c.set === set).id;
+const TB = [
+  { n: 98, name: 'Testzilla', card: N['Raticate'], hp: 300, type: 'Colorless', wk: 'Fighting', rs: '', armor: 0, thorns: 0, enrage: 0, pattern: [1, 0, 2], attacks: [{ name: 'Stomp', dmg: 30 }, { name: 'Roar', dmg: 20, bench: 10, effect: 'PSN' }] },
+  { n: 99, name: 'Testodon', card: N['Onix'], hp: 200, type: 'Fighting', wk: '', rs: '', armor: 10, thorns: 10, enrage: 20, pattern: [1], attacks: [{ name: 'Smash', dmg: 40 }] },
+];
+BOSSES.push(...TB); bossCards(DB); for (const b of TB) CARD_SCRIPTS[bossId(b.n)] = bossScript(b); BOSSES.length -= TB.length;
+/** A boss fight already in the main phase, with the player's side set up like setup(). */
+function bossGame(n, a, over) {
+  BOSSES.push(...TB);
+  const g = newBossGame({ rules: { firstTurnAttack: true, weaknessBonus: 0, resistanceAmount: 30, askEveryChoice: false }, player: { uid: 'ua', name: 'Ann', cards: { [N['Pikachu']]: 60 } }, n, seed: 7, uid: 'boss', rulesOverride: over });
+  BOSSES.length -= TB.length;
+  const p = g.p.a; p.hand = (a.hand || []).map(inst); p.deck = (a.deck || Array(10).fill(N['Bill'])).map(inst); p.prizes = Array(6).fill(N['Bill']).map(inst);
+  const mon = (cid, extra = {}) => ({ id: 'c' + (++ids).toString(36), c: cid, dmg: 0, st: [], tools: [], un: [], fx: [], playedTurn: 0, evolvedTurn: -1, flags: {}, ...extra, en: (extra.en || []).map(inst) });
+  p.active = mon(a.active.c || a.active, a.active.c ? a.active : {}); p.bench = (a.bench || []).map((x) => mon(x.c || x, x.c ? x : {})); p.setupDone = true;
+  g.phase = 'main'; g.status = 'playing'; g.turnNo = 1; g.turn = 'a';
+  return g;
+}
+const bossMon = (g) => g.p.b.active;
+/** The boss takes its turn the way the table drives it: its pattern attack if it has one, otherwise it ends the turn. */
+function bossTurn(g, seed = 1) { const l = legalActions(g, 'b', DB); const a = l.find((x) => x.type === 'attack') || { type: 'endTurn' }; return act(g, { type: a.type, index: a.index }, { seat: 'b', seed }); }
+
+test('a Colossal Pokémon sits alone with its weak points, has no cards, and follows its attack pattern', () => {
+  let g = bossGame(98, { active: N['Chansey'] });
+  assert.equal(DB[bossMon(g).c].name, 'Colossal Testzilla'); assert.equal(g.p.b.bench.length, BOSS_RULES.parts);
+  assert.equal(g.p.b.deck.length + g.p.b.hand.length + g.p.b.prizes.length, 0); assert.equal(g.first, 'a');
+  g = act(g, { type: 'endTurn' });
+  assert.deepEqual(legalActions(g, 'b', DB).map((a) => a.type + (a.name || '')), ['attackStomp', 'endTurn']); // only the next attack of the pattern, no retreat
+  assert.equal(nextBossAttack(g, DB).atk.name, 'Stomp');
+  g = bossTurn(g); assert.equal(active(g, 'a').dmg, 30); assert.equal(g.turn, 'a');
+  g = act(g, { type: 'endTurn' });
+  assert.equal(nextBossAttack(g, DB).atk, null); assert.ok(!has(legalActions(g, 'b', DB), 'attack')); // a rest turn
+  g = bossTurn(g); assert.equal(active(g, 'a').dmg, 30); assert.ok(g.log.some((l) => /gathers its strength/.test(l.m)));
+  assert.equal(bossMon(g).dmg, 0, 'no deck-out damage for having no deck');
+  g = act(g, { type: 'endTurn' }); g = bossTurn(g);
+  assert.equal(active(g, 'a').dmg, 60); assert.ok(active(g, 'a').st.includes('PSN')); // Roar: 20 and Poisoned, then the first 10 of poison
+  assert.equal(nextBossAttack(g, DB).atk.name, 'Stomp', 'the pattern starts again');
+});
+
+test('Colossal Pokémon: damage on a weak point carries through, and attacks that hit the Bench hit the weak points', () => {
+  let g = bossGame(98, { active: { c: cardId('Hitmonlee', 'base3'), en: [N['Fighting Energy'], N['Fighting Energy'], N['Fighting Energy']] } });
+  const part = g.p.b.bench[0].id;
+  const r = actWith(g, { type: 'attack', index: 0 }, [part]); // Stretch Kick: 20 to a Benched Pokémon
+  assert.equal(bossMon(r.state).dmg, 20); assert.equal(r.state.p.b.bench[0].dmg, 0); assert.equal(r.state.p.b.bench.length, BOSS_RULES.parts);
+  g = bossGame(98, { active: { c: N['Magneton'], en: [N['Lightning Energy'], N['Lightning Energy'], N['Lightning Energy'], N['Lightning Energy']] }, bench: [N['Chansey']] });
+  g = act(g, { type: 'attack', index: 1 }); // Selfdestruct: 80, and 20 to each Benched Pokémon
+  assert.equal(bossMon(g).dmg, Math.min(BOSS_RULES.maxHit, 80 + 20 * BOSS_RULES.parts));
+});
+
+test('Colossal Pokémon: the player takes a Prize for each sixth of its HP, wins by Knocking it Out, and loses after enough Knock Outs', () => {
+  let g = bossGame(98, { active: N['Chansey'] }, { maxHit: 150 });
+  g = act(g, { type: 'override', op: 'damage', target: g.boss.id, delta: 110 }); // 110 of 300: two sixths
+  assert.deepEqual(g.pending, [{ t: 'prize', seat: 'a', n: 2 }]);
+  g = act(g, { type: 'takePrize', index: 0 }); g = act(g, { type: 'takePrize', index: 0 });
+  assert.equal(g.p.a.prizes.length, 4); assert.equal(g.winner, null);
+  g = act(g, { type: 'override', op: 'damage', target: g.boss.id, delta: 150 }); g = act(g, { type: 'takePrize', index: 0 }); g = act(g, { type: 'takePrize', index: 0 }); g = act(g, { type: 'takePrize', index: 0 });
+  assert.equal(g.p.a.prizes.length, 1, 'the sixth Prize is never needed'); assert.equal(g.winner, null);
+  g = act(g, { type: 'override', op: 'damage', target: g.boss.id, delta: 40 });
+  assert.equal(g.winner, 'a'); assert.equal(g.pending.length, 0); assert.ok(g.log.some((l) => /Colossal Testzilla has fallen/.test(l.m)));
+  // it wins on Knock Outs, and takes no Prizes for them
+  g = bossGame(98, { active: { c: N['Pikachu'], dmg: 30 }, bench: [{ c: N['Pikachu'], dmg: 30 }, N['Chansey']] }, { kos: 2 });
+  g = act(g, { type: 'endTurn' }); g = bossTurn(g);
+  assert.equal(g.boss.kos, 1); assert.deepEqual(g.pending, [{ t: 'promote', seat: 'a' }]);
+  g = act(g, { type: 'promote', target: g.p.a.bench[0].id }, { seat: 'a' });
+  g = act(g, { type: 'endTurn' }); g = bossTurn(g); // rest
+  g = act(g, { type: 'endTurn' }); g = bossTurn(g); // Roar: 20 to the Active
+  assert.equal(g.boss.kos, 2); assert.equal(g.winner, 'b');
+});
+
+test('Colossal Pokémon: Poison and Confusion wear off after 2 of its turns; it cannot be put to sleep, Paralyzed, or stopped from attacking', () => {
+  let g = bossGame(98, { active: N['Chansey'] }, { conditions: { PSN: 2, BRN: 2, CNF: 2, SLP: 0, PAR: 0 } });
+  for (const code of ['SLP', 'PAR']) { g = act(g, { type: 'override', op: 'status', target: g.boss.id, code }); assert.deepEqual(bossMon(g).st, []); }
+  g = act(g, { type: 'override', op: 'status', target: g.boss.id, code: 'PSN' }); g = act(g, { type: 'override', op: 'status', target: g.boss.id, code: 'CNF' });
+  assert.deepEqual(bossMon(g).st.slice().sort(), ['CNF', 'PSN']);
+  g = act(g, { type: 'override', op: 'flag', target: g.boss.id, k: 'noAttack' }); // Tail Wag and the like
+  g = act(g, { type: 'endTurn' }); assert.ok(has(legalActions(g, 'b', DB), 'attack'));
+  g = bossTurn(g, HEADS); g = act(g, { type: 'endTurn' });
+  assert.ok(bossMon(g).st.includes('PSN'), 'still Poisoned during its second turn');
+  g = bossTurn(g);
+  assert.deepEqual(bossMon(g).st, []); assert.equal(bossMon(g).dmg, 40, 'four poison ticks'); assert.ok(g.log.some((l) => /shakes off being Poisoned/.test(l.m)));
+  g = act(g, { type: 'override', op: 'status', target: g.boss.id, code: 'PSN' }); assert.ok(bossMon(g).st.includes('PSN'), 'it can be Poisoned again afterwards');
+});
+
+test('Colossal Pokémon: Super Fang, Ditto, Metronome, Hurricane and Invisible Wall are kept in check', () => {
+  const C4 = [N['Double Colorless Energy'], N['Double Colorless Energy']];
+  let g = bossGame(98, { active: { c: N['Raticate'], en: C4 } });
+  g = act(g, { type: 'attack', index: 1 }); assert.equal(bossMon(g).dmg, BOSS_RULES.percentHit); // Super Fang: not half its HP
+  g = bossGame(98, { active: { c: cardId('Ditto', 'base3'), en: C4 } });
+  assert.ok(!has(legalActions(g, 'a', DB), 'attack'), 'Ditto does not turn into it');
+  g = bossGame(98, { active: { c: N['Clefairy'], en: C4 } });
+  g = act(g, { type: 'attack', index: 1 }); assert.equal(active(g, 'a').dmg, 0); assert.ok(g.log.some((l) => /Nothing to copy/.test(l.m)));
+  g = bossGame(98, { active: { c: cardId('Pidgeot', 'base2'), en: C4 } });
+  g = act(g, { type: 'attack', index: 1 }); assert.equal(bossMon(g).id, g.boss.id); assert.equal(bossMon(g).dmg, 30); assert.equal(g.winner, null); // Hurricane doesn't send it away
+  g = bossGame(98, { active: cardId('Mr. Mime', 'base2') });
+  g = act(g, { type: 'endTurn' }); g = bossTurn(g); assert.equal(active(g, 'a').dmg, 30, 'Invisible Wall does not stop it');
+  g = bossGame(98, { active: N['Chansey'] }, { maxHit: 150 });
+  g = act(g, { type: 'override', op: 'damage', target: g.boss.id, delta: 290 }); assert.equal(bossMon(g).dmg, 150, 'no more than the cap at once');
+});
+
+test('Colossal Pokémon: armor, striking back and enraging', () => {
+  let g = bossGame(99, { active: { c: N['Hitmonchan'], en: [N['Fighting Energy']] } });
+  g = act(g, { type: 'attack', index: 0 }); // Jab 20
+  assert.equal(bossMon(g).dmg, 10, 'armor takes 10 off'); assert.equal(active(g, 'a').dmg, 10, 'and it strikes back for 10');
+  g = bossTurn(g); assert.equal(active(g, 'a').dmg, 50); // Smash 40
+  g = act(g, { type: 'override', op: 'damage', target: g.boss.id, delta: 90 }); g = act(g, { type: 'takePrize', index: 0 }); g = act(g, { type: 'takePrize', index: 0 }); g = act(g, { type: 'takePrize', index: 0 });
+  g = act(g, { type: 'override', op: 'damage', target: g.p.a.active.id, delta: -50 });
+  g = act(g, { type: 'endTurn' }); g = bossTurn(g); assert.equal(active(g, 'a').dmg, 60, 'at half HP it hits for 20 more');
+});
+
+test('the Arena bosses from the spreadsheet are well formed and never show up as real cards', () => {
+  assert.ok(BOSSES.length >= 1);
+  for (const b of BOSSES) {
+    assert.ok(DB[b.card] && DB[b.card].st === 'Pokémon', b.name); assert.ok(b.hp >= 10 && b.hp % 10 === 0); assert.ok(b.pattern.some(Boolean));
+    for (const k of b.pattern) assert.ok(k === 0 || b.attacks[k - 1], `${b.name}: pattern entry ${k}`);
+    assert.equal(DB[bossId(b.n)].hp, b.hp);
+  }
+  const pool = arenaPool(DB); assert.ok(!pool.some((e) => DB[e.cid].boss || DB[e.cid].bossPart));
+  assert.ok(!goldPool(DB).some((cid) => DB[cid].boss || DB[cid].bossPart));
+  for (const dead of ['Energy Removal', 'Super Energy Removal', 'Sleep!', 'Pokémon Flute']) assert.ok(!pool.some((e) => DB[e.cid].name === dead), dead + ' does nothing against a boss');
 });
