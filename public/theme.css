@@ -963,3 +963,11 @@ table.lgt tr.lead td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
 .bosslast .k{margin-bottom:1px}
 @media (max-width:700px){.boss-call.fixed{padding:10px 16px}.boss-call i{font-size:12.5px}.bosslast{margin-top:5px;padding:4px 6px;font-size:10.5px}}
 @media (prefers-reduced-motion:reduce){.bossfig.rearing .bossbody{animation:none}}
+
+/* each of the boss's Energy: a small Pokémon with an Energy badge in its type's colour */
+.etok{position:relative;line-height:0;--ec:#d9d9d9}
+.etok.t-Fire{--ec:#ff7a2e}.etok.t-Water{--ec:#45b4ff}.etok.t-Grass{--ec:#6fdc6f}.etok.t-Lightning{--ec:#ffd83d}.etok.t-Psychic{--ec:#cf7bff}.etok.t-Fighting{--ec:#e0935a}
+.etok .elogo{position:absolute;right:-5px;bottom:-5px;z-index:4;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;line-height:1;background:radial-gradient(circle at 35% 30%,#fff,var(--ec) 55%);box-shadow:0 0 0 2px #151029,0 0 8px var(--ec);pointer-events:none}
+.bossbench .etok .mon .cd{box-shadow:0 0 0 2px var(--ec)}
+.bossbench .bp-row{padding:9px 0 12px}.bossbench .etok .mon{margin:0}
+@media (max-width:700px){.etok .elogo{width:15px;height:15px;font-size:9px;right:-4px;bottom:-4px}}

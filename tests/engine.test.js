@@ -798,7 +798,7 @@ test('a Colossal Pokémon starts with no Energy, gains one a turn, spends it on 
 test("Colossal Pokémon: its Energy can be Knocked Out on its Bench or discarded, which holds its attacks back", () => {
   // a Bench attack destroys an Energy: no Prize for it, no damage to the boss
   let g = giveEnergy(bossGame(98, { active: { c: cardId('Hitmonlee', 'base3'), en: [N['Fighting Energy'], N['Fighting Energy'], N['Fighting Energy']] } }), 2);
-  const hit = g.p.b.bench[0].id; const destroyed = (x) => x.log.filter((l) => /Energy is destroyed/.test(l.m)).length;
+  const hit = g.p.b.bench[0].id; const destroyed = (x) => x.log.filter((l) => /loses that Energy/.test(l.m)).length;
   const r = actWith(g, { type: 'attack', index: 0 }, [hit]); // Stretch Kick: 20 to a Benched Pokémon
   assert.equal(destroyed(r.state), 1); assert.ok(!r.state.p.b.bench.some((x) => x.id === hit)); assert.equal(bossMon(r.state).dmg, 0); assert.equal(r.state.pending.length, 0);
   assert.equal(r.state.p.b.bench.length, 2, 'one left, plus the one it gains as its turn starts'); assert.equal(bossMon(r.state).en.length, 2);
@@ -931,6 +931,15 @@ test('Colossal Pokémon: Weakness and Resistance do not count, for either side',
   g = act(g, { type: 'endTurn' }); g = bossTurn(g); assert.equal(active(g, 'a').dmg, 40);
   g = bossGame(99, { active: N['Charizard'] }); // Charizard resists Fighting
   g = act(g, { type: 'endTurn' }); g = bossTurn(g); assert.equal(active(g, 'a').dmg, 40);
+});
+
+test("Colossal Pokémon: its Energy are Benched Pokémon in every way (they have a name and picture of their own, and can be Poisoned)", () => {
+  let g = giveEnergy(bossGame(98, { active: N['Chansey'] }, { conditions: { PSN: 2, BRN: 2, CNF: 2, SLP: 1, PAR: 1 } }), 1); const tok = g.p.b.bench[0];
+  g = act(g, { type: 'override', op: 'status', target: g.boss.id, code: 'PAR' }); // so it doesn't spend that Energy on an attack
+  assert.match(DB[tok.c].name, /Rattata \(Colossal Testzilla's Energy\)/); assert.equal(DB[tok.c].st, 'Pokémon'); assert.equal(DB[tok.c].hp, 20);
+  g = act(g, { type: 'override', op: 'status', target: tok.id, code: 'PSN' }); assert.deepEqual(g.p.b.bench[0].st, ['PSN']);
+  g = act(g, { type: 'endTurn' }); assert.equal(g.p.b.bench.find((x) => x.id === tok.id).dmg, 10, 'poison damage between turns, on the Bench');
+  g = bossTurn(g); assert.ok(!g.p.b.bench.some((x) => x.id === tok.id), 'a second 10 Knocks it Out'); assert.ok(g.log.some((l) => /loses that Energy/.test(l.m)));
 });
 
 test('the Arena bosses from the spreadsheet are well formed and never show up as real cards', () => {

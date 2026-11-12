@@ -7,6 +7,7 @@ import { newGame, toMon, instId, P } from './state.js';
 import { mulberry32 } from './rng.js';
 
 export { BOSSES, BOSS_RULES };
+const all0 = (db) => Object.values(db);
 export const bossId = (n) => 'boss-' + n;
 export const partId = (n) => 'boss-' + n + '-part';
 const STATUS = { PSN: 'Poisoned', BRN: 'Burned', PAR: 'Paralyzed', SLP: 'Asleep', CNF: 'Confused' };
@@ -50,15 +51,17 @@ export function bossCards(db) {
   for (const b of BOSSES) {
     const src = db[b.card] || {};
     const art = { set: src.set, i: src.i }; const type = b.type || (src.types || ['Colorless'])[0];
-    // its Energy looks like the basic Energy of its type (a Double Colorless for a Colorless boss)
+    // each of its Energy is a small Pokémon on its Bench: the one the sheet names, else the Basic its line starts from (Magikarp for
+    // Gyarados), else itself. The Energy card attached to it is the basic Energy of its type (a Double Colorless for a Colorless boss).
+    let mini = db[b.minion] || src; for (let k = 0; !db[b.minion] && k < 3 && mini.ev; k++) { const pre = all0(db).find((c) => c.st === 'Pokémon' && c.name === mini.ev && c.set === mini.set) || all0(db).find((c) => c.st === 'Pokémon' && c.name === mini.ev); if (!pre) break; mini = pre; }
     const all = Object.values(db); const ec = all.find((c) => c.st === 'Energy' && c.set === 'base1' && c.name === type + ' Energy') || all.find((c) => c.st === 'Energy' && c.name === 'Double Colorless Energy') || {};
     db[bossId(b.n)] = {
       id: bossId(b.n), set: 'boss', art, name: 'Colossal ' + b.name, st: 'Pokémon', sub: 'Basic', hp: b.hp, types: [type], part: partId(b.n),
       atk: b.attacks.map((a) => ({ n: a.name, c: Array(costOf(a)).fill('Colorless'), d: dmgLabel(a), t: `${costOf(a) ? `Uses up ${costOf(a)} Energy.` : 'Costs no Energy: it uses this on every turn it is still charging.'} ${attackText(a)}`.trim() })), pw: [{ n: 'Colossal', t: colossalText(b) }],
       wk: BOSS_RULES.wr && b.wk ? [b.wk] : null, rs: BOSS_RULES.wr && b.rs ? [b.rs] : null, rc: 0, rar: 'Colossal', boss: b,
     };
-    db[partId(b.n)] = { id: partId(b.n), set: 'boss', art: { set: ec.set, i: ec.i }, name: `Colossal ${b.name}'s Energy`, st: 'Pokémon', sub: 'Basic', hp: rule(BOSS_RULES, 'energyHP', 20), types: ['Colorless'], atk: [], pw: null, wk: null, rs: null, rc: 0, rar: 'Colossal', bossPart: b.n, en: ec.id,
-      txt: `One of Colossal ${b.name}'s Energy. Knock it Out or discard it and the Energy is gone.` };
+    db[partId(b.n)] = { id: partId(b.n), set: 'boss', art: { set: mini.set, i: mini.i }, name: `${mini.name || b.name} (Colossal ${b.name}'s Energy)`, st: 'Pokémon', sub: 'Basic', hp: rule(BOSS_RULES, 'energyHP', 20), types: [type], atk: [], pw: null, wk: null, rs: null, rc: 0, rar: 'Colossal', bossPart: b.n, en: ec.id, etype: type,
+      txt: `A Benched Pokémon that is one of Colossal ${b.name}'s Energy. Knock it Out, or discard an Energy from Colossal ${b.name}, and that Energy is gone.` };
   }
   return db;
 }
@@ -141,7 +144,6 @@ export function bossSpend(ctx, n) {
  *  and an Energy Knocked Out on its Bench comes off it. */
 export function bossEnergySync(ctx) {
   const { g } = ctx; const p = P(g, g.boss.seat); const m = p.active; if (!m || m.id !== g.boss.id) return;
-  for (const x of p.bench) { x.st = []; x.fx = []; }
   if (m.en.length < p.bench.length) {
     const n = p.bench.length - m.en.length; const gone = p.bench.slice().sort((a, b) => b.dmg - a.dmg).slice(0, n).map((x) => x.id);
     p.bench = p.bench.filter((x) => !gone.includes(x.id)); ctx.log(`${ctx.name(g.boss.seat)} loses ${n === 1 ? 'an Energy' : n + ' Energy'} (${p.bench.length} left)`);

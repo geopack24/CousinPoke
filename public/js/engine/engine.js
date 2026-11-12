@@ -400,7 +400,6 @@ function dealDamage(ctx, target, amount, opts = {}) {
 function applyStatus(ctx, target, code) {
   const { db } = ctx;
   if (isDollLike(db, target) && scriptOf(target.c).asPokemon && scriptOf(target.c).asPokemon.noConditions) return false;
-  if (isBossPart(db, target)) return false;
   if (isBoss(ctx.g, target)) {
     const g = ctx.g; const turns = (g.boss.r.conditions || {})[code] || 0;
     if (!turns) { ctx.log(`${nameOf(db, target.c)} can't be ${STATUS_NAMES[code]}`); return false; }
@@ -682,7 +681,7 @@ function checkKOs(ctx) {
         const doll = isDollLike(db, m) && scriptOf(m.c).asPokemon && scriptOf(m.c).asPokemon.noPrize;
         { const fs = scriptOf(m.c).passive; if (fs && fs.onWouldKO && g.lastAttack && g.lastAttack.turn === g.turnNo && g.lastAttack.seat === other(s) && powersActive(g, db) && !conditioned(m) && fs.onWouldKO(ctx, m)) { m.dmg = monHP(db, m, g) - 10; ctx.log(`${nameOf(db, m.c)} hangs on with 10 HP`); continue; } }
         { const ks = scriptOf(m.c).passive; if (ks && ks.onKnockedOut && g.lastAttack && g.lastAttack.turn === g.turnNo && g.lastAttack.seat === other(s) && powersActive(g, db) && !conditioned(m)) { const att = findMon(g, g.lastAttack.attacker); if (att) ks.onKnockedOut(ctx, m, att.m); } }
-        if (isBossPart(db, m)) { removeMon(g, m.id); ctx.log(`${nameOf(db, m.c)} is destroyed`); ctx.event({ t: 'ko', id: m.id, seat: s }); bossEnergySync(ctx); continue; } // one of its Energy: no Prize, nothing to discard
+        if (isBossPart(db, m)) { removeMon(g, m.id); ctx.log(`${nameOf(db, m.c)} was Knocked Out: ${ctx.name(s)} loses that Energy`); ctx.event({ t: 'ko', id: m.id, seat: s }); bossEnergySync(ctx); continue; } // one of its Energy: no Prize, nothing to discard
         removeMon(g, m.id); const rebirth = (scriptOf(m.c).passive || {}).rebirth && !conditioned(m) && powersActive(g, db);
         for (const c of monCards(m)) { if (rebirth && c.id === m.id) p.hand.push(c); else p.discard.push(c); }
         if (rebirth) ctx.log(`Rebirth: ${nameOf(db, m.c)} returns to hand`);

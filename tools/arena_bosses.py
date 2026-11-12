@@ -94,13 +94,18 @@ def main():
             elif tok.isdigit() and int(tok) in mine: pat.append(int(tok))
             else: die(f'{w}: pattern entry "{tok}" is not "rest" or one of {name}\'s attack numbers')
         if not any(pat): die(f'{w}: the attack pattern needs at least one attack')
+        mn = text(col(r, 'energy pokémon', 'energy pokemon')); minion = ''
+        if mn:
+            mp = [c for c in cards if c['name'].lower() == mn.lower() and c['st'] == 'Pokémon' and c['set'] in SETS.values()]
+            if not mp: die(f'{w}: no Pokémon card called "{mn}" for its Energy Pokémon')
+            minion = (next((c for c in mp if c['set'] == card['set']), None) or mp[0])['id']
         hp = num(col(r, 'hp'), w + ' HP', 10, 5000)
         if hp % 10: die(f'{w}: HP must be a multiple of 10')
         st = col(r, 'stage', 'order'); stage = num(st, w + ' stage', 1, 20) if st is not None and text(st) != '' else len(bosses) + 1
         bosses.append({'n': len(bosses) + 1, 'stage': stage, 'name': card['name'], 'card': card['id'], 'hp': hp,
                        'type': typ(col(r, 'type'), w + ' type') or (card.get('types') or ['Colorless'])[0], 'wk': typ(col(r, 'weakness'), w + ' weakness'), 'rs': typ(col(r, 'resistance'), w + ' resistance'),
                        'armor': num(col(r, 'armor'), w + ' armor', 0, 100), 'thorns': num(col(r, 'strikes back'), w + ' strikes back', 0, 100), 'enrage': num(col(r, 'enrage'), w + ' enrage', 0, 100),
-                       'pattern': pat, 'attacks': [mine[k] for k in sorted(mine)]})
+                       'pattern': pat, 'attacks': [mine[k] for k in sorted(mine)], 'minion': minion})
     if attacks: die('the Attacks tab has rows for ' + ', '.join(sorted(attacks)) + ', which is not on the Bosses tab')
     if not bosses: die('the Bosses tab is empty')
     # a boss keeps the number it already has in arena-bosses.js (games in progress refer to it); a new boss gets the next free one
@@ -143,7 +148,7 @@ def main():
            f"  conditions: {{ PSN: {rules['PSN']}, BRN: {rules['BRN']}, CNF: {rules['CNF']}, SLP: {rules['SLP']}, PAR: {rules['PAR']} }}, // how many of its own turns a Special Condition lasts on it (0 = immune)",
            '};', 'export const BOSSES = [']
     for b in bosses:
-        out.append(f"  {{ n: {b['n']}, stage: {b['stage']}, name: {js(b['name'])}, card: {js(b['card'])}, hp: {b['hp']}, type: {js(b['type'])}, wk: {js(b['wk'])}, rs: {js(b['rs'])}, armor: {b['armor']}, thorns: {b['thorns']}, enrage: {b['enrage']}, pattern: {js(b['pattern'])},")
+        out.append(f"  {{ n: {b['n']}, stage: {b['stage']}, name: {js(b['name'])}, card: {js(b['card'])}, hp: {b['hp']}, type: {js(b['type'])}, wk: {js(b['wk'])}, rs: {js(b['rs'])}, armor: {b['armor']}, thorns: {b['thorns']}, enrage: {b['enrage']}, pattern: {js(b['pattern'])}, minion: {js(b['minion'])},")
         out.append('    attacks: [' + ', '.join(atk(a) for a in b['attacks']) + '] },')
     out.append('];')
     (ROOT / 'public' / 'js' / 'arena-bosses.js').write_text('\n'.join(out) + '\n', encoding='utf-8', newline='')
