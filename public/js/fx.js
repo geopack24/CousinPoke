@@ -43,7 +43,7 @@ class Layer {
     const dpr = Math.min(2, window.devicePixelRatio || 1); const w = this.board.clientWidth, h = this.board.clientHeight;
     this.w = w; this.h = h; this.dpr = dpr;
     if (this.canvas.width !== Math.round(w * dpr) || this.canvas.height !== Math.round(h * dpr)) { this.canvas.width = Math.round(w * dpr); this.canvas.height = Math.round(h * dpr); }
-    this.canvas.style.width = w + 'px'; this.canvas.style.height = h + 'px';
+    // (CSS stretches the canvas over the board; a fixed px size here would keep the page wide after the board shrinks)
   }
   add(item) { this.items.push(item); this.start(); return item; }
   at(ms, fn) { const t = setTimeout(() => { this.timers.delete(t); fn(); }, ms); this.timers.add(t); return t; }

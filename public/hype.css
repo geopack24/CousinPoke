@@ -44,8 +44,9 @@ button.pri{letter-spacing:.01em}
 .hero{background-size:auto}
 .hero-fan::before{content:"";position:absolute;left:50%;top:50%;width:620px;height:620px;margin:-310px 0 0 -310px;border-radius:50%;background:repeating-conic-gradient(rgba(255,255,255,.13) 0 7deg,transparent 7deg 20deg);-webkit-mask:radial-gradient(circle,#000 12%,transparent 62%);mask:radial-gradient(circle,#000 12%,transparent 62%);animation:rays 48s linear infinite;pointer-events:none}
 @keyframes rays{to{transform:rotate(360deg)}}
-.live{display:inline-flex;align-items:center;gap:5px;font-weight:900;font-size:11px;letter-spacing:.08em;color:#fff;background:#e5292f;border-radius:4px;padding:1px 6px 1px 5px;vertical-align:1px}
-.live::before{content:"";width:6px;height:6px;border-radius:50%;background:#fff;animation:blink 1.1s steps(2,start) infinite}
+/* the red LIVE badge. Scoped to spans: the game table marks the active player's side with a class also called "live". */
+span.live{display:inline-flex;align-items:center;gap:5px;font-weight:900;font-size:11px;letter-spacing:.08em;color:#fff;background:#e5292f;border-radius:4px;padding:1px 6px 1px 5px;vertical-align:1px}
+span.live::before{content:"";width:6px;height:6px;border-radius:50%;background:#fff;animation:blink 1.1s steps(2,start) infinite}
 @keyframes blink{to{visibility:hidden}}
 .vs{font-family:var(--display);font-size:13px;background:var(--hype);-webkit-background-clip:text;background-clip:text;color:transparent;padding:0 2px}
 .item.mine{border-color:color-mix(in srgb,#ffcb05 55%,var(--line));box-shadow:inset 3px 0 0 #ffcb05}
