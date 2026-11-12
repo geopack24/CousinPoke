@@ -7,6 +7,8 @@ import { R } from './engine/rules.js';
 export const ARENA = { picksTo: 42, energy: 18, wins: 7, losses: 3, lineCopies: 2 };
 const SETS = ['base1', 'base2', 'base3', 'base5', 'gym1', 'gym2']; // no promos
 const BASIC_TYPES = ['Fire', 'Water', 'Grass', 'Lightning', 'Psychic', 'Fighting'];
+// Not offered in the draft. Rainbow Energy: under the house rules any Energy already pays any cost.
+const NOT_IN_DRAFT = new Set(['Rainbow Energy']);
 
 /** Card signature: reprints (same name, HP, attacks, powers) count as one card. */
 const sig = (c) => JSON.stringify([c.name, c.hp, c.sub, (c.atk || []).map((a) => [a.n, a.d, (a.c || []).length]), c.pw ? c.pw.n : null]);
@@ -37,7 +39,7 @@ export function arenaPool(db, rules) {
   }
   for (const c of uniq) {
     if (c.st === 'Trainer' && !banned.has(c.name) && !/Stadium/.test(c.sub || '')) pool.push(entry(c, 'trainer', [c], 1));
-    if (c.st === 'Energy' && c.sub !== 'Basic' && !banned.has(c.name)) pool.push(entry(c, 'energy', [c], 1));
+    if (c.st === 'Energy' && c.sub !== 'Basic' && !banned.has(c.name) && !NOT_IN_DRAFT.has(c.name)) pool.push(entry(c, 'energy', [c], 1));
   }
   CACHE = { db, pool };
   return pool;

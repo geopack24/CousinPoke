@@ -6,6 +6,8 @@ import { apply, legalActions, canPay, energyUnits } from '../public/js/engine/en
 import { mulberry32 } from '../public/js/engine/rng.js';
 import { validateDeck } from '../public/js/engine/rules.js';
 import { automationReport } from '../public/js/engine/cards/index.js';
+import { arenaPool, botDraft, ARENA } from '../public/js/arena-draft.js';
+import { DEFAULT_RULES } from '../public/js/engine/rules.js';
 
 const DATA = JSON.parse(readFileSync(new URL('../public/cards.json', import.meta.url), 'utf8'));
 const DB = Object.fromEntries(DATA.cards.map((c) => [c.id, c]));
@@ -636,4 +638,17 @@ test('taking your last prize wins even when a double Knock Out owed you more pri
   const s = act(g, { type: 'takePrize', index: 0 }, { seat: 'a' });
   assert.equal(s.p.a.prizes.length, 0);
   assert.equal(s.winner, 'a');
+});
+
+test('the Arena draft never offers banned cards, Stadiums, promos or Rainbow Energy, and drafts legal 60-card decks', () => {
+  const pool = arenaPool(DB, DEFAULT_RULES);
+  const names = new Set(pool.flatMap((e) => Object.keys(e.cards).map((id) => DB[id].name)));
+  for (const n of DEFAULT_RULES.banned) assert.ok(!names.has(n), n + ' is in the Arena pool');
+  assert.ok(!names.has('Rainbow Energy'));
+  assert.ok(!pool.some((e) => Object.keys(e.cards).some((id) => /Stadium/.test(DB[id].sub || '') || id.startsWith('basep'))));
+  for (let seed = 1; seed <= 25; seed++) {
+    const d = botDraft(DB, seed, 0.5, DEFAULT_RULES);
+    assert.equal(Object.values(d).reduce((a, b) => a + b, 0), ARENA.picksTo + ARENA.energy);
+    assert.deepEqual(validateDeck({ cards: d }, DEFAULT_RULES, DB).filter((x) => x.bad), []);
+  }
 });
