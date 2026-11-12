@@ -647,6 +647,7 @@ test('the Arena draft never offers banned cards, Stadiums, promos, Rainbow Energ
   for (const n of DEFAULT_RULES.banned) assert.ok(!names.has(n), n + ' is in the Arena pool');
   assert.ok(!names.has('Rainbow Energy'));
   assert.ok(!names.has('Bill'), 'Bill is given, not drafted');
+  for (const e of pool.filter((x) => x.kind === 'basic')) for (const n of ["Blaine's Mankey", "Blaine's Rhyhorn", "Erika's Jigglypuff", "Erika's Paras"]) assert.notEqual(DB[e.cid].name, n, n + ' is a pre-evolution, not a pick');
   assert.equal(ARENA.picksTo + ARENA.bills + ARENA.energy, 60);
   assert.ok(!pool.some((e) => Object.keys(e.cards).some((id) => /Stadium/.test(DB[id].sub || '') || id.startsWith('basep'))));
   for (let seed = 1; seed <= 25; seed++) {

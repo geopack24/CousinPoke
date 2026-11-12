@@ -4,6 +4,7 @@
 // Pure functions (no page state) so the page, the tests and the simulator share them.
 import { mulberry32 } from './engine/rng.js';
 import { R } from './engine/rules.js';
+import { baseSpecies } from './engine/engine.js';
 import { TIERS, TIER_WEIGHTS } from './arena-tiers.js';
 
 export const ARENA = { picksTo: 38, bills: 4, energy: 18, wins: 7, losses: 3, lineCopies: 2 };
@@ -30,13 +31,15 @@ export function arenaPool(db, rules) {
   for (const c of all) { const k = sig(c); if (seen.has(k)) continue; seen.add(k); uniq.push(c); }
   const mon = uniq.filter((c) => c.st === 'Pokémon');
   const evolvesInto = new Set(mon.filter((c) => c.ev).map((c) => c.ev));
+  // species that evolve, whoever owns them: Blaine's Mankey has no "Blaine's Primeape", but a Mankey is still a pre-evolution
+  const speciesEvolves = new Set(mon.filter((c) => c.ev).map((c) => baseSpecies(c.ev)));
   const byName = new Map(); for (const c of mon) { if (!byName.has(c.name)) byName.set(c.name, []); byName.get(c.name).push(c); }
   /** The printing of a pre-evolution to use: same set if there is one, else the earliest. */
   const pre = (name, set) => { const l = byName.get(name); if (!l) return null; return l.find((c) => c.set === set) || l[0]; };
   const pool = [];
   for (const c of mon) {
     if (evolvesInto.has(c.name)) continue; // not the top of its line
-    if (c.sub === 'Basic' || c.sub === 'Baby' || !c.ev) { pool.push(entry(c, 'basic', [c], 1)); continue; }
+    if (c.sub === 'Basic' || c.sub === 'Baby' || !c.ev) { if (speciesEvolves.has(baseSpecies(c.name))) continue; pool.push(entry(c, 'basic', [c], 1)); continue; }
     const line = [c]; let cur = c; let ok = true;
     while (cur.ev) { const p = pre(cur.ev, cur.set); if (!p) { ok = false; break; } line.unshift(p); cur = p; if (line.length > 3) { ok = false; break; } }
     if (!ok || !(line[0].sub === 'Basic' || line[0].sub === 'Baby')) continue;
