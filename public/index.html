@@ -595,7 +595,7 @@ async function loadData(){
   if(window.__bossCards)window.__bossCards(CARDS); // the Arena's Colossal Pokémon
 }
 const C=id=>CARDS[id]||{name:'Unknown card',st:'',sub:'',set:'base1',i:0};
-function cardStyle(cid){const c0=C(cid);const c=c0.art?{...c0,...c0.art}:c0;const s=SETIDX[c.set]||{cols:12,rows:1};return `background-image:url(${c.set}.webp);--x:${c.i%s.cols};--y:${Math.floor(c.i/s.cols)};--rows1:${Math.max(1,s.rows-1)}`}
+function cardStyle(cid){const c0=C(cid);if(c0.bg)return `background-image:${c0.bg};background-size:100% 100%;background-position:0 0;--x:0;--y:0;--rows1:1`;const c=c0.art?{...c0,...c0.art}:c0;const s=SETIDX[c.set]||{cols:12,rows:1};return `background-image:url(${c.set}.webp);--x:${c.i%s.cols};--y:${Math.floor(c.i/s.cols)};--rows1:${Math.max(1,s.rows-1)}`}
 function cardHTML(cid,scale,attrs='',cls=''){return `<div class="cd ${cls}${/Holo/.test(C(cid).rar||'')?' holo':''}" style="--s:${scale};${cardStyle(cid)}" data-cid="${esc(cid)}" ${attrs} role="img" aria-label="${esc(C(cid).name)}"></div>`}
 function backHTML(scale,attrs=''){return `<div class="cd back" style="--s:${scale}" ${attrs}></div>`}
 function energyType(c){if(c.st!=='Energy')return null;if(c.types&&c.types[0])return c.types[0];const t=TYPES.find(t=>c.name.startsWith(t));if(t)return t;if(/Colorless/.test(c.name))return 'Colorless';return 'Colorless'}

@@ -7,7 +7,13 @@ import { newGame, toMon, instId, P } from './state.js';
 import { mulberry32 } from './rng.js';
 
 export { BOSSES, BOSS_RULES };
-const all0 = (db) => Object.values(db);
+const CRYSTAL = { Fire: '#ff7a2e', Water: '#45b4ff', Grass: '#6fdc6f', Lightning: '#ffd83d', Psychic: '#cf7bff', Fighting: '#e0935a', Colorless: '#d9dde6' };
+/** The picture of an Energy Crystal in a boss's colour, as a CSS background (original artwork: a faceted gem on a dark card). */
+function crystalArt(type) {
+  const c = CRYSTAL[type] || CRYSTAL.Colorless;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 245 342"><rect width="245" height="342" rx="14" fill="#151029"/><rect x="7" y="7" width="231" height="328" rx="10" fill="none" stroke="${c}" stroke-width="4" opacity=".7"/><g stroke="#151029" stroke-width="3" stroke-linejoin="round"><polygon points="122,40 190,120 122,300 54,120" fill="${c}"/><polygon points="122,40 190,120 122,150" fill="#ffffff" opacity=".45"/><polygon points="122,40 54,120 122,150" fill="#ffffff" opacity=".2"/><polygon points="54,120 122,150 122,300" fill="#000000" opacity=".28"/><polygon points="190,120 122,150 122,300" fill="#000000" opacity=".1"/></g></svg>`;
+  return `url('data:image/svg+xml,${encodeURIComponent(svg)}')`;
+}
 export const bossId = (n) => 'boss-' + n;
 export const partId = (n) => 'boss-' + n + '-part';
 const STATUS = { PSN: 'Poisoned', BRN: 'Burned', PAR: 'Paralyzed', SLP: 'Asleep', CNF: 'Confused' };
@@ -36,7 +42,7 @@ export function colossalText(b, r = BOSS_RULES) {
   const out = [`Knock it Out to win. It wins when it has Knocked Out ${r.kos} of your Pokémon.`];
   if (!r.wr) out.push(`Weakness and Resistance don't count in this fight, for either side.`);
   out.push(`Each time it loses a sixth of its HP you take a Prize.`);
-  out.push(`Energy: it starts with ${rule(r, 'energyStart', 0) || 'none'} and gains ${rule(r, 'energyPerTurn', 1)} at the start of each of its turns (up to ${rule(r, 'energyMax', 5)}). Its Energy sits on its Bench with ${rule(r, 'energyHP', 20)} HP each, and each attack uses up its Energy cost. ${rule(r, 'energyCharge', 2) ? `When it can't pay for its next attack it uses Energy Charge instead and gains ${rule(r, 'energyCharge', 2)} more.` : 'While it is charging it uses its basic attack, which costs nothing.'} Destroy or discard its Energy to hold its attacks back.`);
+  out.push(`Energy: it starts with ${rule(r, 'energyStart', 0) || 'none'} and gains ${rule(r, 'energyPerTurn', 1)} at the start of each of its turns (up to ${rule(r, 'energyMax', 5)}). Each Energy sits behind an Energy Crystal on its Bench (${rule(r, 'energyHP', 20)} HP each): Knock a crystal Out and its Energy is destroyed; the crystal forms again on its next turn. Each attack uses up its Energy cost. ${rule(r, 'energyCharge', 2) ? `When it can't pay for its next attack it uses Energy Charge instead and gains ${rule(r, 'energyCharge', 2)} more.` : 'While it is charging it uses its basic attack, which costs nothing.'} Break its crystals or discard its Energy to hold its attacks back.`);
   if (lasts.length) out.push(`${lasts.join(', ')}: wears off after ${[...new Set(Object.values(r.conditions).filter(Boolean))].join(' or ')} of its turns.`);
   out.push(`It can't be ${never.length ? never.join(' or ') + ', ' : ''}moved or copied.`);
   if (b.armor) out.push(`Armor: takes ${b.armor} less damage from each attack.`);
@@ -51,17 +57,15 @@ export function bossCards(db) {
   for (const b of BOSSES) {
     const src = db[b.card] || {};
     const art = { set: src.set, i: src.i }; const type = b.type || (src.types || ['Colorless'])[0];
-    // each of its Energy is a small Pokémon on its Bench: the one the sheet names, else the Basic its line starts from (Magikarp for
-    // Gyarados), else itself. The Energy card attached to it is the basic Energy of its type (a Double Colorless for a Colorless boss).
-    let mini = db[b.minion] || src; for (let k = 0; !db[b.minion] && k < 3 && mini.ev; k++) { const pre = all0(db).find((c) => c.st === 'Pokémon' && c.name === mini.ev && c.set === mini.set) || all0(db).find((c) => c.st === 'Pokémon' && c.name === mini.ev); if (!pre) break; mini = pre; }
+    // its Energy cards are the basic Energy of its type (a Double Colorless for a Colorless boss); each sits behind an Energy Crystal
     const all = Object.values(db); const ec = all.find((c) => c.st === 'Energy' && c.set === 'base1' && c.name === type + ' Energy') || all.find((c) => c.st === 'Energy' && c.name === 'Double Colorless Energy') || {};
     db[bossId(b.n)] = {
       id: bossId(b.n), set: 'boss', art, name: 'Colossal ' + b.name, st: 'Pokémon', sub: 'Basic', hp: b.hp, types: [type], part: partId(b.n),
       atk: b.attacks.map((a) => ({ n: a.name, c: Array(costOf(a)).fill('Colorless'), d: dmgLabel(a), t: `${costOf(a) ? `Uses up ${costOf(a)} Energy.` : 'Costs no Energy: it uses this on every turn it is still charging.'} ${attackText(a)}`.trim() })), pw: [{ n: 'Colossal', t: colossalText(b) }],
       wk: BOSS_RULES.wr && b.wk ? [b.wk] : null, rs: BOSS_RULES.wr && b.rs ? [b.rs] : null, rc: 0, rar: 'Colossal', boss: b,
     };
-    db[partId(b.n)] = { id: partId(b.n), set: 'boss', art: { set: mini.set, i: mini.i }, name: `${mini.name || b.name} (Colossal ${b.name}'s Energy)`, st: 'Pokémon', sub: 'Basic', hp: rule(BOSS_RULES, 'energyHP', 20), types: [type], atk: [], pw: null, wk: null, rs: null, rc: 0, rar: 'Colossal', bossPart: b.n, en: ec.id, etype: type,
-      txt: `A Benched Pokémon that is one of Colossal ${b.name}'s Energy. Knock it Out, or discard an Energy from Colossal ${b.name}, and that Energy is gone.` };
+    db[partId(b.n)] = { id: partId(b.n), set: 'boss', bg: crystalArt(type), name: 'Energy Crystal', st: 'Pokémon', sub: 'Basic', hp: rule(BOSS_RULES, 'energyHP', 20), types: ['Colorless'], atk: [], pw: null, wk: null, rs: null, rc: 0, rar: 'Colossal', bossPart: b.n, en: ec.id, etype: type,
+      txt: `One of the Energy Crystals on Colossal ${b.name}'s Bench. Each can hold one of its Energy. Knock a crystal Out and the Energy it holds is destroyed with it. The crystal forms again at the start of Colossal ${b.name}'s next turn.` };
   }
   return db;
 }
@@ -98,14 +102,14 @@ export function newBossGame({ rules, player, n, seed, uid, rulesOverride }) {
   const p = g.p.b; const m = toMon({ id: instId(rng), c: bossId(n) }, 0);
   p.active = m; p.bench = []; p.setupDone = true;
   g.boss = { seat: 'b', n, id: m.id, cid: bossId(n), step: 0, kos: 0, given: 0, seen: 0, r };
-  addEnergy(g, null, rng, rule(r, 'energyStart', 0));
+  formCrystals(g, rng); addEnergy(g, null, rng, rule(r, 'energyStart', 0));
   g.log = [{ t: Date.now(), m: `${name} appears! ${b.hp} HP. Knock it Out before it Knocks Out ${r.kos} of your Pokémon. You go first: place your Basic Pokémon.` }];
   return g;
 }
 /** The next attack of its pattern, and whether it has the Energy for it. `soon` = it will have it on its next turn. */
 export function nextBossAttack(g, db) {
   if (!g.boss) return null; const b = db[g.boss.cid].boss; const idx = (b.pattern[g.boss.step % b.pattern.length] || 0) - 1; // 0 in the pattern is a turn it sits out
-  const atk = idx >= 0 ? b.attacks[idx] : null; const have = g.p[g.boss.seat].bench.length; const cost = atk ? costOf(atk) : 0;
+  const atk = idx >= 0 ? b.attacks[idx] : null; const have = bossEnergy(g); const cost = atk ? costOf(atk) : 0;
   const max = rule(g.boss.r, 'energyMax', 5); const gain = rule(g.boss.r, 'energyPerTurn', 1);
   // its basic attack: the strongest one that costs no Energy. With Energy Charge switched off it uses it on every turn it is still charging.
   let ji = -1; b.attacks.forEach((a, i) => { if (costOf(a) === 0 && (ji < 0 || (a.dmg || 0) > (b.attacks[ji].dmg || 0))) ji = i; });
@@ -115,37 +119,52 @@ export function nextBossAttack(g, db) {
     jab: ji >= 0 && ji !== idx ? { idx: ji, atk: b.attacks[ji], card: db[g.boss.cid].atk[ji] } : null, use: atk ? (ready ? idx : ji) : -1 };
 }
 
-/* ---------- its Energy ----------
-   Each Energy is two things kept in step: a Pokémon-like card on its Bench (so attacks that hit the Bench can destroy
-   it) and an Energy card attached to the Colossal Pokémon (so Energy Removal and attacks that discard Energy work). */
-function addEnergy(g, db, rng, n) {
-  const b = g.boss; const p = P(g, b.seat); const m = p.active; if (!m || m.id !== b.id) return 0;
-  const max = Math.min(rule(b.r, 'energyMax', 5), g.rules.benchSize || 5); const pc = partId(b.n); let k = 0;
-  for (; k < n && p.bench.length < max; k++) { const id = instId(rng); p.bench.push(toMon({ id, c: pc }, g.turnNo)); m.en.push({ id: id + 'e', c: (db && db[pc] && db[pc].en) || 'base1-96' }); }
+/* ---------- its Energy and the Energy Crystals ----------
+   Its Bench holds a row of Energy Crystals, one for each Energy it can hold. A crystal is a Pokémon-like card with a
+   little HP that the player can attack; each can hold one Energy (flags.charged). Knock a crystal Out and the Energy
+   it holds goes with it; the crystal forms again at the start of the boss's next turn. Damage on a crystal stays when
+   the boss spends or regains Energy, so it can't shake off chip damage by attacking.
+   Each Energy is also an Energy card attached to the boss, so Energy Removal and attacks that discard Energy work;
+   the two are kept in step. */
+const holds = (x) => x.flags.charged !== false; // (a fight begun before the crystals: every card on its Bench held an Energy)
+/** How much Energy it has. */
+export const bossEnergy = (g) => P(g, g.boss.seat).bench.filter(holds).length;
+/** Fill its Bench with crystals, up to the most Energy it can hold. Returns how many formed. */
+function formCrystals(g, rng) {
+  const b = g.boss; const p = P(g, b.seat); const max = Math.min(rule(b.r, 'energyMax', 5), g.rules.benchSize || 5); let k = 0;
+  for (; p.bench.length < max; k++) { const t = toMon({ id: instId(rng), c: partId(b.n) }, g.turnNo); t.flags.charged = false; p.bench.push(t); }
   return k;
 }
-/** The start of its turn: it gains Energy. */
+/** Put up to n Energy into empty crystals, left to right. Returns how many went in. */
+function addEnergy(g, db, rng, n) {
+  const b = g.boss; const p = P(g, b.seat); const m = p.active; if (!m || m.id !== b.id) return 0; const pc = partId(b.n); let k = 0;
+  for (const x of p.bench) { if (k >= n) break; if (holds(x)) continue; x.flags.charged = true; m.en.push({ id: instId(rng) + 'e', c: (db && db[pc] && db[pc].en) || 'base1-96' }); k++; }
+  return k;
+}
+/** Take n Energy out of its crystals, from the right (the crystals themselves stay, with whatever damage they have). */
+function drainEnergy(g, n) { const p = P(g, g.boss.seat); let k = 0; for (let i = p.bench.length - 1; i >= 0 && k < n; i--) if (holds(p.bench[i])) { p.bench[i].flags.charged = false; k++; } return k; }
+/** The start of its turn: broken crystals form again, then it gains Energy. */
 export function bossCharge(ctx) {
-  const { g, db } = ctx; const k = addEnergy(g, db, ctx.rng, rule(g.boss.r, 'energyPerTurn', 1));
-  if (k) { ctx.log(`${ctx.name(g.boss.seat)} gains ${k === 1 ? 'an Energy' : k + ' Energy'} (${P(g, g.boss.seat).bench.length})`); ctx.event({ t: 'bossenergy', k, n: P(g, g.boss.seat).bench.length }); }
+  const { g, db } = ctx; const f = formCrystals(g, ctx.rng); if (f) ctx.log(`${f === 1 ? 'An Energy Crystal forms' : f + ' Energy Crystals form'} again on ${ctx.name(g.boss.seat)}'s Bench`);
+  const k = addEnergy(g, db, ctx.rng, rule(g.boss.r, 'energyPerTurn', 1));
+  if (k) { ctx.log(`${ctx.name(g.boss.seat)} gains ${k === 1 ? 'an Energy' : k + ' Energy'} (${bossEnergy(g)})`); ctx.event({ t: 'bossenergy', k, n: bossEnergy(g) }); }
 }
 /** Energy Charge: what it does on a turn it can't pay for its next attack. It gains extra Energy instead of attacking. */
 export function bossEnergyCharge(ctx) {
-  const { g, db } = ctx; const k = addEnergy(g, db, ctx.rng, rule(g.boss.r, 'energyCharge', 2)); const n = P(g, g.boss.seat).bench.length;
+  const { g, db } = ctx; const k = addEnergy(g, db, ctx.rng, rule(g.boss.r, 'energyCharge', 2)); const n = bossEnergy(g);
   ctx.log(`${ctx.name(g.boss.seat)} used Energy Charge${k ? ` and gains ${k === 1 ? 'an Energy' : k + ' Energy'} (${n})` : ''}`); ctx.event({ t: 'bosscharge', k, n });
 }
-/** Using an attack uses up its Energy cost: the most damaged Energy goes first. */
+/** Using an attack uses up its Energy cost. */
 export function bossSpend(ctx, n) {
   const { g } = ctx; const p = P(g, g.boss.seat); const m = p.active; if (!m || n <= 0) return;
-  const gone = p.bench.slice().sort((a, b) => b.dmg - a.dmg).slice(0, n).map((x) => x.id);
-  p.bench = p.bench.filter((x) => !gone.includes(x.id)); m.en.length = Math.min(m.en.length, p.bench.length);
+  drainEnergy(g, n); m.en.length = Math.min(m.en.length, bossEnergy(g));
 }
-/** Keeps the two halves in step after anything happened: Energy discarded from it leaves its Bench (most damaged first),
- *  and an Energy Knocked Out on its Bench comes off it. */
+/** Keeps the two halves in step after anything happened: an Energy card discarded from it empties a crystal, and an
+ *  Energy lost with its crystal comes off it. */
 export function bossEnergySync(ctx) {
   const { g } = ctx; const p = P(g, g.boss.seat); const m = p.active; if (!m || m.id !== g.boss.id) return;
-  if (m.en.length < p.bench.length) {
-    const n = p.bench.length - m.en.length; const gone = p.bench.slice().sort((a, b) => b.dmg - a.dmg).slice(0, n).map((x) => x.id);
-    p.bench = p.bench.filter((x) => !gone.includes(x.id)); ctx.log(`${ctx.name(g.boss.seat)} loses ${n === 1 ? 'an Energy' : n + ' Energy'} (${p.bench.length} left)`);
-  } else if (m.en.length > p.bench.length) m.en.length = p.bench.length;
+  for (const x of p.bench) if (x.flags.charged == null) x.flags.charged = true;
+  const have = bossEnergy(g);
+  if (m.en.length < have) { const n = drainEnergy(g, have - m.en.length); ctx.log(`${ctx.name(g.boss.seat)} loses ${n === 1 ? 'an Energy' : n + ' Energy'} (${bossEnergy(g)} left)`); }
+  else if (m.en.length > have) m.en.length = have;
 }

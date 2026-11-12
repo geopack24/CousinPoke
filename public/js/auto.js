@@ -395,7 +395,7 @@ function bossImpact(board, atk, events) {
 function bossBeats(events) {
   const board = boardEl(); if (!board) return; const flash = (el, cls, ms) => { if (el && fxEnabled()) { el.classList.add(cls); setTimeout(() => el.classList.remove(cls), ms); } };
   const gained = events.filter((e) => e.t === 'bossenergy' || e.t === 'bosscharge').reduce((n, e) => n + (e.k || 0), 0);
-  if (gained) { sfx.play('boss.energy'); const all = [...board.querySelectorAll('.bossbench .mon')]; all.slice(-gained).forEach((el, i) => setTimeout(() => flash(el, 'epop', 900), i * 140)); }
+  if (gained) { sfx.play('boss.energy'); const all = [...board.querySelectorAll('.bossbench .eslot.on .ecard')]; all.slice(-gained).forEach((el, i) => setTimeout(() => flash(el, 'epop', 900), i * 140)); }
   if (events.some((e) => e.t === 'bosscharge')) { // Energy Charge is announced like an attack
     sfx.play('boss.charge', 150); flash(board.querySelector('.bossfig'), 'charging', 1300);
     if (fxEnabled()) { const k = events.find((e) => e.t === 'bosscharge').k || 0; const rc = board.getBoundingClientRect(); const el = document.createElement('div'); el.className = 'boss-call fixed t-Charge'; el.style.cssText = `left:${Math.round(rc.left + rc.width / 2)}px;top:${Math.round(innerHeight * 0.4)}px;animation-duration:2600ms`; el.innerHTML = `<small>${esc(C(PT.S.game.state.boss.cid).name)} uses</small><b>Energy Charge</b><i>gains ${k} Energy · no attack this turn</i>`; document.body.appendChild(el); setTimeout(() => el.remove(), 2600); }
@@ -629,7 +629,7 @@ function bossSideHTML(g, seat, compact, SC) {
     def.thorns ? [`✊ Strikes back ${def.thorns}`, `Any Pokémon that damages it with an attack takes ${def.thorns}.`] : null,
     def.enrage ? [`${rage ? '🔥 Enraged' : '🔥 Enrages at half HP'} +${def.enrage}`, `At half HP or less its attacks do ${def.enrage} more damage.`] : null]
     .filter(Boolean).map(([t, d]) => `<span class="btrait${/Enraged/.test(t) ? ' hot' : ''}" title="${esc(d)}">${esc(t)}</span>`).join('');
-  const scBoss = compact ? .5 : .7; const scPart = compact ? .15 : .2; // the card is big enough for its Moveset to be read on it
+  const scBoss = compact ? .5 : .7; const scPart = compact ? .14 : .19; // the card is big enough for its Moveset to be read on it
   const fig = m ? monHTML({ ...m, en: [] }, seat, true, false, scBoss) : `<div class="bossdown">${PT.cardHTML(b.cid, scBoss)}<span>Defeated</span></div>`;
   // what it did on its last turn, kept on screen so nothing is missed (from the game log)
   const lastT = g.phase !== 'main' ? 0 : g.turn === seat ? g.turnNo - 2 : g.turnNo - 1;
@@ -638,10 +638,10 @@ function bossSideHTML(g, seat, compact, SC) {
   // everything it can do, with the next one marked, laid over the printed attacks on its card; tap for the full card text
   const moves = `<div class="bossmoves" data-bosscard="${esc(b.cid)}" role="button" tabindex="0" title="Tap for the full text of its attacks"><span class="k">Moveset</span>${(def.attacks || []).map((a, k) => `<span class="bm${k === nx.idx ? ' next' : ''}"><b>${esc(a.name)}</b><i>⚡${a.cost == null ? 1 : a.cost}</i><em>${a.flips ? a.dmg + '×' : a.dmg || '–'}${a.bench ? '+' : ''}</em></span>`).join('')}${nx.charge > 0 ? `<span class="bm ec"><b>Energy Charge</b><i>+${nx.charge}⚡</i><em>–</em></span>` : ''}</div>`;
   // laid out like an opposing player: its Energy along the far edge (its Bench), the Colossal Pokémon in front of it in the middle
-  const slots = Array.from({ length: Math.max(nx.max, p.bench.length) }, (_, k) => (p.bench[k] ? `<div class="etok t-${esc((c.types || ['Colorless'])[0])}">${monHTML(p.bench[k], seat, false, false, scPart)}<span class="elogo" title="One of its Energy">⚡</span></div>` : `<div class="slot" style="--s:${scPart}">energy</div>`)).join('');
+  const slots = Array.from({ length: Math.max(nx.max, p.bench.length) }, (_, k) => (p.bench[k] ? `<div class="eslot${p.bench[k].flags.charged !== false ? ' on' : ''}"><div class="ecard">${p.bench[k].flags.charged !== false ? PT.cardHTML(C(p.bench[k].c).en, scPart * 0.8) : ''}</div>${monHTML(p.bench[k], seat, false, false, scPart)}</div>` : `<div class="eslot gone"><div class="ecard"></div><div class="slot" style="--s:${scPart}">forms next turn</div></div>`)).join('');
   return `<div class="side boss ${live ? 'live' : (g.phase === 'main' && !g.winner ? 'idle' : '')}${rage ? ' raging' : ''}">
     <div class="pname"><span>${esc(g.seats[seat].name)}</span>${turnNow ? '<span class="chip">Its turn</span>' : ''}${g.winner === seat ? '<span class="chip">Winner</span>' : ''}</div>
-    <div class="bossbench" title="It gains Energy every turn and its attacks use it up. Each Energy is a Pokémon on its Bench: Knock it Out or discard it to hold its attacks back."><span class="k">Energy ${p.bench.length} / ${nx.max}</span><div class="bp-row">${slots}</div></div>
+    <div class="bossbench" title="It gains Energy every turn and its attacks use it up. Each Energy sits behind an Energy Crystal. Knock a crystal Out and the Energy behind it is destroyed; the crystal forms again on its next turn."><span class="k">Energy ${nx.have} / ${nx.max}</span><div class="bp-row">${slots}</div></div>
     <div class="bossfield">
       <div class="bossleft">${m ? `<div class="bossnext${coming ? '' : ' rest'}"><span class="k">${!nx.atk || coming ? (turnNow ? 'This turn' : 'Next turn') : 'Charging'}</span>${nextHTML}${jabHTML}</div>` : ''}${lastHTML}</div>
       <div class="bossmid"><div class="bossfig" data-active-slot="${seat}"><div class="bossbody">${fig}${m ? moves : ''}</div></div>

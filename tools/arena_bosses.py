@@ -14,7 +14,7 @@ SETS = {'base set': 'base1', 'base': 'base1', 'jungle': 'base2', 'fossil': 'base
 TYPES = ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting', 'Colorless']
 EFFECTS = {'': None, 'none': None, 'poisoned': 'PSN', 'burned': 'BRN', 'paralyzed': 'PAR', 'asleep': 'SLP', 'confused': 'CNF', 'discard energy': 'energy', 'heal itself': 'heal', 'force switch': 'switch'}
 RULES = {  # label in the sheet -> (key, default)
-    'knock outs the boss needs to win': ('kos', 6), 'most energy it can hold': ('energyMax', 5), 'energy it gains each turn': ('energyPerTurn', 1), 'energy it starts with': ('energyStart', 0), 'energy charge gains': ('energyCharge', 2), 'hp of each energy': ('energyHP', 20),
+    'knock outs the boss needs to win': ('kos', 6), 'most energy it can hold': ('energyMax', 5), 'energy it gains each turn': ('energyPerTurn', 1), 'energy it starts with': ('energyStart', 0), 'energy charge gains': ('energyCharge', 2), 'hp of each energy': ('energyHP', 20), 'hp of each energy crystal': ('energyHP', 20),
     'weak points on its bench': ('_old1', 0), 'extra damage when a weak point is hit': ('_old2', 0),  # from the first version of the sheet: read and ignored
     'biggest hit from one move': ('maxHit', 150), 'super fang, life drain and destiny bond do this much': ('percentHit', 40),
     'poisoned lasts (boss turns)': ('PSN', 2), 'burned lasts (boss turns)': ('BRN', 2), 'confused lasts (boss turns)': ('CNF', 2), 'asleep lasts (boss turns)': ('SLP', 1), 'paralyzed lasts (boss turns)': ('PAR', 1),
@@ -94,18 +94,13 @@ def main():
             elif tok.isdigit() and int(tok) in mine: pat.append(int(tok))
             else: die(f'{w}: pattern entry "{tok}" is not "rest" or one of {name}\'s attack numbers')
         if not any(pat): die(f'{w}: the attack pattern needs at least one attack')
-        mn = text(col(r, 'energy pokémon', 'energy pokemon')); minion = ''
-        if mn:
-            mp = [c for c in cards if c['name'].lower() == mn.lower() and c['st'] == 'Pokémon' and c['set'] in SETS.values()]
-            if not mp: die(f'{w}: no Pokémon card called "{mn}" for its Energy Pokémon')
-            minion = (next((c for c in mp if c['set'] == card['set']), None) or mp[0])['id']
         hp = num(col(r, 'hp'), w + ' HP', 10, 5000)
         if hp % 10: die(f'{w}: HP must be a multiple of 10')
         st = col(r, 'stage', 'order'); stage = num(st, w + ' stage', 1, 20) if st is not None and text(st) != '' else len(bosses) + 1
         bosses.append({'n': len(bosses) + 1, 'stage': stage, 'name': card['name'], 'card': card['id'], 'hp': hp,
                        'type': typ(col(r, 'type'), w + ' type') or (card.get('types') or ['Colorless'])[0], 'wk': typ(col(r, 'weakness'), w + ' weakness'), 'rs': typ(col(r, 'resistance'), w + ' resistance'),
                        'armor': num(col(r, 'armor'), w + ' armor', 0, 100), 'thorns': num(col(r, 'strikes back'), w + ' strikes back', 0, 100), 'enrage': num(col(r, 'enrage'), w + ' enrage', 0, 100),
-                       'pattern': pat, 'attacks': [mine[k] for k in sorted(mine)], 'minion': minion})
+                       'pattern': pat, 'attacks': [mine[k] for k in sorted(mine)]})
     if attacks: die('the Attacks tab has rows for ' + ', '.join(sorted(attacks)) + ', which is not on the Bosses tab')
     if not bosses: die('the Bosses tab is empty')
     # a boss keeps the number it already has in arena-bosses.js (games in progress refer to it); a new boss gets the next free one
@@ -124,7 +119,7 @@ def main():
         key = RULES[label][0]; rules[key] = num(col(r, 'value'), f'Rules row {i}', 0, 1000); seen.add(key)
     if rules['kos'] < 1: die('Rules: the boss needs at least 1 Knock Out to win')
     if not 1 <= rules['energyMax'] <= 5: die('Rules: the most Energy it can hold must be 1 to 5 (the Bench has 5 places)')
-    if rules['energyHP'] < 10 or rules['energyHP'] % 10: die('Rules: the HP of each Energy must be a multiple of 10')
+    if rules['energyHP'] < 10 or rules['energyHP'] % 10: die('Rules: the HP of each Energy Crystal must be a multiple of 10')
     for b in bosses:
         for a in b['attacks']:
             if a['cost'] > rules['energyMax']: die(f"{b['name']}: {a['name']} costs {a['cost']} Energy, more than it can ever hold ({rules['energyMax']})")
@@ -148,7 +143,7 @@ def main():
            f"  conditions: {{ PSN: {rules['PSN']}, BRN: {rules['BRN']}, CNF: {rules['CNF']}, SLP: {rules['SLP']}, PAR: {rules['PAR']} }}, // how many of its own turns a Special Condition lasts on it (0 = immune)",
            '};', 'export const BOSSES = [']
     for b in bosses:
-        out.append(f"  {{ n: {b['n']}, stage: {b['stage']}, name: {js(b['name'])}, card: {js(b['card'])}, hp: {b['hp']}, type: {js(b['type'])}, wk: {js(b['wk'])}, rs: {js(b['rs'])}, armor: {b['armor']}, thorns: {b['thorns']}, enrage: {b['enrage']}, pattern: {js(b['pattern'])}, minion: {js(b['minion'])},")
+        out.append(f"  {{ n: {b['n']}, stage: {b['stage']}, name: {js(b['name'])}, card: {js(b['card'])}, hp: {b['hp']}, type: {js(b['type'])}, wk: {js(b['wk'])}, rs: {js(b['rs'])}, armor: {b['armor']}, thorns: {b['thorns']}, enrage: {b['enrage']}, pattern: {js(b['pattern'])},")
         out.append('    attacks: [' + ', '.join(atk(a) for a in b['attacks']) + '] },')
     out.append('];')
     (ROOT / 'public' / 'js' / 'arena-bosses.js').write_text('\n'.join(out) + '\n', encoding='utf-8', newline='')
