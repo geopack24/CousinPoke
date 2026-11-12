@@ -58,11 +58,11 @@ On the Arena page a boss stays face down until it is the next one to fight. Each
 - **Its Energy is on its Bench.** Each Energy is a Bench target with 20 HP and is also attached to the boss as an Energy card. Knock one Out (attacks that hit the Bench) or discard one (Energy Removal, attacks that discard Energy) and it is gone, which holds the boss's attacks back. No Prize for it.
 - **Its attacks** get past Pokémon Powers that prevent damage (Invisible Wall).
 - **No Weakness or Resistance.** Neither counts in a boss fight, for your Pokémon or the boss.
-- **Special Conditions.** Poison, Burn and Confusion wear off after 2 of its turns. It can't be Asleep or Paralyzed, and effects that stop it attacking, move it, copy it or return it to hand do nothing.
+- **Special Conditions.** Poison, Burn and Confusion wear off after 2 of its turns. Paralysis costs it one turn (no attack, no Energy Charge; it still gains its Energy). Sleep gets the usual wake-up flip and costs it one turn if it stays Asleep. Effects that stop it attacking in other ways, move it, copy it or return it to hand do nothing.
 - **Limits.** No single move takes more than 150 off it. Super Fang, Life Drain and Destiny Bond do a fixed 40 instead.
 - **Traits.** A boss may have armor (less damage from each attack), strike back (damage to whatever hits it) and an enrage bonus at half HP.
 
-The bosses, their attacks and the shared settings come from a spreadsheet: `python tools/arena_bosses.py "Arena bosses.xlsx"` rewrites `public/js/arena-bosses.js`. Left out of the draft: Trainers that do nothing against a boss (Sleep!, Pokémon Flute…) or that have the opponent draw cards (Erika, Blaine's Quizzes, Misty's Duel, Sabrina's Gaze), Trainers that hinge on the opponent's choice (Challenge!, Lt. Surge's Treaty, Misty's Wish), and Mr. Mime, Jynx, Sabrina's Jynx, Sabrina's Hypno and Clefable (with its Clefairy), which are too strong against one huge Pokémon. A card effect that gives the opponent a Prize (Electrode's Buzzap) counts as a Knock Out for the boss.
+The bosses, their attacks and the shared settings come from a spreadsheet: `python tools/arena_bosses.py "Arena bosses.xlsx"` rewrites `public/js/arena-bosses.js`. Left out of the draft: Trainers that do nothing against a boss (Pokémon Flute…) or that have the opponent draw cards (Erika, Blaine's Quizzes, Misty's Duel, Sabrina's Gaze), Trainers that hinge on the opponent's choice (Challenge!, Lt. Surge's Treaty, Misty's Wish), and Mr. Mime, Jynx, Sabrina's Jynx, Sabrina's Hypno and Clefable (with its Clefairy), which are too strong against one huge Pokémon. A card effect that gives the opponent a Prize (Electrode's Buzzap) counts as a Knock Out for the boss.
 
 ## Ranked league
 

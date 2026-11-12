@@ -854,13 +854,20 @@ test('Colossal Pokémon: Poison and Confusion wear off after 2 of its turns; it 
   g = act(g, { type: 'override', op: 'status', target: g.boss.id, code: 'PSN' }); assert.ok(bossMon(g).st.includes('PSN'), 'it can be Poisoned again afterwards');
 });
 
-test('Colossal Pokémon: Paralysis costs it one turn, with no attack and no Energy Charge', () => {
+test('Colossal Pokémon: Paralysis costs it one turn, with no attack and no Energy Charge; Sleep does the same if it fails its wake-up flip', () => {
   let g = bossGame(98, { active: N['Chansey'] }, { conditions: { PSN: 2, BRN: 2, CNF: 2, SLP: 0, PAR: 1 } });
   g = act(g, { type: 'override', op: 'status', target: g.boss.id, code: 'PAR' }); assert.deepEqual(bossMon(g).st, ['PAR']);
   g = act(g, { type: 'endTurn' }); assert.ok(!has(legalActions(g, 'b', DB), 'attack'));
   g = bossTurn(g); assert.equal(active(g, 'a').dmg, 0); assert.equal(g.p.b.bench.length, 1, 'only the Energy every turn brings');
   assert.deepEqual(bossMon(g).st, [], 'it wears off after that turn'); assert.ok(g.log.some((l) => /is Paralyzed and can't act/.test(l.m)));
   g = act(g, { type: 'endTurn' }); g = bossTurn(g); assert.equal(active(g, 'a').dmg, 30, 'back to its pattern');
+  // Sleep: the usual wake-up flip before its turn; if it stays Asleep it loses that one turn and then wakes
+  let z = bossGame(98, { active: N['Chansey'] }, { conditions: { PSN: 2, BRN: 2, CNF: 2, SLP: 1, PAR: 1 } });
+  z = act(z, { type: 'override', op: 'status', target: z.boss.id, code: 'SLP' }); assert.deepEqual(bossMon(z).st, ['SLP']);
+  let t = act(z, { type: 'endTurn' }, { seed: TAILS }); assert.deepEqual(bossMon(t).st, ['SLP'], 'tails: still Asleep');
+  t = bossTurn(t); assert.equal(active(t, 'a').dmg, 0); assert.equal(t.p.b.bench.length, 1); assert.deepEqual(bossMon(t).st, [], 'awake after the turn it lost');
+  let h = act(z, { type: 'endTurn' }, { seed: HEADS }); assert.deepEqual(bossMon(h).st, [], 'heads: it wakes up');
+  h = bossTurn(h); assert.equal(active(h, 'a').dmg, 30, 'and attacks');
 });
 
 test('Colossal Pokémon: Super Fang, Ditto, Metronome, Hurricane and Invisible Wall are kept in check', () => {
@@ -923,7 +930,8 @@ test('the Arena bosses from the spreadsheet are well formed and never show up as
   const pool = arenaPool(DB); assert.ok(!pool.some((e) => DB[e.cid].boss || DB[e.cid].bossPart));
   assert.ok(!goldPool(DB).some((cid) => DB[cid].boss || DB[cid].bossPart));
   assert.ok(pool.some((e) => DB[e.cid].name === 'Energy Removal'), 'a boss has Energy to remove');
-  for (const dead of ['Sleep!', 'Pokémon Flute', 'Erika', "Blaine's Quiz #1", "Misty's Duel", "Sabrina's Gaze", 'Mr. Mime', 'Clefable', "Sabrina's Jynx"]) assert.ok(!pool.some((e) => DB[e.cid].name === dead), dead + ' is not in the Arena pool');
+  assert.ok(pool.some((e) => DB[e.cid].name === 'Sleep!'), 'a boss can be put to sleep');
+  for (const dead of ['Pokémon Flute', 'Erika', "Blaine's Quiz #1", "Misty's Duel", "Sabrina's Gaze", 'Mr. Mime', 'Clefable', "Sabrina's Jynx"]) assert.ok(!pool.some((e) => DB[e.cid].name === dead), dead + ' is not in the Arena pool');
 });
 
 test('Arena reward: a swap replaces a pick of the same size, and a size the deck lacks is never offered', () => {

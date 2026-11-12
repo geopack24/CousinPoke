@@ -17,7 +17,7 @@ RULES = {  # label in the sheet -> (key, default)
     'knock outs the boss needs to win': ('kos', 6), 'most energy it can hold': ('energyMax', 5), 'energy it gains each turn': ('energyPerTurn', 1), 'energy it starts with': ('energyStart', 0), 'energy charge gains': ('energyCharge', 2), 'hp of each energy': ('energyHP', 20),
     'weak points on its bench': ('_old1', 0), 'extra damage when a weak point is hit': ('_old2', 0),  # from the first version of the sheet: read and ignored
     'biggest hit from one move': ('maxHit', 150), 'super fang, life drain and destiny bond do this much': ('percentHit', 40),
-    'poisoned lasts (boss turns)': ('PSN', 2), 'burned lasts (boss turns)': ('BRN', 2), 'confused lasts (boss turns)': ('CNF', 2), 'asleep lasts (boss turns)': ('SLP', 0), 'paralyzed lasts (boss turns)': ('PAR', 1),
+    'poisoned lasts (boss turns)': ('PSN', 2), 'burned lasts (boss turns)': ('BRN', 2), 'confused lasts (boss turns)': ('CNF', 2), 'asleep lasts (boss turns)': ('SLP', 1), 'paralyzed lasts (boss turns)': ('PAR', 1),
     'weakness and resistance count (1 = yes, 0 = no)': ('wr', 0),
 }
 

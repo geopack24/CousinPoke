@@ -10,7 +10,7 @@ export const BOSS_RULES = {
   maxHit: 150,     // the most a single move can take off it
   percentHit: 40,  // what Super Fang, Life Drain and Destiny Bond do to it instead
   wr: 0,           // 1 = Weakness and Resistance count in boss fights; 0 = they don't, for either side
-  conditions: { PSN: 2, BRN: 2, CNF: 2, SLP: 0, PAR: 1 }, // how many of its own turns a Special Condition lasts on it (0 = immune)
+  conditions: { PSN: 2, BRN: 2, CNF: 2, SLP: 1, PAR: 1 }, // how many of its own turns a Special Condition lasts on it (0 = immune)
 };
 export const BOSSES = [
   { n: 1, stage: 1, name: "Raticate", card: "base1-40", hp: 200, type: "Colorless", wk: "", rs: "", armor: 0, thorns: 0, enrage: 0, pattern: [1, 1, 2],

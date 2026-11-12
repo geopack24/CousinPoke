@@ -17,8 +17,8 @@ const BASIC_TYPES = ['Fire', 'Water', 'Grass', 'Lightning', 'Psychic', 'Fighting
 // Not offered in the draft. Rainbow Energy: under the house rules any Energy already pays any cost.
 // Bill: every Arena deck is given 4 of them, so nobody has to spend picks on card draw.
 const NOT_IN_DRAFT = new Set(['Rainbow Energy', 'Bill',
-  // cards that do nothing against a Colossal Pokémon (it has no hand, deck or discard pile, and can't be put to sleep or moved)
-  'Pokémon Flute', "Rocket's Sneak Attack", "The Rocket's Trap", 'Sleep!', "Erika's Perfume", 'Minion of Team Rocket', 'Tickling Machine', "Sabrina's Psychic Control",
+  // cards that do nothing against a Colossal Pokémon (it has no hand, deck or discard pile, and can't be moved)
+  'Pokémon Flute', "Rocket's Sneak Attack", "The Rocket's Trap", "Erika's Perfume", 'Minion of Team Rocket', 'Tickling Machine', "Sabrina's Psychic Control",
   // cards that have the opponent draw cards: a Colossal Pokémon has no deck or hand
   'Erika', "Blaine's Quiz #1", "Blaine's Quiz #2", "Blaine's Quiz #3", "Misty's Duel", "Sabrina's Gaze",
   // Pokémon George took out as too strong against one huge Pokémon (Clefable takes its Clefairy with it)
