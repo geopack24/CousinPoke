@@ -50,6 +50,7 @@ A Trainer whose text needs a Pokémon "with X in its name" (Brock's Training Met
 
 Each Arena game is against one Colossal Pokémon: a single giant with a large HP pool in seat B, no deck, hand or Prizes. `public/js/engine/boss.js` builds the game (`newBossGame`) and the boss cards; the rules live in `engine.js` behind `g.boss`.
 
+- **Reward.** After each win the player is shown 3 cards (`makeSwapOffer`) and may swap one into the deck in place of a pick of the same size: a single card for a single card, an evolution line for a line of the same length. A size the deck has none of is never offered, and what leaves the deck is gone for good.
 - **Winning and losing.** Knock it Out to win. It wins when it has Knocked Out 6 of your Pokémon (Clefairy Doll and Mysterious Fossil don't count). You take a Prize for each sixth of its HP you knock off.
 - **Its turn.** It follows a fixed attack pattern, which may include rest turns; the table always shows what it will do next. Its attacks cost no Energy and get past Pokémon Powers that prevent damage (Invisible Wall).
 - **No Weakness or Resistance.** Neither counts in a boss fight, for your Pokémon or the boss.
@@ -58,7 +59,7 @@ Each Arena game is against one Colossal Pokémon: a single giant with a large HP
 - **Limits.** No single move takes more than 150 off it. Super Fang, Life Drain and Destiny Bond do a fixed 40 instead.
 - **Traits.** A boss may have armor (less damage from each attack), strike back (damage to whatever hits it) and an enrage bonus at half HP.
 
-The bosses, their attacks and the shared settings come from a spreadsheet: `python tools/arena_bosses.py "Arena bosses.xlsx"` rewrites `public/js/arena-bosses.js`. Trainers that do nothing against a boss (Energy Removal, Sleep!, Pokémon Flute…) are left out of the draft.
+The bosses, their attacks and the shared settings come from a spreadsheet: `python tools/arena_bosses.py "Arena bosses.xlsx"` rewrites `public/js/arena-bosses.js`. Trainers that do nothing against a boss (Energy Removal, Sleep!, Pokémon Flute…) or that have the opponent draw cards (Erika, Blaine's Quizzes, Misty's Duel, Sabrina's Gaze) are left out of the draft.
 
 ## Ranked league
 

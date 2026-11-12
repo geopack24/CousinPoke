@@ -870,3 +870,19 @@ table.lgt tr.lead td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
 .ar-boss .ab-tick{position:absolute;inset:0;display:grid;place-items:center;font-size:26px;font-weight:900;color:#5fe08a;text-shadow:0 2px 6px #000;line-height:1}
 .ar-boss.now{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent),0 0 16px rgba(255,203,5,.35)}
 @media (max-width:700px){.ar-ladder{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* ---------- the card swap after a win ---------- */
+.ar-swaprow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}
+.ar-swapc{display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;min-width:0}
+.ar-swapc b{font-size:14px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ar-swapc small{font-size:11.5px;opacity:.75;line-height:1.25}
+.ar-swapbtn{all:unset;cursor:pointer;line-height:0;border-radius:10px;transition:transform .15s,box-shadow .15s;max-width:100%}
+.ar-swapbtn .cd{max-width:100%}
+.ar-swapbtn:hover,.ar-swapbtn:focus-visible{transform:translateY(-4px)}
+.ar-swapc.t-R .ar-swapbtn{box-shadow:0 0 0 2px #4da3ff,0 0 18px rgba(77,163,255,.55)}
+.ar-swapc.t-E .ar-swapbtn{box-shadow:0 0 0 2px #b46bff,0 0 22px rgba(180,107,255,.65)}
+.ar-swapc.t-L .ar-swapbtn{box-shadow:0 0 0 3px #ff9d2e,0 0 28px rgba(255,157,46,.8)}
+.ar-outs{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;max-height:52vh;overflow:auto;padding:4px}
+.ar-out{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;border-radius:10px;border:2px solid transparent;background:var(--well);text-align:center;min-width:0}
+.ar-out b{font-size:12px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ar-out small{font-size:10.5px;opacity:.7}
+.ar-out:hover{border-color:var(--well-line)}.ar-out.sel{border-color:var(--danger);background:rgba(214,58,44,.18)}
+@media (max-width:700px){.ar-swaprow{gap:6px}.ar-swapbtn .cd{--s:.34 !important}.ar-swapc b{font-size:12px}}

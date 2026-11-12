@@ -6,6 +6,7 @@ import { apply, legalActions, canPay, energyUnits } from '../public/js/engine/en
 import { mulberry32 } from '../public/js/engine/rng.js';
 import { validateDeck } from '../public/js/engine/rules.js';
 import { automationReport } from '../public/js/engine/cards/index.js';
+import { makeSwapOffer, swapOuts, applySwap, deckUnits, poolEntry } from '../public/js/arena-draft.js';
 import { arenaPool, botDraft, ARENA, ARENA_REWARDS, goldPool, pickGold, makeOffer, tierOf, addEnergyPick, energyTaken, draftedCount, finalDeck, canOffer, addPick } from '../public/js/arena-draft.js';
 import { TIER_WEIGHTS } from '../public/js/arena-tiers.js';
 import { DEFAULT_RULES } from '../public/js/engine/rules.js';
@@ -852,5 +853,26 @@ test('the Arena bosses from the spreadsheet are well formed and never show up as
   }
   const pool = arenaPool(DB); assert.ok(!pool.some((e) => DB[e.cid].boss || DB[e.cid].bossPart));
   assert.ok(!goldPool(DB).some((cid) => DB[cid].boss || DB[cid].bossPart));
-  for (const dead of ['Energy Removal', 'Super Energy Removal', 'Sleep!', 'Pokémon Flute']) assert.ok(!pool.some((e) => DB[e.cid].name === dead), dead + ' does nothing against a boss');
+  for (const dead of ['Energy Removal', 'Super Energy Removal', 'Sleep!', 'Pokémon Flute', 'Erika', "Blaine's Quiz #1", "Misty's Duel", "Sabrina's Gaze"]) assert.ok(!pool.some((e) => DB[e.cid].name === dead), dead + ' does nothing against a boss');
+});
+
+test('Arena reward: a swap replaces a pick of the same size, and a size the deck lacks is never offered', () => {
+  const zard = N['Charizard'], raichu = N['Raichu'], hitmonchan = N['Hitmonchan'], potion = N['Potion'];
+  // a deck with one Stage 1 line and singles, but no Stage 2 line
+  let cards = {}; for (const k of [raichu]) cards = addPick(DB, cards, k);
+  cards[hitmonchan] = 2; cards[potion] = 1;
+  const units = deckUnits(DB, cards);
+  assert.deepEqual(units.map((u) => u.size).sort(), [1, 1, 1, 4]); assert.equal(units.find((u) => u.size === 4).id, raichu);
+  assert.equal(swapOuts(DB, cards, zard).length, 0, 'no Stage 2 line to replace');
+  for (let n = 1; n <= 60; n++) { const offer = makeSwapOffer(DB, 1234, n, cards); assert.equal(offer.length, 3); for (const k of offer) { const e = poolEntry(DB, k); assert.ok(e.size === 1 || e.size === 4, 'only singles and Stage 1 lines'); assert.ok(swapOuts(DB, cards, k).length); } }
+  assert.deepEqual(makeSwapOffer(DB, 1234, 3, cards), makeSwapOffer(DB, 1234, 3, cards), 'reloading never rerolls');
+  // a Stage 1 line goes in for the Stage 1 line: same number of cards, the old line gone entirely
+  const dugtrio = N['Dugtrio']; assert.deepEqual(swapOuts(DB, cards, dugtrio).map((u) => u.id), [raichu]);
+  const next = applySwap(DB, cards, dugtrio, raichu);
+  assert.equal(draftedCount(next), draftedCount(cards)); assert.ok(!next[raichu] && !next[N['Pikachu']]); assert.equal(next[dugtrio], 2); assert.equal(next[N['Diglett']], 2);
+  // a single card for a single card; never the same card for itself, never past 4 copies, never the last Basic
+  assert.ok(swapOuts(DB, cards, potion).every((u) => u.size === 1 && u.id !== potion));
+  assert.throws(() => applySwap(DB, cards, zard, raichu));
+  const four = { [hitmonchan]: 4, [potion]: 1 }; assert.deepEqual(swapOuts(DB, four, hitmonchan).map((u) => u.id), [], 'a fifth Hitmonchan is not allowed');
+  const one = { [hitmonchan]: 1, [potion]: 1 }; assert.deepEqual(swapOuts(DB, one, N['PlusPower']).map((u) => u.id), [potion], 'the only Basic stays');
 });

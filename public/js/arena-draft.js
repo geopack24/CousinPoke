@@ -18,7 +18,9 @@ const BASIC_TYPES = ['Fire', 'Water', 'Grass', 'Lightning', 'Psychic', 'Fighting
 // Bill: every Arena deck is given 4 of them, so nobody has to spend picks on card draw.
 const NOT_IN_DRAFT = new Set(['Rainbow Energy', 'Bill',
   // cards that do nothing against a Colossal Pokémon (it has no Energy, hand, deck or discard pile, and can't be put to sleep or moved)
-  'Energy Removal', 'Super Energy Removal', 'Pokémon Flute', "Rocket's Sneak Attack", "The Rocket's Trap", 'Sleep!', "Erika's Perfume", 'Minion of Team Rocket', 'Tickling Machine', "Sabrina's Psychic Control"]);
+  'Energy Removal', 'Super Energy Removal', 'Pokémon Flute', "Rocket's Sneak Attack", "The Rocket's Trap", 'Sleep!', "Erika's Perfume", 'Minion of Team Rocket', 'Tickling Machine', "Sabrina's Psychic Control",
+  // cards that have the opponent draw cards: a Colossal Pokémon has no deck or hand
+  'Erika', "Blaine's Quiz #1", "Blaine's Quiz #2", "Blaine's Quiz #3", "Misty's Duel", "Sabrina's Gaze"]);
 
 /** Card signature: reprints (same name, HP, attacks, powers) count as one card. */
 const sig = (c) => JSON.stringify([c.name, c.hp, c.sub, (c.atk || []).map((a) => [a.n, a.d, (a.c || []).length]), c.pw ? c.pw.n : null]);
@@ -124,6 +126,66 @@ export const tierOf = (cid) => TIERS[cid] || 'C';
 export function addPick(db, cards, key, rules) {
   const e = poolEntry(db, key, rules); if (!e) throw new Error('not in the arena pool: ' + key);
   const out = { ...(cards || {}) }; for (const [cid, k] of Object.entries(e.cards)) out[cid] = (out[cid] || 0) + k; return out;
+}
+
+/* ---------- the reward for a win: swap one pick ----------
+   After each boss the player is shown 3 cards and may swap one into the deck. It has to take the place of a pick of
+   the same size: an evolution line for an evolution line of the same length (2 copies of each card), a single card
+   for a single card. What leaves the deck is gone for good. */
+/** The drafted cards taken apart into picks: evolution lines first (longest first), then every other card on its own.
+ *  Each is { id, cid, size, cards }: id is the line's top card for a line, the card itself otherwise. */
+export function deckUnits(db, cards, rules) {
+  const left = { ...(cards || {}) }; const out = [];
+  const lines = arenaPool(db, rules).filter((e) => e.kind === 'line').sort((a, b) => b.size - a.size);
+  for (const e of lines) while (Object.entries(e.cards).every(([cid, k]) => (left[cid] || 0) >= k)) { for (const [cid, k] of Object.entries(e.cards)) left[cid] -= k; out.push({ id: e.key, cid: e.cid, size: e.size, cards: e.cards }); }
+  for (const [cid, k] of Object.entries(left)) for (let i = 0; i < k; i++) out.push({ id: cid, cid, size: 1, cards: { [cid]: 1 } });
+  return out;
+}
+function swapped(cards, e, u) {
+  const out = { ...(cards || {}) };
+  for (const [cid, k] of Object.entries(u.cards)) { out[cid] = (out[cid] || 0) - k; if (out[cid] <= 0) delete out[cid]; }
+  for (const [cid, k] of Object.entries(e.cards)) out[cid] = (out[cid] || 0) + k;
+  return out;
+}
+function swapLegal(db, next, e, rules) {
+  const r = R(rules); if (basicsIn(next, db) < 1) return false;
+  if (e.needs && !Object.keys(next).some((cid) => { const c = db[cid]; return c && c.st === 'Pokémon' && !e.cards[cid] && e.needs.some((w) => c.name.includes(w)); })) return false;
+  const have = nameCounts(next, db); have['Professor Oak'] = (have['Professor Oak'] || 0) + ARENA.oaks;
+  for (const n of Object.keys(e.names)) { const max = r.limits && r.limits[n] != null ? Math.min(r.limits[n], r.maxCopies) : r.maxCopies; if ((have[n] || 0) > max) return false; }
+  return true;
+}
+/** What a card on offer could take the place of: the picks of the same size whose removal leaves a legal deck (one entry per distinct pick). */
+export function swapOuts(db, cards, inKey, rules, units) {
+  const e = poolEntry(db, inKey, rules); if (!e) return [];
+  const seen = new Set(); const out = [];
+  for (const u of units || deckUnits(db, cards, rules)) {
+    if (u.size !== e.size || u.id === e.key || seen.has(u.id)) continue; seen.add(u.id);
+    if (swapLegal(db, swapped(cards, e, u), e, rules)) out.push(u);
+  }
+  return out;
+}
+/** The 3 cards offered after win number n. Deterministic from (seed, n). Only cards that have something of their size
+ *  to replace are in the pool: no Stage 2 line is offered to a deck without one. The tier is rolled first, as in the draft. */
+export function makeSwapOffer(db, seed, n, cards, rules) {
+  const rng = mulberry32(((seed >>> 0) ^ Math.imul(n + 101, 2246822519)) >>> 0);
+  const units = deckUnits(db, cards, rules); const sizes = new Set(units.map((u) => u.size));
+  const pool = arenaPool(db, rules).filter((e) => sizes.has(e.size) && swapOuts(db, cards, e.key, rules, units).length);
+  const out = []; const used = new Set();
+  for (let i = 0; i < 3; i++) {
+    const l = pool.filter((e) => !used.has(e.key)); if (!l.length) break;
+    const by = {}; for (const e of l) (by[e.tier] = by[e.tier] || []).push(e);
+    const tiers = Object.keys(by).filter((t) => (TIER_WEIGHTS[t] || 0) > 0).sort(); if (!tiers.length) break;
+    let roll = rng() * tiers.reduce((a, t) => a + TIER_WEIGHTS[t], 0); let tier = tiers[tiers.length - 1];
+    for (const t of tiers) { roll -= TIER_WEIGHTS[t]; if (roll < 0) { tier = t; break; } }
+    const e = by[tier][Math.floor(rng() * by[tier].length)]; used.add(e.key); out.push(e.key);
+  }
+  return out;
+}
+/** Swap `inKey` in for the pick `outId` (returns the new drafted cards). */
+export function applySwap(db, cards, inKey, outId, rules) {
+  const e = poolEntry(db, inKey, rules); const u = swapOuts(db, cards, inKey, rules).find((x) => x.id === outId);
+  if (!e || !u) throw new Error("That swap isn't allowed");
+  return swapped(cards, e, u);
 }
 
 /** Split the 18 basic Energy between the types the drafted Pokémon use (by the coloured symbols in their attack costs). */
