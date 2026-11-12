@@ -54,10 +54,13 @@ export function arenaPool(db, rules) {
   CACHE = { db, pool };
   return pool;
 }
+/** Names a Trainer depends on: "…with Brock in its name" -> ['Brock']. Such a card is only offered once the deck has a matching Pokémon. */
+const NEEDS = /(?:with|has|have|had|having)\s+"?((?:Lt\. Surge|[A-Z][a-z]+)(?:'s)?)"?\s+in\s+(?:its|their)\s+names?/g;
+function needsOf(c) { if (c.st !== 'Trainer') return null; const w = [...new Set([...(c.txt || '').replace(/\s+/g, ' ').matchAll(NEEDS)].map((m) => m[1].replace(/'s$/, '')))]; return w.length ? w : null; }
 function entry(top, kind, line, copies) {
   const cards = {}; const names = {};
   for (const c of line) { cards[c.id] = (cards[c.id] || 0) + copies; names[c.name] = (names[c.name] || 0) + copies; }
-  return { key: top.id, cid: top.id, kind, tier: TIERS[top.id] || 'C', cards, names, size: line.length * copies, line: line.map((c) => c.id) };
+  return { key: top.id, cid: top.id, kind, tier: TIERS[top.id] || 'C', needs: needsOf(top), cards, names, size: line.length * copies, line: line.map((c) => c.id) };
 }
 
 /** Copies of each name already in the drafted cards (basic Energy doesn't count). */
@@ -65,6 +68,8 @@ function nameCounts(cards, db) { const o = {}; for (const [cid, k] of Object.ent
 export const draftedCount = (cards) => Object.values(cards || {}).reduce((a, b) => a + b, 0);
 function fits(e, cards, db, rules) {
   const r = R(rules); const left = ARENA.picksTo - draftedCount(cards); if (e.size > left) return false;
+  // a Trainer that only works with "X's" Pokémon is no use until the deck has one
+  if (e.needs && !Object.keys(cards || {}).some((cid) => { const c = db[cid]; return c && c.st === 'Pokémon' && e.needs.some((w) => c.name.includes(w)); })) return false;
   const have = nameCounts(cards, db); have['Professor Oak'] = (have['Professor Oak'] || 0) + ARENA.oaks; // the free Oak counts toward the 4-copy limit
   for (const [n, k] of Object.entries(e.names)) { const max = r.limits && r.limits[n] != null ? Math.min(r.limits[n], r.maxCopies) : r.maxCopies; if ((have[n] || 0) + k > max) return false; }
   return true;
@@ -107,6 +112,8 @@ export function makeOffer(db, seed, round, cards, rules) {
   }
   return out.map((e) => e.key);
 }
+/** Can this pool entry be offered to a deck with these drafted cards? */
+export const canOffer = (db, key, cards, rules) => { const e = arenaPool(db, rules).find((x) => x.key === key); return !!e && fits(e, cards, db, rules); };
 export const poolEntry = (db, key, rules) => arenaPool(db, rules).find((e) => e.key === key) || null;
 /** A card's tier letter: C, U, R, E or L. */
 export const tierOf = (cid) => TIERS[cid] || 'C';

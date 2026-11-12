@@ -6,7 +6,7 @@ import { apply, legalActions, canPay, energyUnits } from '../public/js/engine/en
 import { mulberry32 } from '../public/js/engine/rng.js';
 import { validateDeck } from '../public/js/engine/rules.js';
 import { automationReport } from '../public/js/engine/cards/index.js';
-import { arenaPool, botDraft, ARENA, ARENA_REWARDS, goldPool, pickGold, makeOffer, tierOf, addEnergyPick, energyTaken, draftedCount, finalDeck } from '../public/js/arena-draft.js';
+import { arenaPool, botDraft, ARENA, ARENA_REWARDS, goldPool, pickGold, makeOffer, tierOf, addEnergyPick, energyTaken, draftedCount, finalDeck, canOffer, addPick } from '../public/js/arena-draft.js';
 import { TIER_WEIGHTS } from '../public/js/arena-tiers.js';
 import { DEFAULT_RULES } from '../public/js/engine/rules.js';
 
@@ -703,4 +703,21 @@ test('Arena: a basic Energy can be taken instead of a card, and an all-Energy dr
   // a deck drafted under an earlier, longer draft still comes to 60 (the free Oak only goes in while there is room)
   let old = {}; for (let i = 0; i < 41; i++) { const id = Object.keys(addEnergyPick(DB, {}))[0]; old[id] = (old[id] || 0) + 1; }
   assert.equal(Object.values(finalDeck(DB, old)).reduce((a, b) => a + b, 0), 60);
+});
+
+test("Arena: a Trainer that needs \"X's\" Pokémon is only offered once the deck has one", () => {
+  const pool = arenaPool(DB, DEFAULT_RULES);
+  const named = pool.filter((e) => e.needs);
+  assert.deepEqual(named.map((e) => DB[e.cid].name).sort(), ['Blaine', "Brock's Protection", "Brock's Training Method", "Erika's Maids", 'Giovanni', "Giovanni's Last Resort", 'Koga', "Koga's Ninja Trick", 'Misty', 'Sabrina', "Sabrina's ESP", "The Boss's Way"]);
+  for (const e of named) assert.equal(canOffer(DB, e.key, {}, DEFAULT_RULES), false, DB[e.cid].name + ' with an empty deck');
+  // an empty deck is never offered one, whatever the seed
+  for (let seed = 1; seed <= 1500; seed++) for (const k of makeOffer(DB, seed * 31, 0, {}, DEFAULT_RULES)) assert.ok(!pool.find((e) => e.key === k).needs);
+  const brock = pool.find((e) => e.kind !== 'trainer' && Object.keys(e.cards).some((id) => DB[id].name.startsWith("Brock's")));
+  const deck = addPick(DB, {}, brock.key, DEFAULT_RULES);
+  const byName = (n) => pool.find((e) => DB[e.cid].name === n).key;
+  assert.equal(canOffer(DB, byName("Brock's Training Method"), deck, DEFAULT_RULES), true);
+  assert.equal(canOffer(DB, byName("Brock's Protection"), deck, DEFAULT_RULES), true);
+  assert.equal(canOffer(DB, byName('Misty'), deck, DEFAULT_RULES), false, "a Brock's Pokémon doesn't unlock Misty");
+  const dark = pool.find((e) => DB[e.cid].name === 'Dark Charizard');
+  assert.equal(canOffer(DB, byName("The Boss's Way"), addPick(DB, {}, dark.key, DEFAULT_RULES), DEFAULT_RULES), true);
 });
