@@ -1083,3 +1083,37 @@ test('the Token Shop: five of each kind at 1,250, bought with Tokens, shown only
   assert.deepEqual(shop.lookOf({ owned: [], equip: { mat: 'mat-inferno', coin: 'coin-nope' } }), {});
   assert.equal(shop.sideClasses(null), ''); assert.equal(shop.coinClass(undefined), '');
 });
+
+test('Arena: Wildfire shatters one Energy Crystal per card discarded (lit ones first), and Bench counts only see crystals that hold Energy', () => {
+  // Moltres discards 3 Fire Energy: both lit crystals and one unlit one go; nothing is drawn or milled
+  let g = giveEnergy(bossGame(98, { active: { c: cardId('Moltres', 'base3'), en: [N['Fire Energy'], N['Fire Energy'], N['Fire Energy']] } }), 2);
+  assert.equal(g.p.b.bench.length, 5); assert.equal(nrg(g), 2);
+  let r = apply(g, { type: 'attack', index: 0, seat: 'a', seed: 1, answers: [g.p.a.active.en.map((e) => e.id)] }, DB);
+  assert.ok(!r.error && !r.prompt, r.error);
+  const shattered = (st, re) => st.log.filter((l) => /An Energy Crystal shatters/.test(l.m) && re.test(l.m)).length;
+  assert.equal(shattered(r.state, /loses that Energy/), 2, 'the two that held Energy went first'); assert.equal(shattered(r.state, /held no Energy/), 1, 'then an empty one');
+  assert.equal(nrg(r.state), 1, 'so it starts its turn from nothing (plus the one Energy every turn brings)');
+  assert.equal(r.state.p.a.active.en.length, 0); assert.ok(r.state.log.some((l) => /Wildfire: 3 Energy Crystals shatter/.test(l.m)));
+  // one card: one lit crystal
+  g = giveEnergy(bossGame(98, { active: { c: cardId('Moltres', 'base3'), en: [N['Fire Energy'], N['Fire Energy']] } }), 3);
+  r = apply(g, { type: 'attack', index: 0, seat: 'a', seed: 1, answers: [[g.p.a.active.en[0].id]] }, DB);
+  assert.equal(shattered(r.state, /loses that Energy/), 1); assert.equal(shattered(r.state, /held no Energy/), 0); assert.equal(nrg(r.state), 3, '3 - 1 + 1 for its turn');
+  // Dark Hypno's Bench Manipulation: one coin for each crystal that holds Energy, none for the empty ones
+  const hypno = (lit) => { const h = giveEnergy(bossGame(98, { active: { c: cardId('Dark Hypno', 'base5'), en: [N['Psychic Energy'], N['Psychic Energy'], N['Psychic Energy']] } }), lit); return apply(h, { type: 'attack', index: 1, seat: 'a', seed: 4, answers: [] }, DB); };
+  assert.equal(hypno(2).events.filter((e) => e.t === 'flip').length, 2);
+  assert.equal(hypno(0).events.filter((e) => e.t === 'flip').length, 0);
+  assert.equal(hypno(5).events.filter((e) => e.t === 'flip').length, 5);
+});
+
+test('the promos printed in the e-Reader frame are out everywhere, by card id: the promo Rapidash goes, Jungle Rapidash stays', async () => {
+  const bad = (cid) => validateDeck({ cards: { [cid]: 1 } }, DEFAULT_RULES, DB).filter((x) => x.bad && /banned/.test(x.m)).map((x) => x.m);
+  assert.deepEqual(bad('basep-51'), ['Rapidash (this printing) is banned']); assert.deepEqual(bad(cardId('Rapidash', 'base2')), []);
+  for (const id of ['basep-50', 'basep-52', 'basep-53']) assert.equal(bad(id).length, 1, id);
+  const pool = arenaPool(DB, DEFAULT_RULES);
+  assert.ok(!pool.some((e) => Object.keys(e.cards).some((id) => DEFAULT_RULES.bannedIds.includes(id))));
+  assert.ok(pool.some((e) => Object.keys(e.cards).includes(cardId('Rapidash', 'base2'))), 'Jungle Rapidash is still drafted');
+  assert.ok(!goldPool(DB).some((id) => DEFAULT_RULES.bannedIds.includes(id) || DB[id].name === 'Scizor'), 'and none of them turns up as a gold card');
+  const { installLeague } = await import('../public/js/league.js');
+  const keys = installLeague({ CARDS: DB, S: {}, uid: () => 'x', esc: (s) => s, nameOf: () => '' }).pool().map((e) => e.name);
+  assert.ok(keys.includes('Rapidash') && !keys.includes('Rapidash (Promo)') && !keys.includes('Rapidash (Jungle)'));
+});

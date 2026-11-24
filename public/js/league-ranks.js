@@ -40,7 +40,7 @@ export const CLAUDE_SCORE = {
   // 35 to 49: depth
   "Giovanni's Pinsir": 49, "Rocket's Scyther": 49, Jolteon: 49, 'Arcanine (Promo)': 49, "Brock's Golem": 48, 'Magmar (Promo)': 48,
   'Moltres (Fossil)': 47, 'Mewtwo (Base Set)': 47, "Brock's Sandslash (Gym Heroes)": 46, "Misty's Cloyster": 46, Flareon: 46, Jynx: 46,
-  "Brock's Onix (Gym Heroes 21)": 45, "Misty's Seadra": 45, 'Rapidash (Jungle)': 45, "Brock's Golbat": 44, 'Scyther (Promo)': 44,
+  "Brock's Onix (Gym Heroes 21)": 45, "Misty's Seadra": 45, Rapidash: 45, "Brock's Golbat": 44, 'Scyther (Promo)': 44,
   "Blaine's Moltres": 44, 'Dark Vaporeon': 44, 'Articuno (Promo 22)': 43, "Brock's Dugtrio": 43, "Lt. Surge's Electabuzz (Gym Heroes 6)": 43,
   'Zapdos (Promo)': 42, Marowak: 42, "Brock's Ninetales": 42, "Koga's Arbok": 42, "Sabrina's Hypno": 41, Arbok: 41, Nidoqueen: 41,
   'Dark Slowbro': 41, "Lt. Surge's Magneton": 40, "Koga's Weezing": 40, Kabutops: 39, Slowbro: 38, "Rocket's Moltres": 38,
@@ -50,7 +50,7 @@ export const CLAUDE_SCORE = {
   "Misty's Seaking": 34, Tentacruel: 34, Sandslash: 33, 'Electabuzz (Promo 2)': 33, "Erika's Exeggutor": 32, "Misty's Poliwrath": 32,
   Omastar: 31, Onix: 31, Kingler: 31, Starmie: 30, "Sabrina's Slowbro": 29, 'Dark Rapidash': 28, 'Dark Flareon': 27, 'Dark Weezing': 26,
   "Sabrina's Venomoth": 26, "Koga's Golbat": 25, Venomoth: 25, 'Dark Dugtrio': 24, Golbat: 23, Weezing: 22, 'Electrode (Jungle)': 22,
-  "Blaine's Magmar": 22, Cloyster: 21, 'Rapidash (Promo)': 21, 'Electabuzz (Promo 46)': 19, "Lt. Surge's Electabuzz (Gym Heroes 27)": 18,
+  "Blaine's Magmar": 22, Cloyster: 21, 'Electabuzz (Promo 46)': 19, "Lt. Surge's Electabuzz (Gym Heroes 27)": 18,
   "Sabrina's Golduck": 17, 'Dark Electrode': 16, Seaking: 15, Seadra: 15, "Sabrina's Mr. Mime (Gym Challenge)": 14,
   "Sabrina's Mr. Mime (Gym Heroes)": 14, "Blaine's Rhyhorn": 12, "Erika's Tangela": 12, 'Surfing Pikachu': 10, "_____'s Pikachu": 10,
   "Sabrina's Jynx (Gym Challenge)": 8, "Erika's Paras": 8, 'Flying Pikachu': 6, "Blaine's Mankey": 4,

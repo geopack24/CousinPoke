@@ -22,9 +22,10 @@ const NOT_IN_DRAFT = new Set(['Rainbow Energy', 'Bill',
   // cards that have the opponent draw cards: a Colossal Pokémon has no deck or hand
   'Erika', "Blaine's Quiz #1", "Blaine's Quiz #2", "Blaine's Quiz #3", "Misty's Duel", "Sabrina's Gaze", 'Computer Error',
   // Pokémon George took out as too strong against one huge Pokémon (Clefable takes its Clefairy with it)
-  'Mr. Mime', 'Clefable', "Sabrina's Jynx", 'Jynx', "Sabrina's Hypno", 'Togepi', // (Togepi: Mini-Metronome can't copy a boss, like Clefable's Metronome) // (the last two: damage for every damage counter on the Defending Pokémon)
+  'Mr. Mime', 'Clefable', "Sabrina's Jynx", 'Jynx', "Sabrina's Hypno", "Sabrina's Gengar", 'Togepi', // (Togepi: Mini-Metronome can't copy a boss, like Clefable's Metronome) // (the last two: damage for every damage counter on the Defending Pokémon)
   // Trainers that hinge on the opponent's choice, which a boss can't sensibly make
-  'Challenge!', "Lt. Surge's Treaty", "Misty's Wish",
+  'Challenge!', "Lt. Surge's Secret Plan", // (Secret Plan, a face-down card on the Bench: taken out of the Arena at the commissioner's request)
+  "Lt. Surge's Treaty", "Misty's Wish",
   'Devolution Spray', // (marked "remove" in George's rarity sheet)
   'Warp Point']); // (a boss can't be switched, so it was a free Switch; George's report)
 
@@ -36,8 +37,8 @@ let CACHE = null;
 /** The draftable pool: [{ key, cid, kind: 'line'|'basic'|'trainer'|'energy', cards: {cid: n}, size, names: {name: n} }] */
 export function arenaPool(db, rules) {
   if (CACHE && CACHE.db === db) return CACHE.pool;
-  const r = R(rules); const banned = new Set(r.banned || []);
-  const all = Object.values(db).filter((c) => SETS.includes(c.set)).sort((a, b) => ord(a) - ord(b));
+  const r = R(rules); const banned = new Set(r.banned || []); const bannedIds = new Set(r.bannedIds || []);
+  const all = Object.values(db).filter((c) => SETS.includes(c.set) && !bannedIds.has(c.id)).sort((a, b) => ord(a) - ord(b));
   // one printing per distinct card
   const uniq = []; const seen = new Set();
   for (const c of all) { const k = sig(c); if (seen.has(k)) continue; seen.add(k); uniq.push(c); }
@@ -275,7 +276,8 @@ export function botDraft(db, seed, skill, rules) {
 /** Every card that can come in gold: each distinct Pokémon in the sets, promos included (one printing of each). */
 export function goldPool(db) {
   const seen = new Set(); const out = [];
-  for (const c of Object.values(db).filter((x) => SETS.includes(x.set) && x.st === 'Pokémon').sort((a, b) => ord(a) - ord(b))) { const k = sig(c); if (seen.has(k)) continue; seen.add(k); out.push(c.id); }
+  const out0 = R(); const gone = (x) => (out0.banned || []).includes(x.name) || (out0.bannedIds || []).includes(x.id); // no gold versions of cards that are out of the game
+  for (const c of Object.values(db).filter((x) => SETS.includes(x.set) && x.st === 'Pokémon' && !gone(x)).sort((a, b) => ord(a) - ord(b))) { const k = sig(c); if (seen.has(k)) continue; seen.add(k); out.push(c.id); }
   return out;
 }
 /** A random gold card the player doesn't own yet (null once they own them all). */

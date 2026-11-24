@@ -134,6 +134,12 @@ const holds = (x) => x.flags.charged !== false;
 /** How much Energy it has: the crystals that hold one. */
 export const bossEnergy = (g) => P(g, g.boss.seat).bench.filter(holds).length;
 /** Every crystal it has, in order, with whether it holds an Energy (for the table). */
+/** Attacks that read differently in the Arena, where the opponent is a Colossal Pokémon: card name -> attack name -> the
+ *  text shown there. The card scripts carry the matching behaviour. */
+export const ARENA_TEXT = {
+  Moltres: { Wildfire: "You may discard any number of Fire Energy cards attached to Moltres when you use this attack. If you do, shatter that many of the Colossal Pokémon's Energy Crystals (the ones holding Energy go first)." },
+};
+export const arenaText = (card, attack) => ((card && ARENA_TEXT[card.name]) || {})[attack] || null;
 export function bossCrystals(g) { return P(g, g.boss.seat).bench.map((x) => ({ x, lit: holds(x) })); }
 /** A fight saved while empty crystals were kept off the Bench: put them back on it. */
 function oldLayout(g) {

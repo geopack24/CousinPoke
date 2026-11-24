@@ -33,6 +33,9 @@ export const selfDestruct = (n, bench) => ({ effect: (ctx, m) => { ctx.damage(n)
 export const recover = (type) => ({ canUse: ({ g, db, m }) => (g.rules.energyTextAnyType ? m.en.length : m.en.filter((e) => energyIs(db, e, type, g.rules)).length) ? null : `Needs a ${type} Energy to discard`, effect: (ctx, m) => { ctx.requireDiscardEnergy(m, 1, typeFilter(ctx, type)); ctx.heal(m); } });
 export const discardDefenderEnergy = (n) => ({ effect: (ctx) => { ctx.damage(n); const d = ctx.opp.active; if (d && d.en.length) { const k = ctx.chooseCards('Choose an Energy to discard from the Defending Pokémon', d.en, { id: 'discardTheirs' }); ctx.discardEnergy(d, d.en.filter((e) => k.includes(e.id))); } } });
 /** n damage to the Active plus `snipe` to one chosen Benched Pokémon of the opponent. */
+/** The Pokémon that count as being on a player's Bench. A Colossal Pokémon's Bench is its Energy Crystals, and only the
+ *  ones holding Energy count as Pokémon (every crystal can still be picked as a target). */
+export const benched = (ctx, p) => p.bench.filter((x) => !(ctx.db[x.c] || {}).bossPart || x.flags.charged !== false);
 export const benchSnipe = (n, snipe) => ({ effect: (ctx) => { if (n) ctx.damage(n); if (ctx.opp.bench.length) { const k = ctx.chooseMon(`Choose a Benched Pokémon to take ${snipe}`, ctx.opp.bench, { id: 'snipe' })[0]; ctx.benchDamageOne(k, snipe); } } });
 /** Heal self by the damage dealt (Leech Life style); `half` rounds half up to 10. */
 export const drain = (n, half) => ({ effect: (ctx, m) => { const dealt = ctx.damage(n); const heal = half ? Math.ceil(dealt / 20) * 10 : dealt; if (heal) ctx.heal(m, heal); } });

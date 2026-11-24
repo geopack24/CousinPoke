@@ -31,10 +31,16 @@ export const DEFAULT_RULES = {
     'Scizor', 'Entei', 'Suicune', 'Ho-oh', 'Celebi', 'Marill', 'Togepi', 'Cleffa', 'Igglybuff', 'Pichu', 'Smeargle', 'Hitmontop', 'Misdreavus', 'Unown [J]',
     // and every Stadium card:
     "No Removal Gym", "The Rocket's Training Gym", "Celadon City Gym", "Cerulean City Gym", "Pewter City Gym", "Vermilion City Gym", "Narrow Gym", "Chaos Gym", "Resistance Gym", "Cinnabar City Gym", "Fuchsia City Gym", "Rocket's Minefield Gym", "Saffron City Gym", "Viridian City Gym", "Lucky Stadium", "Pokémon Tower"],
+  // single printings that are out, by card id: the four promos printed in the later e-Reader frame, which looks like nothing
+  // else in the game (Celebi, Rapidash, Ho-oh, Suicune). Jungle's Rapidash is untouched.
+  bannedIds: ['basep-50', 'basep-51', 'basep-52', 'basep-53'],
   limits: { 'Energy Removal': 2, 'Super Energy Removal': 2, 'Pokémon Center': 2 },
   notes: '',
 };
 export const R = (r) => Object.assign({}, DEFAULT_RULES, r || {});
+
+/** Is this card out of the game under these rules: by name, or this printing by id? */
+export const isBannedCard = (rules, card) => !!card && ((rules.banned || []).includes(card.name) || (rules.bannedIds || []).includes(card.id));
 
 export function isBasicLike(card) {
   return (card.st === 'Pokémon' && (card.sub === 'Basic' || card.sub === 'Baby')) || (card.st === 'Trainer' && /as if it were a Basic/i.test(card.txt || ''));
@@ -49,6 +55,7 @@ export function validateDeck(deck, rules, db) {
   const byName = {}; let basics = 0; const banned = rules.banned || []; const limits = rules.limits || {};
   for (const [cid, k] of Object.entries(deck.cards || {})) {
     const c = db[cid]; if (!c) { out.push({ bad: true, m: `Unknown card ${cid}` }); continue; }
+    if ((rules.bannedIds || []).includes(cid) && !banned.includes(c.name)) { out.push({ bad: true, m: `${c.name} (this printing) is banned` }); continue; }
     if (isBasicLike(c)) basics += k;
     if (c.st === 'Energy' && c.sub === 'Basic') continue;
     byName[c.name] = (byName[c.name] || 0) + k;

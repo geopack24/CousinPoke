@@ -580,7 +580,7 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const TYPES=['Grass','Fire','Water','Lightning','Psychic','Fighting','Colorless'];
 const TCOL={Grass:'#4caf50',Fire:'#f4511e',Water:'#2196f3',Lightning:'#fdd835',Psychic:'#9c27b0',Fighting:'#a1887f',Colorless:'#e0e0e0'};
-const DEFAULT_RULES={deckSize:60,prizes:6,handSize:7,benchSize:5,maxCopies:4,firstTurnAttack:false,autoDraw:true,mulliganDraw:1,colorlessCosts:true,noAttackAfterRetreat:true,unlimitedTrainers:true,conditionsPersist:true,deckOutDamage:true,multiEvolve:true,confusionSelfDamage:20,conditionsStack:true,askEveryChoice:true,basicEnergyAnyType:true,mulliganRescue:true,dceCountsAsWater:true,energyPickup:true,dceNoReturn:true,evolveSameTurn:true,benchRescue:true,anyVersionEvolves:true,charizardDoubleDiscard:true,weaknessBonus:10,resistanceAmount:20,banned:["Imposter Oak's Revenge",'Impostor Professor Oak','Lass','Scoop Up','Gust of Wind','Scizor','Entei','Suicune','Ho-oh','Celebi','Marill','Togepi','Cleffa','Igglybuff','Pichu','Smeargle','Hitmontop','Misdreavus','Unown [J]',"No Removal Gym","The Rocket's Training Gym","Celadon City Gym","Cerulean City Gym","Pewter City Gym","Vermilion City Gym","Narrow Gym","Chaos Gym","Resistance Gym","Cinnabar City Gym","Fuchsia City Gym","Rocket's Minefield Gym","Saffron City Gym","Viridian City Gym","Lucky Stadium","Pokémon Tower"],limits:{'Energy Removal':2,'Super Energy Removal':2,'Pokémon Center':2},notes:''};
+const DEFAULT_RULES={deckSize:60,prizes:6,handSize:7,benchSize:5,maxCopies:4,firstTurnAttack:false,autoDraw:true,mulliganDraw:1,colorlessCosts:true,noAttackAfterRetreat:true,unlimitedTrainers:true,conditionsPersist:true,deckOutDamage:true,multiEvolve:true,confusionSelfDamage:20,conditionsStack:true,askEveryChoice:true,basicEnergyAnyType:true,mulliganRescue:true,dceCountsAsWater:true,energyPickup:true,dceNoReturn:true,evolveSameTurn:true,benchRescue:true,anyVersionEvolves:true,charizardDoubleDiscard:true,weaknessBonus:10,resistanceAmount:20,banned:["Imposter Oak's Revenge",'Impostor Professor Oak','Lass','Scoop Up','Gust of Wind','Scizor','Entei','Suicune','Ho-oh','Celebi','Marill','Togepi','Cleffa','Igglybuff','Pichu','Smeargle','Hitmontop','Misdreavus','Unown [J]',"No Removal Gym","The Rocket's Training Gym","Celadon City Gym","Cerulean City Gym","Pewter City Gym","Vermilion City Gym","Narrow Gym","Chaos Gym","Resistance Gym","Cinnabar City Gym","Fuchsia City Gym","Rocket's Minefield Gym","Saffron City Gym","Viridian City Gym","Lucky Stadium","Pokémon Tower"],bannedIds:['basep-50','basep-51','basep-52','basep-53'],limits:{'Energy Removal':2,'Super Energy Removal':2,'Pokémon Center':2},notes:''};
 const R=r=>Object.assign({},DEFAULT_RULES,r||{});
 const STATUS=[['SLP','Asleep'],['CNF','Confused'],['PAR','Paralyzed'],['PSN','Poisoned']];
 
@@ -632,10 +632,12 @@ function showModal(title,body,foot,bind,opts){
   document.body.appendChild(bg);if(bind)bind(bg.querySelector('#modal'));
 }
 function askNumber(title,def,cb){showModal(title,`<input type="number" id="askn" value="${def}" min="0" step="1" style="width:8em">`,`<button class="pri" id="askok" type="button">OK</button>`,m=>{const i=m.querySelector('#askn');i.focus();i.select();const ok=()=>{const v=parseInt(i.value,10);closeModal();if(!isNaN(v))cb(v)};m.querySelector('#askok').onclick=ok;i.onkeydown=e=>{if(e.key==='Enter')ok()}})}
+/* Some attacks read differently against a Colossal Pokémon: shown on the Arena page and at Arena tables. */
+const arenaTxt=(c,a)=>(S.screen==='arena'||(S.screen==='game'&&S.game&&S.game.arena))&&window.__arenaText?window.__arenaText(c,a.n):null;
 function viewCard(cid){
   const c=C(cid);const rules=activeRules();const cl=!!rules.colorlessCosts;
-  const banned=(rules.banned||[]).includes(c.name);const lim=rules.limits&&rules.limits[c.name];
-  const atk=(c.atk||[]).map(a=>`<div class="atk"><div class="row"><span class="cost">${dotsHTML(a.c,cl)}</span><b>${esc(a.n)}</b><span class="grow"></span><b>${esc(a.d)}</b></div>${a.t?`<div class="small">${esc(a.t)}</div>`:''}</div>`).join('')+(cl&&(c.atk||[]).length?`<div class="small muted" style="margin-top:6px">House rule: energy types don't matter. Any energy pays these costs.</div>`:'')+(banned?`<div class="notice small" style="margin-top:8px;border-left-color:var(--danger)"><b>Banned</b> under the current rules.</div>`:lim!=null?`<div class="notice small" style="margin-top:8px">Limited to ${lim} per deck under the current rules.</div>`:'');
+  const banned=(rules.banned||[]).includes(c.name)||(rules.bannedIds||[]).includes(c.id);const lim=rules.limits&&rules.limits[c.name];
+  const atk=(c.atk||[]).map(a=>`<div class="atk"><div class="row"><span class="cost">${dotsHTML(a.c,cl)}</span><b>${esc(a.n)}</b><span class="grow"></span><b>${esc(a.d)}</b></div>${arenaTxt(c,a)?`<div class="small"><span class="pill" style="margin-right:6px">In the Arena</span>${esc(arenaTxt(c,a))}</div>`:a.t?`<div class="small">${esc(a.t)}</div>`:''}</div>`).join('')+(cl&&(c.atk||[]).length?`<div class="small muted" style="margin-top:6px">House rule: energy types don't matter. Any energy pays these costs.</div>`:'')+(banned?`<div class="notice small" style="margin-top:8px;border-left-color:var(--danger)"><b>Banned</b> under the current rules.</div>`:lim!=null?`<div class="notice small" style="margin-top:8px">Limited to ${lim} per deck under the current rules.</div>`:'');
   const pw=(c.pw||[]).map(p=>`<div class="atk"><b>Pokémon Power: ${esc(p.n)}</b><div class="small">${esc(p.t)}</div></div>`).join('');
   const meta=[];if(c.hp)meta.push(`${c.hp} HP`);if(c.types)meta.push(c.types.join('/'));if(c.sub)meta.push(c.sub);if(c.ev)meta.push('Evolves from '+c.ev);
   const foot=[];if(c.wk)foot.push('Weakness: '+c.wk.join(', '));if(c.rs)foot.push('Resistance: '+c.rs.join(', '));if(c.st==='Pokémon')foot.push('Retreat: '+c.rc);
@@ -711,7 +713,7 @@ function validateDeck(d,rules){
   rules=R(rules);const out=[];const n=deckCount(d);
   if(n!==rules.deckSize)out.push({bad:true,m:`${n} of ${rules.deckSize} cards`});else out.push({good:true,m:`${n} cards`});
   const byName={};let basics=0;const banned=rules.banned||[];const limits=rules.limits||{};
-  for(const [cid,k] of Object.entries(d.cards||{})){const c=C(cid);if(isBasicLike(c))basics+=k;if(c.st==='Energy'&&c.sub==='Basic')continue;byName[c.name]=(byName[c.name]||0)+k}
+  for(const [cid,k] of Object.entries(d.cards||{})){const c=C(cid);if((rules.bannedIds||[]).includes(cid)&&!banned.includes(c.name)){out.push({bad:true,m:`${c.name} (this printing) is banned`});continue}if(isBasicLike(c))basics+=k;if(c.st==='Energy'&&c.sub==='Basic')continue;byName[c.name]=(byName[c.name]||0)+k}
   for(const [nm,k] of Object.entries(byName)){
     if(banned.includes(nm)){out.push({bad:true,m:`${nm} is banned`});continue}
     const max=limits[nm]!=null?Math.min(limits[nm],rules.maxCopies):rules.maxCopies;
@@ -949,7 +951,7 @@ function currentDeck(){
 }
 function filteredCards(){
   const q=B.q.trim().toLowerCase();const lgset=B.league&&lgBuilder()?LG().legalNames(uid):null;
-  return DATA.cards.filter(c=>{if(!B.sets.has(c.set))return false;if(B.st&&c.st!==B.st)return false;if(lgset&&c.st==='Pokémon'&&!lgset.has(c.name)&&!lgset.has(LG().keyOf(c.id)))return false;
+  return DATA.cards.filter(c=>{if(!B.sets.has(c.set))return false;if(c.st==='Pokémon'&&(DEFAULT_RULES.banned.includes(c.name)||(DEFAULT_RULES.bannedIds||[]).includes(c.id)))return false; /* removed Pokémon aren't listed */if(B.st&&c.st!==B.st)return false;if(lgset&&c.st==='Pokémon'&&!lgset.has(c.name)&&!lgset.has(LG().keyOf(c.id)))return false;
     if(B.type){if(c.st==='Pokémon'){if(!(c.types||[]).includes(B.type))return false}else if(c.st==='Energy'){if(energyType(c)!==B.type)return false}else return false}
     if(B.stage&&c.sub!==B.stage)return false;
     if(q){const hay=(c.name+' '+(c.txt||'')+' '+(c.atk||[]).map(a=>a.n+' '+a.t).join(' ')+' '+(c.pw||[]).map(p=>p.n+' '+p.t).join(' ')).toLowerCase();if(!hay.includes(q))return false}
@@ -970,7 +972,7 @@ function renderBuilder(main){
       </div>
       <div class="filters fl-sets"><span class="flabel">Sets</span><div class="chips">${SETS.map(s=>`<button type="button" class="tag ${B.sets.has(s.id)?'on':''}" data-set="${s.id}">${esc(s.name)}</button>`).join('')}</div></div>
       <div class="filters fl-types"><span class="flabel">Types</span><div class="chips">${TYPES.map(t=>`<button type="button" class="tag ty ${B.type===t?'on':''}" data-type="${t}"><i style="background:${TCOL[t]}"></i>${t}</button>`).join('')}</div></div>
-      <div class="cdgrid">${list.map(c=>{const k=d.cards[c.id]||0;const isBan=bannedSet.has(c.name);const lim=DEFAULT_RULES.limits[c.name];return `<div class="tile${k?' have':''}"><div class="cd click" style="${cardStyle(c.id)}" data-cid="${c.id}" data-view="${c.id}" role="img" aria-label="${esc(c.name)}">${isBan?'<span class="ban">Banned</span>':lim!=null?`<span class="ban lim">Max ${lim}</span>`:''}</div><div class="nm" title="${esc(c.name)}">${esc(c.name)}</div><div class="ct"><button class="sm" type="button" data-dec="${c.id}" ${k?'':'disabled'}>−</button><b>${k}</b><button class="sm" type="button" data-inc="${c.id}">+</button></div></div>`}).join('')}</div>
+      <div class="cdgrid">${list.map(c=>{const k=d.cards[c.id]||0;const isBan=bannedSet.has(c.name)||(DEFAULT_RULES.bannedIds||[]).includes(c.id);const lim=DEFAULT_RULES.limits[c.name];return `<div class="tile${k?' have':''}"><div class="cd click" style="${cardStyle(c.id)}" data-cid="${c.id}" data-view="${c.id}" role="img" aria-label="${esc(c.name)}">${isBan?'<span class="ban">Banned</span>':lim!=null?`<span class="ban lim">Max ${lim}</span>`:''}</div><div class="nm" title="${esc(c.name)}">${esc(c.name)}</div><div class="ct"><button class="sm" type="button" data-dec="${c.id}" ${k?'':'disabled'}>−</button><b>${k}</b><button class="sm" type="button" data-inc="${c.id}">+</button></div></div>`}).join('')}</div>
     </div>
     <div class="deckpane panel${B.paneOpen?' open':''}">${paneStripHTML(d)}${paneBarHTML(d,v)}${paneBodyHTML(d,v)}</div></div>`;
   if(focusId){const el=main.querySelector('#'+focusId);if(el){el.focus();try{el.setSelectionRange(el.value.length,el.value.length)}catch(e){}}}
@@ -1353,8 +1355,8 @@ start();
 import { install } from './js/auto.js';
 import { installLeague } from './js/league.js';
 import { installArena } from './js/arena.js';
-import { bossCards } from './js/engine/boss.js';
-window.__bossCards = bossCards; if (Object.keys(window.PT.CARDS).length) bossCards(window.PT.CARDS);
+import { bossCards, arenaText } from './js/engine/boss.js';
+window.__bossCards = bossCards; window.__arenaText = arenaText; if (Object.keys(window.PT.CARDS).length) bossCards(window.PT.CARDS);
 window.AUTO = install(window.PT);
 window.LEAGUE = installLeague(window.PT);
 window.ARENA = installArena(window.PT);
