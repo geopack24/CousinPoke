@@ -488,6 +488,14 @@ table.lgt tr.lead td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
   #hdr .who .dot{display:none}
   #hdr .chip{max-width:62px;font-size:11px;padding:3px 6px}
 }
+/* six sections don't all fit across a phone: the menu shrinks first, then scrolls sideways rather than pushing the page wide */
+@media (max-width:600px){
+  #hdr nav{flex:1 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  #hdr nav::-webkit-scrollbar{display:none}
+  #hdr nav button{flex:none}
+  #hdr .who{flex:none}
+}
+@media (max-width:480px){#hdr nav{gap:1px}#hdr nav button{padding:5px 5px;font-size:11.5px}#hdr nav #nav-builder{max-width:54px;white-space:normal}}
 
 /* =====================================================================
    ARENA (single player)

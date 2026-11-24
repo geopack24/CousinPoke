@@ -136,7 +136,7 @@
 .shop-coin{perspective:500px}.shop-coin .cf-coin{transform-style:preserve-3d}
 .shop-item .shop-coin .cf-coin{transition:transform .9s cubic-bezier(.2,.7,.2,1)}.shop-item:hover .shop-coin .cf-coin{transform:rotateY(720deg) translateY(-6px)}
 .shop-buy{min-width:120px;font-size:15px}.shop-need{color:var(--muted,#b9b4d6)}
-.shop-back{align-self:flex-start}
+.shoppage{display:flex;flex-direction:column;gap:18px}.shop-earn{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0}
 /* the Arena page's way in */
 .ar-wallet{cursor:pointer;font:inherit;color:inherit}.ar-wallet .ar-shopcta{margin-left:6px;padding:2px 9px;border-radius:999px;background:linear-gradient(90deg,#ffcb05,#ff8a3d);color:#2a1200;font:900 10.5px/1.7 var(--body);letter-spacing:.1em;text-transform:uppercase;animation:shopCan 1.6s ease-in-out infinite alternate}
 .shop-door{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:space-between;padding:14px 18px;border-radius:16px;color:#fff;background:linear-gradient(110deg,#3a0f66,#12256b 55%,#0a3a55);box-shadow:0 0 0 1px rgba(255,200,61,.5),0 0 30px rgba(255,200,61,.18);overflow:hidden;position:relative}

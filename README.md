@@ -46,7 +46,7 @@ It plays through the same rules engine as a person (`public/js/bot.js`). For eve
 
 ## The Token Shop
 
-Arena runs pay Cousin Tokens, and the shop on the Arena page spends them: five play mats, five sets of card sleeves and five coins, 1,250 Tokens each (five perfect runs). A mat covers your side of the table, sleeves are the backs of your cards, and the coin is the one you flip; the other player sees all three. `public/js/shop.js` has the catalogue and the buy and equip rules, `public/shop.css` draws everything with gradients (no image files), and what a player owns and has equipped lives in their Arena document (`owned`, `equip`), which every page already receives.
+Arena runs pay Cousin Tokens, and the Shop page in the top menu spends them: five play mats, five sets of card sleeves and five coins, 1,250 Tokens each (five perfect runs). A mat covers your side of the table, sleeves are the backs of your cards, and the coin is the one you flip; the other player sees all three. `public/js/shop.js` has the catalogue and the buy and equip rules, `public/shop.css` draws everything with gradients (no image files), and what a player owns and has equipped lives in their Arena document (`owned`, `equip`), which every page already receives.
 
 ## The Arena (single player)
 

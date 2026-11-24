@@ -549,6 +549,7 @@ table.dboard th.me{color:var(--fg)}
     <button data-nav="builder" id="nav-builder">Deck builder</button>
     <button data-nav="arena" id="nav-arena">Arena</button>
     <button data-nav="league" id="nav-league">League</button>
+    <button data-nav="shop" id="nav-shop">Shop</button>
     <button data-nav="game" id="nav-game" hidden>Table</button>
   </nav>
   <div class="who">
@@ -681,7 +682,7 @@ async function sync(){
     if(!S.name&&ls.get('pid',null)===uid&&S.players[uid]&&S.players[uid].name){S.name=S.players[uid].name;ls.set('name',S.name);renderHeader();changed=true}
     if(d.decks&&sig('decks')!==lastSig.decks){lastSig.decks=sig('decks');S.decks=d.decks;changed=true}
     if(d.games&&sig('games')!==lastSig.games){lastSig.games=sig('games');S.games=d.games;changed=true}
-    if(d.arena&&sig('arena')!==lastSig.arena){lastSig.arena=sig('arena');S.arena=d.arena;if(S.screen==='arena'||S.screen==='lobby')changed=true}
+    if(d.arena&&sig('arena')!==lastSig.arena){lastSig.arena=sig('arena');S.arena=d.arena;if(S.screen==='arena'||S.screen==='lobby'||S.screen==='shop')changed=true}
     if(d.game){
       if(d.game.missing){if(S.screen==='game'){toast('That table was closed');S.gameId=null;S.game=null;go('lobby')}}
       else if(!d.game.unchanged&&(!S.game||S.game.id!==d.game.id||d.game.version!==S.game.version)){
@@ -733,6 +734,7 @@ function parseDeckText(t){const cards={};const bad=[];t.split(/\r?\n/).forEach(l
 function renderHeader(){
   $('#namebtn').textContent=S.name?S.name:'Set your name';
   document.querySelectorAll('#hdr nav button').forEach(b=>b.classList.toggle('on',b.dataset.nav===S.screen));
+  const onb=document.querySelector('#hdr nav button.on');const nv=document.querySelector('#hdr nav');if(onb&&nv&&nv.scrollWidth>nv.clientWidth)nv.scrollLeft=Math.max(0,onb.offsetLeft-nv.offsetLeft-(nv.clientWidth-onb.offsetWidth)/2); // on a phone the menu scrolls sideways: keep the current section in view
   $('#nav-game').hidden=!S.gameId;
 }
 $('#hdr').addEventListener('click',e=>{const b=e.target.closest('button[data-nav]');if(!b)return;if(b.dataset.nav==='game'&&S.gameId){S.screen='game';render()}else go(b.dataset.nav)});
@@ -769,7 +771,7 @@ $('#namebtn').addEventListener('click',()=>{showModal('Your name',`<p class="sma
 /* ---------- render root ---------- */
 function render(){
   if(!S.ready)return;renderHeader();const main=$('#main');main.className=S.screen==='game'?'wide':S.screen==='builder'?'roomy':'';
-  if(S.screen==='lobby')renderLobby(main);else if(S.screen==='builder')renderBuilder(main);else if(S.screen==='league'){if(LG())LG().render(main);else main.innerHTML='<div class="panel muted">Loading the league…</div>'}else if(S.screen==='arena'){if(AR())AR().render(main);else main.innerHTML='<div class="panel muted">Loading the Arena…</div>'}else renderGame(main);
+  if(S.screen==='lobby')renderLobby(main);else if(S.screen==='builder')renderBuilder(main);else if(S.screen==='league'){if(LG())LG().render(main);else main.innerHTML='<div class="panel muted">Loading the league…</div>'}else if(S.screen==='arena'){if(AR())AR().render(main);else main.innerHTML='<div class="panel muted">Loading the Arena…</div>'}else if(S.screen==='shop'){if(AR())AR().renderShop(main);else main.innerHTML='<div class="panel muted">Loading the shop…</div>'}else renderGame(main);
   if(S.screen==='game'&&S.game&&S.game.arena&&AR())AR().noteGame(S.game);
 }
 
@@ -1314,7 +1316,7 @@ async function start(){
   try{await loadData()}catch(e){$('#main').innerHTML='<div class="panel"><b>Could not load the card database.</b> Reload the page to try again.</div>';return}
   initIdentity();S.ready=true;renderHeader();
   const v=ls.get('view',{screen:'lobby'});
-  if(v.screen==='game'&&v.gameId)openGame(v.gameId);else if(v.screen==='builder')go('builder');else if(v.screen==='league')go('league');else if(v.screen==='arena')go('arena');else go('lobby');
+  if(v.screen==='game'&&v.gameId)openGame(v.gameId);else if(v.screen==='builder')go('builder');else if(v.screen==='league')go('league');else if(v.screen==='arena')go('arena');else if(v.screen==='shop')go('shop');else go('lobby');
   if(S.name)savePlayerName(S.name,true);
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();closeModal()}});
@@ -1356,7 +1358,7 @@ window.__bossCards = bossCards; if (Object.keys(window.PT.CARDS).length) bossCar
 window.AUTO = install(window.PT);
 window.LEAGUE = installLeague(window.PT);
 window.ARENA = installArena(window.PT);
-if (window.PT && window.PT.S && ['game', 'league', 'lobby', 'arena'].includes(window.PT.S.screen)) window.PT.render();
+if (window.PT && window.PT.S && ['game', 'league', 'lobby', 'arena', 'shop'].includes(window.PT.S.screen)) window.PT.render();
 </script>
 </body>
 </html>

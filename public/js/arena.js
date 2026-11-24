@@ -9,7 +9,7 @@ import { play as sfx } from './sfx.js';
 import { SHOP, KINDS, shopHTML, previewHTML, item as shopItem, buy as shopBuy, equip as shopEquip, ownedSet } from './shop.js';
 
 let PT = null;
-const V = { busy: false, noted: new Set(), revealed: null, offer: null, picking: false, peek: null, noClick: false, shop: false };
+const V = { busy: false, noted: new Set(), revealed: null, offer: null, picking: false, peek: null, noClick: false };
 const esc = (s) => PT.esc(s);
 const me = () => PT.uid();
 const C = (cid) => PT.CARDS[cid] || {};
@@ -26,7 +26,7 @@ const goldIds = (d) => ((d && d.gold) || []).map((g) => g.cid);
 /** A card with the gold holographic finish. */
 const goldCard = (cid, s, attrs = '') => `<span class="goldcard" style="--s:${s}" ${attrs}>${PT.cardHTML(cid, s)}</span>`;
 
-export function installArena(bridge) { PT = bridge; return { render, noteGame, closingTable, lobbyFeature, isArenaGame, heroCount }; }
+export function installArena(bridge) { PT = bridge; return { render, renderShop, noteGame, closingTable, lobbyFeature, isArenaGame, heroCount }; }
 export const isArenaGame = (g) => !!(g && g.arena);
 function heroCount() { const r = run(); return r && r.status !== 'done' ? `${r.wins}–${r.losses}` : null; }
 
@@ -274,7 +274,7 @@ async function checkCurrent() {
 /* ---------- views ---------- */
 const TCOL = { Fire: '#f08030', Water: '#6890f0', Grass: '#78c850', Lightning: '#f8d030', Psychic: '#f85888', Fighting: '#c03028', Colorless: '#a8a878' };
 function header(r) {
-  const d = mine(); const wallet = `<button type="button" class="ar-wallet" data-shop="${V.shop ? 0 : 1}" title="Arena winnings. Spend them in the Token Shop."><span aria-hidden="true">${COIN.icon}</span><b>${((d && d.tokens) || 0).toLocaleString()}</b><em>${COIN.name}</em><span class="ar-shopcta">${V.shop ? 'Back' : 'Shop'}</span></button>`;
+  const d = mine(); const wallet = `<button type="button" class="ar-wallet" data-shop="1" title="Arena winnings. Spend them in the Token Shop."><span aria-hidden="true">${COIN.icon}</span><b>${((d && d.tokens) || 0).toLocaleString()}</b><em>${COIN.name}</em><span class="ar-shopcta">Shop</span></button>`;
   const rec = `<div class="ar-headside">${wallet}${r && r.status !== 'done' ? `<div class="ar-record">${recordHTML(r)}</div>` : ''}</div>`;
   return `<header class="arhead${r && r.status === 'draft' ? ' slim' : ''}"><div class="ar-copy"><span class="kicker">Single player</span><h1>The Arena</h1><div class="ornate" aria-hidden="true"></div>
     <p class="small muted">Draft a deck one pick at a time, then take down seven Colossal Pokémon. Seven wins is a perfect run; lose once and the run is over.</p></div>${rec}</header>`;
@@ -509,8 +509,7 @@ export function render(main) {
   if (r && r.gameId) checkCurrent();
   if (r && r.status === 'draft' && draftedCount(r.cards) >= ARENA.picksTo && !V.busy) { A.closeDraft(); main.innerHTML = '<div class="panel muted">Finishing your draft…</div>'; return; }
   const body = !r || r.status === 'done' ? startView(d) : r.status === 'draft' ? draftView(r) : playView(r);
-  main.innerHTML = V.shop ? `<div class="arena">${header(r)}<button type="button" class="shop-back" data-shop="0">← Back to the Arena</button>${shopHTML(d, esc)}</div>`
-    : `<div class="arena">${header(r)}${body}${r && r.status === 'draft' ? '' : shopDoorHTML(d) + goldCaseHTML(d)}<div class="ar-lower">${boardHTML()}${historyHTML(d)}</div></div>`;
+  main.innerHTML = `<div class="arena">${header(r)}${body}${r && r.status === 'draft' ? '' : shopDoorHTML(d) + goldCaseHTML(d)}<div class="ar-lower">${boardHTML()}${historyHTML(d)}</div></div>`;
   if (r && r.status === 'draft') afterDraft();
   main.onkeydown = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('ar-choice')) { e.preventDefault(); pickAnimated(e.target); } };
   main.onpointerdown = holdStart;
@@ -532,7 +531,13 @@ export function render(main) {
     else if (b.dataset.retire) PT.showModal('End this run?', `<p>The run ends with its current record${r ? ` (${r.wins}–${r.losses})` : ''} and pays ${coins(ARENA_REWARDS[Math.min(r ? r.wins : 0, ARENA_REWARDS.length - 1)] || 0)}. This can't be undone.</p>`, '<button class="dng" id="rtok" type="button">End run</button>', (m) => { m.querySelector('#rtok').onclick = async () => { PT.closeModal(); const gid = r && r.gameId; const ok = await A.retire(); if (gid) PT.api('DELETE', 'games/' + gid).catch(() => {}); if (ok && run() && run().status === 'done') chestReveal(run()); }; });
   };
 }
-/* ---------- the Token Shop (shop.js has the catalogue and the drawing; buying goes through the Arena document) ---------- */
+/* ---------- the Token Shop: its own page in the top menu (shop.js has the catalogue and the drawing; buying goes through the Arena document) ---------- */
+export function renderShop(main) {
+  if (!Object.keys(PT.CARDS).length) { main.innerHTML = '<div class="panel muted">Loading…</div>'; return; }
+  main.innerHTML = `<div class="shoppage">${shopHTML(mine(), esc)}<p class="shop-earn small muted">Cousin Tokens come from Arena runs: the more wins, the bigger the chest. <button type="button" class="sm" data-shop="0">Go to the Arena</button></p></div>`;
+  main.onkeydown = null; main.onpointerdown = null;
+  main.onclick = (e) => { const b = e.target.closest('button'); if (b) shopClick(b); };
+}
 function shopDoorHTML(d) {
   const own = ownedSet(d); const show = ['mat-galaxy', 'sleeve-nova', 'coin-prism'].map(shopItem);
   return `<section class="shop-door"><div><span class="kicker">New</span><h2>The Token Shop</h2><p class="small">Play mats, card sleeves and coins for your ${COIN.name}. ${own.size ? `You have ${own.size} of ${SHOP.length}.` : 'Everyone you play sees them.'}</p></div>
@@ -540,7 +545,7 @@ function shopDoorHTML(d) {
 }
 function shopClick(b) {
   const ds = b.dataset;
-  if (ds.shop != null) { V.shop = ds.shop === '1'; PT.render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return true; }
+  if (ds.shop != null) { PT.go(ds.shop === '1' ? 'shop' : 'arena'); return true; }
   if (ds.shopLook) { const it = shopItem(ds.shopLook); if (it) PT.showModal(it.name, `${previewHTML(it, true)}<p style="margin:12px 0 0">${esc(it.blurb)}</p><p class="small muted" style="margin:6px 0 0">${esc(KINDS[it.kind].one)}. ${esc(KINDS[it.kind].what)}</p>`, ''); return true; }
   if (ds.shopOn) { const it = shopItem(ds.shopOn); if (it) A.equip(it.kind, it.id); return true; }
   if (ds.shopOff) { A.equip(ds.shopOff, null); return true; }
