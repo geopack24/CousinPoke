@@ -718,10 +718,21 @@ function checkWin(ctx) {
   }
 }
 
-/** House rule: a player with no Pokémon in play draws until a Basic turns up (at most 7 cards) and puts it in as Active;
- *  the other player draws the same number of cards. Returns false (a loss) when 7 draws or the deck run out without a Basic. */
+/** House rule: a player with no Pokémon in play who holds a Basic must put it in as Active (their choice of which, if
+ *  they hold different ones): nothing is drawn. Only with no Basic in hand do they draw until one turns up (at most 7
+ *  cards) and put it in as Active, and then the other player draws the same number of cards.
+ *  Returns false (a loss) when 7 draws or the deck run out without a Basic. */
 function benchRescue(ctx, s) {
-  const { g, db } = ctx; const p = P(g, s); const drawn = []; let basic = null;
+  const { g, db } = ctx; const p = P(g, s);
+  const held = p.hand.filter((c) => db[c.c] && isBasicLike(db[c.c]));
+  if (held.length) {
+    const pick = new Set(held.map((c) => c.c)).size === 1 ? held[0].id
+      : ctx.chooseCards('You have no Pokémon in play: choose the Basic Pokémon from your hand that comes in as Active', held, { seat: s, id: 'rescueHand', min: 1, max: 1 })[0];
+    const c = pullCard(g, pick); p.active = toMon(c, g.turnNo); g.pending = g.pending.filter((t) => !(t.t === 'promote' && t.seat === s));
+    ctx.log(`${ctx.name(s)} had no Pokémon left and put ${nameOf(db, c.c)} in from hand as Active`); ctx.event({ t: 'play', id: p.active.id, seat: s });
+    return true;
+  }
+  const drawn = []; let basic = null;
   while (drawn.length < 7 && p.deck.length) { const c = p.deck.shift(); drawn.push(c); if (isBasicLike(db[c.c])) { basic = c; break; } }
   for (const c of drawn) if (c !== basic) p.hand.push(c);
   ctx.event({ t: 'draw', seat: s, n: drawn.length });

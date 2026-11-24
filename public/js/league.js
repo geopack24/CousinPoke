@@ -16,7 +16,6 @@ import * as sfx from './sfx.js';
 // ?league=test (any short lowercase name) opens a separate practice league; the real one is 'main'.
 const LID = (() => { try { const v = new URLSearchParams(location.search).get('league'); return v && /^[a-z0-9-]{1,24}$/.test(v) ? v : 'main'; } catch (e) { return 'main'; } })();
 const testBanner = () => (LID === 'main' ? '' : `<div class="notice testlg"><b>Practice league "${LID}"</b>: separate from the real league. Picks, trades and results here don't count. <a href="${location.pathname}">Back to the real league</a></div>`);
-const SETS_OK = new Set(['base1', 'base2', 'base3', 'base5', 'gym1', 'gym2']); // no promos
 const RAR = { 'Rare Holo': 0, Rare: 1, Uncommon: 2, Common: 3 };
 const STAGES = ['Basic', 'Stage 1', 'Stage 2'];
 
@@ -48,7 +47,7 @@ const isCommish = (l = L()) => !!(l && l.commish === me());
 const seasonKeys = (l = L()) => Object.keys((l && l.seasons) || {}).sort((a, b) => +a - +b);
 function prevSeason(l, key) { const ks = seasonKeys(l).filter((k) => +k < +key); return ks.length ? l.seasons[ks[ks.length - 1]] : null; }
 
-const SET_NAMES = { base1: 'Base Set', base2: 'Jungle', base3: 'Fossil', base5: 'Team Rocket', gym1: 'Gym Heroes', gym2: 'Gym Challenge' };
+const SET_NAMES = { base1: 'Base Set', base2: 'Jungle', base3: 'Fossil', base5: 'Team Rocket', gym1: 'Gym Heroes', gym2: 'Gym Challenge', basep: 'Promo' };
 const SET_ORDER = Object.keys(SET_NAMES);
 /** Same card = same HP, stage, type, evolution, attacks (name, cost, damage) and Pokémon Power names. Holo/non-holo prints match; Base Set and Fossil Zapdos don't. */
 const cardSig = (c) => JSON.stringify([+c.hp || 0, c.sub || '', c.types || [], c.ev || '', (c.atk || []).map((a) => [a.n, a.c, a.d]), (c.pw || []).map((x) => x.n)]);
@@ -66,13 +65,14 @@ function pool() {
     if (!e) names.set(c.name, (e = { name: c.name, cards: [], types: new Set(), stages: new Set(), ev: new Set() }));
     e.cards.push(c); (c.types || []).forEach((t) => e.types.add(t)); e.stages.add(c.sub || 'Basic'); if (c.ev) e.ev.add(c.ev);
   }
-  const into = new Map();
-  for (const e of names.values()) for (const f of e.ev) { if (!into.has(f)) into.set(f, new Set()); into.get(f).add(e.name); }
+  const into = new Map(); const intoMain = new Set(); // intoMain: names something outside the promos evolves from
+  for (const e of names.values()) for (const f of e.ev) { if (!into.has(f)) into.set(f, new Set()); into.get(f).add(e.name); if (e.cards.some((c) => c.set !== 'basep')) intoMain.add(f); }
   PRE = new Map();
   const walk = (n, seen) => { const e = names.get(n); if (e) for (const f of e.ev) if (!seen.has(f) && names.has(f)) { seen.add(f); walk(f, seen); } return seen; };
   for (const n of names.keys()) PRE.set(n, walk(n, new Set()));
   FREE = new Set([...names.values()].filter((e) => e.types.size > 0 && [...e.types].every((t) => t === 'Colorless')).map((e) => e.name));
-  BASE = new Set([...names.values()].filter((e) => !FREE.has(e.name) && !e.stages.has('Stage 1') && !e.stages.has('Stage 2') && into.has(e.name)).map((e) => e.name));
+  // (a Basic whose only evolution is a promo, like Scyther with Scizor, stays a pick of its own)
+  BASE = new Set([...names.values()].filter((e) => !FREE.has(e.name) && !e.stages.has('Stage 1') && !e.stages.has('Stage 2') && intoMain.has(e.name)).map((e) => e.name));
   // card-level entries
   BYNAME = new Map(); KEYOF = new Map();
   const ord = (c) => SET_ORDER.indexOf(c.set) * 1000 + (parseInt(c.n, 10) || 0);
@@ -121,8 +121,7 @@ function legality(cards, uid, l = L()) {
   for (const cid of Object.keys(cards || {})) {
     const c = PT.CARDS[cid];
     if (!c || c.st !== 'Pokémon') continue;
-    if (!SETS_OK.has(c.set)) bad.add(c.name + ' (promo)');
-    else if (!ok.has(keyOf(cid)) && !ok.has(c.name)) bad.add(keyOf(cid));
+    if (!ok.has(keyOf(cid)) && !ok.has(c.name)) bad.add(keyOf(cid));
   }
   return { ok: !bad.size, bad: [...bad] };
 }
@@ -1027,7 +1026,7 @@ const HOUSE_FLAGS = [
   ['conditionsStack', 'Asleep, Confused and Paralyzed stack instead of replacing each other'],
   ['deckOutDamage', 'Running out of cards doesn\'t lose: your Active takes 10 damage each turn instead'],
   ['mulliganRescue', 'House mulligan: your opponent may mulligan too (no extra draw); a second miss draws one card at a time (up to 5, opponent draws as many); 5 misses loses'],
-  ['benchRescue', 'No Pokémon left in play: draw until you find a Basic (up to 7) instead of losing; your opponent draws as many'],
+  ['benchRescue', 'No Pokémon left in play: a Basic in your hand must be played. With none in hand, draw until you find a Basic (up to 7) instead of losing; your opponent draws as many'],
   ['askEveryChoice', 'The table always asks you, even when there\'s only one choice'],
 ];
 function rulesTab(l, s) {
@@ -1049,7 +1048,7 @@ function rulesTab(l, s) {
     ${sec('', 'The Draft', `<ul>
       ${li(`Snake order, set by the commissioner: the order reverses every round.`)}
       ${li(`Every distinct card is its own pick. Charizard, Dark Charizard and Blaine's Charizard are three picks, and so are cards that share a name but play differently, like <b>Zapdos (Base Set)</b> and <b>Zapdos (Fossil)</b> (${splitNames} names are split into ${split} picks this way). Holo and non-holo prints of the same card are one pick.`)}
-      ${li(`Not in the draft: Colorless Pokémon (free for everyone), Basic Pokémon that evolve (they come with their evolutions), and promos. That leaves <b>${POOL.length}</b> picks.`)}
+      ${li(`Not in the draft: Colorless Pokémon (free for everyone) and Basic Pokémon that evolve (they come with their evolutions). Promo cards are in, each as its own pick. That leaves <b>${POOL.length}</b> picks.`)}
       ${li(`The draft keeps going until every player presses <b>I'm done drafting</b>. Changing your mind is allowed until everyone has.`)}
       ${li(`The commissioner can make a pick for the player on the clock, undo the last pick, or end or reopen the draft.`)}
     </ul>`)}
@@ -1059,7 +1058,7 @@ function rulesTab(l, s) {
       ${li(`<b>Colorless Pokémon are free for everyone:</b> Chansey, Snorlax, Dragonite, Wigglytuff and the rest.`)}
       ${li(`<b>Trainers and Energy are free for everyone.</b>`)}
       ${li(`Owning one version of a split card doesn't cover the other: Zapdos (Base Set) doesn't let you play Zapdos (Fossil).`)}
-      ${li(`Promo printings aren't allowed in major-match decks.`)}
+      ${li(`Promo cards are allowed like any others: you can play a promo Pokémon if you own that pick.`)}
     </ul>`)}
     ${sec('', 'Keepers', `<ul>
       ${li(`Starting with the second season, each player may keep <b>one</b> Pokémon from last season's roster.`)}

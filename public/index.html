@@ -782,7 +782,7 @@ function rulesForm(r,prefix='r'){
     <label class="chk"><input type="checkbox" id="${prefix}-askEveryChoice" ${r.askEveryChoice!==false?'checked':''}>Always ask, even when there's only one choice (the table never picks for you)</label>
     <label class="chk"><input type="checkbox" id="${prefix}-basicEnergyAnyType" ${r.basicEnergyAnyType!==false?'checked':''}>Any basic Energy counts as any type for card text (search, attach, discard, move); Colorless doesn't</label>
     <label class="chk"><input type="checkbox" id="${prefix}-mulliganRescue" ${r.mulliganRescue!==false?'checked':''}>House mulligan: opponent may mulligan too (no extra draw); a second miss draws one card at a time (max 5, opponent draws as many), 5 misses loses</label>
-    <label class="chk"><input type="checkbox" id="${prefix}-benchRescue" ${r.benchRescue!==false?'checked':''}>No Pokémon left: draw until a Basic (max 7) instead of losing; opponent draws as many</label>
+    <label class="chk"><input type="checkbox" id="${prefix}-benchRescue" ${r.benchRescue!==false?'checked':''}>No Pokémon left: play a Basic from your hand if you hold one; otherwise draw until a Basic (max 7) instead of losing, and the opponent draws as many</label>
     <label class="chk"><input type="checkbox" id="${prefix}-anyVersionEvolves" ${r.anyVersionEvolves!==false?'checked':''}>Evolutions work on any version of the Pokémon (Blaine's, Dark, Rocket's or plain)</label>
     <label class="chk"><input type="checkbox" id="${prefix}-energyPickup" ${r.energyPickup!==false?'checked':''}>Instead of attaching, you may pick up a basic Energy from one of your Pokémon</label>
     <label class="chk"><input type="checkbox" id="${prefix}-dceCountsAsWater" ${r.dceCountsAsWater!==false?'checked':''}>Hydro Pump / Water Gun bonus counts a Double Colorless as 2 Water</label>
@@ -912,7 +912,7 @@ function confirmDeleteGame(id){const cg=(S.game&&S.game.id===id)?S.game:S.games.
   showModal('Close this table?',`<p>The table and its log are removed for everyone.</p>${arenaLive?'<p class="notice" style="border-left-color:var(--danger)"><b>This Arena game isn\u2019t finished.</b> Closing it now counts as a loss, which ends your run.</p>':''}`,`<button class="dng" id="dok" type="button">${arenaLive?'Close and take the loss':'Close table'}</button>`,m=>{m.querySelector('#dok').onclick=async()=>{closeModal();try{if(cg&&cg.arena&&AR()){const full=await api('GET','games/'+id);if(full&&!full.missing)await AR().closingTable(full)}await api('DELETE','games/'+id);if(S.gameId===id){S.gameId=null;S.game=null;if(S.screen==='game')go(cg&&cg.arena?'arena':'lobby')}syncSoon(100)}catch(e){toast('Could not close ('+(e.code||'error')+')')}}})}
 
 /* ---------- deck builder ---------- */
-const B={deckId:null,deck:null,q:'',sets:new Set(['base1','base2','base3','base5','gym1','gym2']),st:'',type:'',stage:'',dirty:false,paneOpen:false,inDeck:false,league:false};
+const B={deckId:null,deck:null,q:'',sets:new Set(['base1','base2','base3','base5','gym1','gym2','basep']),st:'',type:'',stage:'',dirty:false,paneOpen:false,inDeck:false,league:false};
 const lgBuilder=()=>{const l=LG();if(!l||!S.league||!l.isMember(uid))return false;const s=l.season();return !!(s&&s.status!=='setup')};
 let autoT=null,saveState='saved';
 function setSaveState(st){saveState=st;const el=document.querySelector('#dpsave');if(el){el.textContent=st==='saving'?'Saving…':st==='saved'?'Saved ✓':st==='error'?'Not saved ⚠':'Unsaved';el.className='dp-save '+st}}
@@ -937,7 +937,7 @@ function currentDeck(){
 }
 function filteredCards(){
   const q=B.q.trim().toLowerCase();const lgset=B.league&&lgBuilder()?LG().legalNames(uid):null;
-  return DATA.cards.filter(c=>{if(!B.sets.has(c.set))return false;if(B.st&&c.st!==B.st)return false;if(lgset&&c.st==='Pokémon'&&((!lgset.has(c.name)&&!lgset.has(LG().keyOf(c.id)))||c.set==='basep'))return false;
+  return DATA.cards.filter(c=>{if(!B.sets.has(c.set))return false;if(B.st&&c.st!==B.st)return false;if(lgset&&c.st==='Pokémon'&&!lgset.has(c.name)&&!lgset.has(LG().keyOf(c.id)))return false;
     if(B.type){if(c.st==='Pokémon'){if(!(c.types||[]).includes(B.type))return false}else if(c.st==='Energy'){if(energyType(c)!==B.type)return false}else return false}
     if(B.stage&&c.sub!==B.stage)return false;
     if(q){const hay=(c.name+' '+(c.txt||'')+' '+(c.atk||[]).map(a=>a.n+' '+a.t).join(' ')+' '+(c.pw||[]).map(p=>p.n+' '+p.t).join(' ')).toLowerCase();if(!hay.includes(q))return false}

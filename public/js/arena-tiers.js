@@ -13,13 +13,17 @@ export const TIERS = {
   'base5-8': 'L', // Dark Gyarados
   'base5-13': 'L', // Dark Vileplume
   'base3-4': 'L', // Dragonite
+  'basep-5': 'L', // Dragonite
+  'basep-34': 'L', // Entei
   'gym2-4': 'L', // Erika's Venusaur
   'base3-5': 'L', // Gengar
   'gym2-5': 'L', // Giovanni's Gyarados
   'gym2-6': 'L', // Giovanni's Machamp
   'gym2-7': 'L', // Giovanni's Nidoking
   'base1-6': 'L', // Gyarados
+  'basep-52': 'L', // Ho-oh
   'base1-10': 'L', // Mewtwo
+  'basep-3': 'L', // Mewtwo
   'gym2-13': 'L', // Misty's Gyarados
   'base3-12': 'L', // Moltres
   'base3-13': 'L', // Muk
@@ -29,11 +33,16 @@ export const TIERS = {
   'gym2-15': 'L', // Rocket's Zapdos
   'gym2-29': 'L', // Sabrina's Gengar
   'gym1-14': 'L', // Sabrina's Gengar
+  'basep-53': 'L', // Suicune
   'base1-15': 'L', // Venusaur
+  'basep-13': 'L', // Venusaur
   'base3-15': 'L', // Zapdos
   'base1-16': 'L', // Zapdos
   'base1-23': 'E', // Arcanine
+  'basep-6': 'E', // Arcanine
+  'basep-48': 'E', // Articuno
   'gym2-1': 'E', // Blaine's Arcanine
+  'basep-50': 'E', // Celebi
   'base1-71': 'E', // Computer Search
   'base5-4': 'E', // Dark Charizard
   'base5-5': 'E', // Dark Dragonite
@@ -47,11 +56,17 @@ export const TIERS = {
   'gym1-8': 'E', // Lt. Surge's Magneton
   'gym1-28': 'E', // Lt. Surge's Raichu
   'base1-8': 'E', // Machamp
+  'basep-43': 'E', // Machamp
   'base3-11': 'E', // Magneton
+  'basep-8': 'E', // Mew
+  'basep-12': 'E', // Mewtwo
+  'basep-21': 'E', // Moltres
   'base1-88': 'E', // Professor Oak
   'gym2-16': 'E', // Sabrina's Alakazam
+  'basep-33': 'E', // Scizor
   'base1-79': 'E', // Super Energy Removal
   'base2-15': 'E', // Vileplume
+  'basep-22': 'R', // Articuno
   'base1-17': 'R', // Beedrill
   'gym2-21': 'R', // Blaine's Ninetales
   'gym2-3': 'R', // Brock's Ninetales
@@ -67,12 +82,15 @@ export const TIERS = {
   'base3-3': 'R', // Ditto
   'base2-34': 'R', // Dodrio
   'base1-20': 'R', // Electabuzz
+  'basep-2': 'R', // Electabuzz
+  'basep-46': 'R', // Electabuzz
   'base1-92': 'R', // Energy Removal
   'gym1-4': 'R', // Erika's Dragonair
   'base2-35': 'R', // Exeggutor
   'gym2-8': 'R', // Giovanni's Persian
   'base1-7': 'R', // Hitmonchan
   'base3-7': 'R', // Hitmonlee
+  'basep-37': 'R', // Hitmontop
   'base3-8': 'R', // Hypno
   'base2-4': 'R', // Jolteon
   'base2-5': 'R', // Kangaskhan
@@ -82,7 +100,9 @@ export const TIERS = {
   'gym2-28': 'R', // Lt. Surge's Jolteon
   'base1-36': 'R', // Magmar
   'base3-39': 'R', // Magmar
+  'basep-44': 'R', // Magmar
   'base1-9': 'R', // Magneton
+  'basep-47': 'R', // Mew
   'gym1-56': 'R', // Misty's Starmie
   'gym1-10': 'R', // Misty's Tentacruel
   'base2-6': 'R', // Mr. Mime
@@ -100,13 +120,16 @@ export const TIERS = {
   'base5-16': 'R', // Rocket's Sneak Attack
   'gym1-34': 'R', // Sabrina's Venomoth
   'base2-10': 'R', // Scyther
+  'basep-45': 'R', // Scyther
   'base2-11': 'R', // Snorlax
+  'basep-49': 'R', // Snorlax
   'base1-90': 'R', // Super Potion
   'base3-44': 'R', // Tentacruel
   'base5-73': 'R', // The Boss's Way
   'base2-12': 'R', // Vaporeon
   'base2-14': 'R', // Victreebel
   'base2-16': 'R', // Wigglytuff
+  'basep-23': 'R', // Zapdos
   'gym2-32': 'U', // Blaine's Dodrio
   'gym1-36': 'U', // Blaine's Kangaskhan
   'gym2-33': 'U', // Blaine's Rapidash
@@ -114,10 +137,12 @@ export const TIERS = {
   'gym1-20': 'U', // Brock's Golem
   'gym1-41': 'U', // Brock's Lickitung
   'base5-74': 'U', // Challenge!
+  'basep-15': 'U', // Cool Porygon
   'base5-3': 'U', // Dark Blastoise
   'base5-7': 'U', // Dark Golbat
   'base5-10': 'U', // Dark Machamp
   'base5-41': 'U', // Dark Muk
+  'basep-17': 'U', // Dark Persian
   'base5-43': 'U', // Dark Primeape
   'base1-80': 'U', // Defender
   'base1-72': 'U', // Devolution Spray
@@ -130,6 +155,7 @@ export const TIERS = {
   'gym1-16': 'U', // Erika
   'gym1-3': 'U', // Erika's Clefable
   'base2-3': 'U', // Flareon
+  'basep-25': 'U', // Flying Pikachu
   'base1-82': 'U', // Full Heal
   'base5-81': 'U', // Full Heal Energy
   'gym2-24': 'U', // Giovanni's Pinsir
@@ -137,6 +163,7 @@ export const TIERS = {
   'gym1-7': 'U', // Lt. Surge's Fearow
   'gym2-11': 'U', // Lt. Surge's Raichu
   'base1-83': 'U', // Maintenance
+  'basep-39': 'U', // Misdreavus
   'gym1-29': 'U', // Misty's Cloyster
   'gym2-54': 'U', // Misty's Dewgong
   'gym2-12': 'U', // Misty's Golduck
@@ -151,16 +178,19 @@ export const TIERS = {
   'base1-94': 'U', // Potion
   'base5-82': 'U', // Potion Energy
   'base2-43': 'U', // Primeape
+  'basep-51': 'U', // Rapidash
   'base3-61': 'U', // Recycle
   'base2-45': 'U', // Rhydon
   'gym1-11': 'U', // Rocket's Hitmonchan
   'gym1-33': 'U', // Rocket's Snorlax
   'gym1-125': 'U', // Sabrina's Gaze
   'base3-43': 'U', // Slowbro
+  'basep-28': 'U', // Surfing Pikachu
   'base1-95': 'U', // Switch
   'base2-13': 'U', // Venomoth
   'gym2-126': 'U', // Warp Point
   'base3-45': 'U', // Weezing
+  'basep-24': 'U', // _____'s Pikachu
 };
 // How much more often a card comes up than the other cards of its tier (from the sheet's Weight column; 1 when not listed).
 export const TIER_BOOST = {

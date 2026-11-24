@@ -12,7 +12,7 @@ export const ARENA = { picksTo: 40, bills: 4, oaks: 1, energy: 15, deck: 60, win
 export const ENERGY_PICK = 'energy';
 /** Prize for a finished run, by wins: Cousin Tokens (index = wins). A perfect run also wins a gold card. */
 export const ARENA_REWARDS = [0, 15, 30, 50, 75, 100, 150, 250];
-const SETS = ['base1', 'base2', 'base3', 'base5', 'gym1', 'gym2']; // no promos
+const SETS = ['base1', 'base2', 'base3', 'base5', 'gym1', 'gym2', 'basep']; // the promos count like any other set
 const BASIC_TYPES = ['Fire', 'Water', 'Grass', 'Lightning', 'Psychic', 'Fighting'];
 // Not offered in the draft. Rainbow Energy: under the house rules any Energy already pays any cost.
 // Bill: every Arena deck is given 4 of them, so nobody has to spend picks on card draw.
@@ -20,9 +20,9 @@ const NOT_IN_DRAFT = new Set(['Rainbow Energy', 'Bill',
   // cards that do nothing against a Colossal Pokémon (it has no hand, deck or discard pile, and can't be moved)
   'Pokémon Flute', "Rocket's Sneak Attack", "The Rocket's Trap", "Erika's Perfume", 'Minion of Team Rocket', 'Tickling Machine', "Sabrina's Psychic Control",
   // cards that have the opponent draw cards: a Colossal Pokémon has no deck or hand
-  'Erika', "Blaine's Quiz #1", "Blaine's Quiz #2", "Blaine's Quiz #3", "Misty's Duel", "Sabrina's Gaze",
+  'Erika', "Blaine's Quiz #1", "Blaine's Quiz #2", "Blaine's Quiz #3", "Misty's Duel", "Sabrina's Gaze", 'Computer Error',
   // Pokémon George took out as too strong against one huge Pokémon (Clefable takes its Clefairy with it)
-  'Mr. Mime', 'Clefable', "Sabrina's Jynx", 'Jynx', "Sabrina's Hypno", // (the last two: damage for every damage counter on the Defending Pokémon)
+  'Mr. Mime', 'Clefable', "Sabrina's Jynx", 'Jynx', "Sabrina's Hypno", 'Togepi', // (Togepi: Mini-Metronome can't copy a boss, like Clefable's Metronome) // (the last two: damage for every damage counter on the Defending Pokémon)
   // Trainers that hinge on the opponent's choice, which a boss can't sensibly make
   'Challenge!', "Lt. Surge's Treaty", "Misty's Wish",
   'Devolution Spray', // (marked "remove" in George's rarity sheet)
@@ -42,9 +42,10 @@ export function arenaPool(db, rules) {
   const uniq = []; const seen = new Set();
   for (const c of all) { const k = sig(c); if (seen.has(k)) continue; seen.add(k); uniq.push(c); }
   const mon = uniq.filter((c) => c.st === 'Pokémon');
-  const evolvesInto = new Set(mon.filter((c) => c.ev).map((c) => c.ev));
+  // (evolutions that only exist as promos don't stop a Basic being a pick of its own: Scyther stays draftable beside the Scizor line)
+  const evolvesInto = new Set(mon.filter((c) => c.ev && c.set !== 'basep').map((c) => c.ev));
   // species that evolve, whoever owns them: Blaine's Mankey has no "Blaine's Primeape", but a Mankey is still a pre-evolution
-  const speciesEvolves = new Set(mon.filter((c) => c.ev).map((c) => baseSpecies(c.ev)));
+  const speciesEvolves = new Set(mon.filter((c) => c.ev && c.set !== 'basep').map((c) => baseSpecies(c.ev)));
   const byName = new Map(); for (const c of mon) { if (!byName.has(c.name)) byName.set(c.name, []); byName.get(c.name).push(c); }
   /** The printing of a pre-evolution to use: same set if there is one, else the earliest. */
   const pre = (name, set) => { const l = byName.get(name); if (!l) return null; return l.find((c) => c.set === set) || l[0]; };
@@ -271,7 +272,7 @@ export function botDraft(db, seed, skill, rules) {
   return finalDeck(db, cards);
 }
 
-/** Every card that can come in gold: each distinct Pokémon in the six sets (one printing of each). */
+/** Every card that can come in gold: each distinct Pokémon in the sets, promos included (one printing of each). */
 export function goldPool(db) {
   const seen = new Set(); const out = [];
   for (const c of Object.values(db).filter((x) => SETS.includes(x.set) && x.st === 'Pokémon').sort((a, b) => ord(a) - ord(b))) { const k = sig(c); if (seen.has(k)) continue; seen.add(k); out.push(c.id); }

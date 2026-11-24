@@ -397,6 +397,18 @@ test('house rule: with no Pokémon left you draw until a Basic, and the opponent
   assert.equal(g.p.b.hand.length, 2, 'the two Bills drawn on the way went to hand');
   assert.equal(g.p.a.hand.length, 3, 'Ann drew 3 cards too');
   assert.ok(!g.pending.some((t) => t.t === 'promote'), 'no promote step left over');
+  // a Basic in hand has to be played instead: nothing is drawn, by either player
+  let q = setup({ a: { active: { c: N['Hitmonchan'], en: [N['Fighting Energy']] }, deck: [N['Bill'], N['Bill']] }, b: { active: { c: N['Pikachu'], dmg: 30 }, hand: [N['Bill'], N['Chansey']], deck: [N['Bill'], N['Machop'], N['Bill']] } });
+  q = act(q, { type: 'attack', index: 0 });
+  assert.ok(!q.winner); assert.equal(q.p.b.active.c, N['Chansey'], 'the Chansey in hand came in');
+  assert.equal(q.p.b.deck.length, 3, 'Bob drew nothing for it'); assert.equal(q.p.a.hand.length, 0, 'and neither did Ann');
+  assert.ok(q.log.some((l) => /put Chansey in from hand as Active/.test(l.m))); assert.ok(!q.pending.some((t) => t.t === 'promote'));
+  // holding two different Basics, the player chooses which
+  const two = setup({ a: { active: { c: N['Hitmonchan'], en: [N['Fighting Energy']] }, deck: [N['Bill'], N['Bill']] }, b: { active: { c: N['Pikachu'], dmg: 30 }, hand: [N['Machop'], N['Chansey']], deck: [N['Bill'], N['Bill']] } });
+  const ask = apply(two, { type: 'attack', index: 0, seat: 'a', seed: 1, answers: [] }, DB);
+  assert.equal(ask.prompt.seat, 'b'); assert.deepEqual(ask.prompt.options.map((o) => o.label).sort(), ['Chansey', 'Machop']);
+  const chose = actWith(two, { type: 'attack', index: 0 }, [ask.prompt.options.find((o) => o.label === 'Machop').key]);
+  assert.equal(chose.state.p.b.active.c, N['Machop']); assert.equal(chose.state.p.b.hand.filter((c) => c.c === N['Chansey']).length, 1);
   // seven misses is a loss
   let h = setup({ a: { active: { c: N['Hitmonchan'], en: [N['Fighting Energy']] }, deck: Array(8).fill(N['Bill']) }, b: { active: { c: N['Pikachu'], dmg: 30 }, deck: Array(8).fill(N['Bill']) } });
   h = act(h, { type: 'attack', index: 0 });
@@ -661,7 +673,7 @@ test('taking your last prize wins even when a double Knock Out owed you more pri
   assert.equal(s.winner, 'a');
 });
 
-test('the Arena draft never offers banned cards, Stadiums, promos, Rainbow Energy or Bill, and drafts legal 60-card decks with 4 Bills', () => {
+test('the Arena draft never offers banned cards, Stadiums, Rainbow Energy or Bill, includes the promos, and drafts legal 60-card decks with 4 Bills', () => {
   const pool = arenaPool(DB, DEFAULT_RULES);
   const names = new Set(pool.flatMap((e) => Object.keys(e.cards).map((id) => DB[id].name)));
   for (const n of DEFAULT_RULES.banned) assert.ok(!names.has(n), n + ' is in the Arena pool');
@@ -669,7 +681,9 @@ test('the Arena draft never offers banned cards, Stadiums, promos, Rainbow Energ
   assert.ok(!names.has('Bill'), 'Bill is given, not drafted');
   for (const e of pool.filter((x) => x.kind === 'basic')) for (const n of ["Blaine's Mankey", "Blaine's Rhyhorn", "Erika's Jigglypuff", "Erika's Paras"]) assert.notEqual(DB[e.cid].name, n, n + ' is a pre-evolution, not a pick');
   assert.equal(ARENA.picksTo + ARENA.bills + ARENA.oaks + ARENA.energy, 60);
-  assert.ok(!pool.some((e) => Object.keys(e.cards).some((id) => /Stadium/.test(DB[id].sub || '') || id.startsWith('basep'))));
+  assert.ok(!pool.some((e) => Object.keys(e.cards).some((id) => /Stadium/.test(DB[id].sub || ''))));
+  // promos are allowed like any other set: Mega Drain Venusaur is a pick, and Scyther is still one beside the promo Scizor line
+  assert.ok(pool.some((e) => e.key === 'basep-13' && e.kind === 'line' && e.size === 6)); assert.ok(pool.some((e) => e.key === 'base2-10' && e.kind === 'basic')); assert.ok(pool.some((e) => DB[e.cid].name === 'Scizor' && e.kind === 'line'));
   for (let seed = 1; seed <= 25; seed++) {
     const d = botDraft(DB, seed, 0.5, DEFAULT_RULES);
     assert.equal(Object.values(d).reduce((a, b) => a + b, 0), 60);
@@ -683,7 +697,7 @@ test('Arena prizes: more wins pay more Cousin Tokens, and a gold card is always 
   assert.equal(ARENA_REWARDS.length, ARENA.wins + 1);
   for (let w = 1; w <= ARENA.wins; w++) assert.ok(ARENA_REWARDS[w] > ARENA_REWARDS[w - 1]);
   const pool = goldPool(DB);
-  assert.ok(pool.length > 300 && pool.every((id) => DB[id].st === 'Pokémon' && !id.startsWith('basep')));
+  assert.ok(pool.length > 300 && pool.every((id) => DB[id].st === 'Pokémon')); assert.ok(pool.includes('basep-13'), 'promos can come in gold too');
   const owned = pool.slice(0, pool.length - 1);
   for (let i = 0; i < 20; i++) assert.equal(pickGold(DB, owned), pool[pool.length - 1]);
   assert.equal(pickGold(DB, pool), null);

@@ -150,7 +150,7 @@ const S = {
   // 30 Togepi
   'basep-30': { attacks: { Snivel: reduceNext(20), 'Mini-Metronome': { effect: (ctx, m) => {
     if (!ctx.flip()) { ctx.log('Mini-Metronome: the attack does nothing'); return; }
-    const d = ctx.opp.active; if (!d) return; const atks = ctx.cardFor(d).atk || []; if (!atks.length) { ctx.log('Nothing to copy'); return; }
+    const d = ctx.opp.active; if (!d) return; const atks = ctx.db[d.c].boss ? [] : ctx.cardFor(d).atk || []; if (!atks.length) { ctx.log('Nothing to copy'); return; }
     const k = ctx.choose({ id: 'minimetronome', title: 'Copy which attack?', options: atks.map((a) => ({ key: a.n, label: `${a.n} ${a.d || ''}` })) })[0];
     const atk = atks.find((a) => a.n === k); ctx.log(`Mini-Metronome copies ${atk.n}`); ctx.runAttack(m, atk, ctx.cardFor(d).id);
   } } } },
