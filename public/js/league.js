@@ -13,6 +13,7 @@
 import { playTurnChime } from './fx.js';
 import * as sfx from './sfx.js';
 import { CLAUDE_RANK } from './league-ranks.js';
+import { DEFAULT_RULES } from './engine/rules.js';
 
 // ?league=test (any short lowercase name) opens a separate practice league; the real one is 'main'.
 const LID = (() => { try { const v = new URLSearchParams(location.search).get('league'); return v && /^[a-z0-9-]{1,24}$/.test(v) ? v : 'main'; } catch (e) { return 'main'; } })();
@@ -53,6 +54,7 @@ const SET_ORDER = Object.keys(SET_NAMES);
 /** Same card = same HP, stage, type, evolution, attacks (name, cost, damage) and Pokémon Power names. Holo/non-holo prints match; Base Set and Fossil Zapdos don't. */
 const cardSig = (c) => JSON.stringify([+c.hp || 0, c.sub || '', c.types || [], c.ev || '', (c.atk || []).map((a) => [a.n, a.c, a.d]), (c.pw || []).map((x) => x.n)]);
 let KEYOF = null; // card id -> pick key
+const BANNED = new Set(DEFAULT_RULES.banned || []);
 const RANKS = new Map(CLAUDE_RANK.map((k, i) => [k, i + 1])); // pick key -> Claude-Rank (1 is the best pick)
 const byRank = (a, b) => (a.rank || 1e9) - (b.rank || 1e9) || a.name.localeCompare(b.name);
 
@@ -63,7 +65,7 @@ function pool() {
   const names = new Map();
   for (const id of Object.keys(PT.CARDS)) {
     const c = PT.CARDS[id];
-    if (c.st !== 'Pokémon' || !SET_NAMES[c.set]) continue;
+    if (c.st !== 'Pokémon' || !SET_NAMES[c.set] || BANNED.has(c.name)) continue; // a banned Pokémon (Scizor) is not a pick
     let e = names.get(c.name);
     if (!e) names.set(c.name, (e = { name: c.name, cards: [], types: new Set(), stages: new Set(), ev: new Set() }));
     e.cards.push(c); (c.types || []).forEach((t) => e.types.add(t)); e.stages.add(c.sub || 'Basic'); if (c.ev) e.ev.add(c.ev);

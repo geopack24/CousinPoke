@@ -26,7 +26,9 @@ export const DEFAULT_RULES = {
   charizardDoubleDiscard: true, // Base Set Charizard's Fire Spin may discard energy worth 2 (one Double Colorless) instead of 2 cards
   weaknessBonus: 10,           // Weakness adds this much damage (0 = official doubling)
   resistanceAmount: 20,        // Resistance takes this much off (official: 30)
-  banned: ["Imposter Oak's Revenge", 'Impostor Professor Oak', 'Lass', 'Scoop Up', 'Gust of Wind', // and every Stadium card:
+  banned: ["Imposter Oak's Revenge", 'Impostor Professor Oak', 'Lass', 'Scoop Up', 'Gust of Wind',
+    'Scizor', // not one of the original Pokémon; a banned Pokémon is also left out of the league and Arena drafts
+    // and every Stadium card:
     "No Removal Gym", "The Rocket's Training Gym", "Celadon City Gym", "Cerulean City Gym", "Pewter City Gym", "Vermilion City Gym", "Narrow Gym", "Chaos Gym", "Resistance Gym", "Cinnabar City Gym", "Fuchsia City Gym", "Rocket's Minefield Gym", "Saffron City Gym", "Viridian City Gym", "Lucky Stadium", "Pokémon Tower"],
   limits: { 'Energy Removal': 2, 'Super Energy Removal': 2, 'Pokémon Center': 2 },
   notes: '',

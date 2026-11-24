@@ -41,7 +41,7 @@ export function arenaPool(db, rules) {
   // one printing per distinct card
   const uniq = []; const seen = new Set();
   for (const c of all) { const k = sig(c); if (seen.has(k)) continue; seen.add(k); uniq.push(c); }
-  const mon = uniq.filter((c) => c.st === 'Pokémon');
+  const mon = uniq.filter((c) => c.st === 'Pokémon' && !banned.has(c.name)); // a banned Pokémon (Scizor) is never drafted
   // (evolutions that only exist as promos don't stop a Basic being a pick of its own: Scyther stays draftable beside the Scizor line)
   const evolvesInto = new Set(mon.filter((c) => c.ev && c.set !== 'basep').map((c) => c.ev));
   // species that evolve, whoever owns them: Blaine's Mankey has no "Blaine's Primeape", but a Mankey is still a pre-evolution
