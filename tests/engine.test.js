@@ -1135,3 +1135,11 @@ test('Arena: Energy Removal and Super Energy Removal can be pointed at a lit Ene
   // Super Energy Removal on a crystal takes that Energy and one more, for one of your own
   s = play(ser, lit[0]); assert.equal(nrg(s), 1); assert.equal(s.p.b.active.en.length, 1); assert.equal(s.p.a.active.en.length, 0);
 });
+
+test('Arena: if the same attack Knocks Out the Colossal Pokémon and gives it its last Knock Out, the player wins', () => {
+  // Magneton's Selfdestruct (80 to the boss, 80 to itself) with the boss 80 from falling and one Knock Out from winning
+  const g = bossGame(98, { active: { c: N['Magneton'], en: [N['Lightning Energy'], N['Lightning Energy'], N['Lightning Energy'], N['Lightning Energy']] }, bench: [N['Pikachu']] });
+  g.boss.kos = g.boss.r.kos - 1; bossMon(g).dmg = DB[g.boss.cid].hp - 80; g.boss.seen = bossMon(g).dmg;
+  const r = apply(g, { type: 'attack', index: 1, seat: 'a', seed: 1, answers: [] }, DB);
+  assert.ok(!r.error && !r.prompt, r.error); assert.equal(r.state.winner, 'a'); assert.ok(r.state.log.some((l) => /has fallen/.test(l.m)));
+});
