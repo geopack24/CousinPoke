@@ -1026,13 +1026,16 @@ test('Arena reward: a swap replaces a pick of the same size, and a size the deck
 
 test('Claude-Rank covers every league draft pick exactly once', async () => {
   const { installLeague } = await import('../public/js/league.js');
-  const { CLAUDE_RANK } = await import('../public/js/league-ranks.js');
+  const { CLAUDE_RANK, CLAUDE_SCORE } = await import('../public/js/league-ranks.js');
   const pool = installLeague({ CARDS: DB, S: {}, uid: () => 'x', esc: (s) => s, nameOf: () => '' }).pool();
   const keys = pool.map((e) => e.name);
   assert.deepEqual(keys.filter((k) => !CLAUDE_RANK.includes(k)), [], 'picks with no rank');
   assert.deepEqual(CLAUDE_RANK.filter((k) => !keys.includes(k)), [], 'ranked names that are not picks');
   assert.equal(new Set(CLAUDE_RANK).size, CLAUDE_RANK.length, 'no pick is ranked twice');
   assert.equal(pool.find((e) => e.name === CLAUDE_RANK[0]).rank, 1);
+  // every pick has a whole-number score from 1 to 100, and the order runs from the highest score down
+  for (const e of pool) assert.ok(Number.isInteger(e.score) && e.score >= 1 && e.score <= 100 && e.score === CLAUDE_SCORE[e.name], e.name);
+  for (let i = 1; i < CLAUDE_RANK.length; i++) assert.ok(CLAUDE_SCORE[CLAUDE_RANK[i - 1]] >= CLAUDE_SCORE[CLAUDE_RANK[i]]);
   // a pick that brings another pick with it never ranks below it
   const rank = (k) => CLAUDE_RANK.indexOf(k);
   for (const n of ['Scizor', 'Entei', 'Suicune', 'Ho-oh', 'Celebi', 'Marill', 'Pichu', 'Hitmontop', 'Misdreavus', 'Unown [J]']) assert.ok(!keys.includes(n), n + ' is banned, so it is not a pick');
