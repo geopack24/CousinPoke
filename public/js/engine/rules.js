@@ -27,7 +27,8 @@ export const DEFAULT_RULES = {
   weaknessBonus: 10,           // Weakness adds this much damage (0 = official doubling)
   resistanceAmount: 20,        // Resistance takes this much off (official: 30)
   banned: ["Imposter Oak's Revenge", 'Impostor Professor Oak', 'Lass', 'Scoop Up', 'Gust of Wind',
-    'Scizor', // not one of the original Pokémon; a banned Pokémon is also left out of the league and Arena drafts
+    // Pokémon that aren't among the original ones (the promos' Johto Pokémon); a banned Pokémon is also left out of the league and Arena drafts:
+    'Scizor', 'Entei', 'Suicune', 'Ho-oh', 'Celebi', 'Marill', 'Togepi', 'Cleffa', 'Igglybuff', 'Pichu', 'Smeargle', 'Hitmontop', 'Misdreavus', 'Unown [J]',
     // and every Stadium card:
     "No Removal Gym", "The Rocket's Training Gym", "Celadon City Gym", "Cerulean City Gym", "Pewter City Gym", "Vermilion City Gym", "Narrow Gym", "Chaos Gym", "Resistance Gym", "Cinnabar City Gym", "Fuchsia City Gym", "Rocket's Minefield Gym", "Saffron City Gym", "Viridian City Gym", "Lucky Stadium", "Pokémon Tower"],
   limits: { 'Energy Removal': 2, 'Super Energy Removal': 2, 'Pokémon Center': 2 },

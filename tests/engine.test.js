@@ -682,8 +682,8 @@ test('the Arena draft never offers banned cards, Stadiums, Rainbow Energy or Bil
   for (const e of pool.filter((x) => x.kind === 'basic')) for (const n of ["Blaine's Mankey", "Blaine's Rhyhorn", "Erika's Jigglypuff", "Erika's Paras"]) assert.notEqual(DB[e.cid].name, n, n + ' is a pre-evolution, not a pick');
   assert.equal(ARENA.picksTo + ARENA.bills + ARENA.oaks + ARENA.energy, 60);
   assert.ok(!pool.some((e) => Object.keys(e.cards).some((id) => /Stadium/.test(DB[id].sub || ''))));
-  // promos are allowed like any other set: Mega Drain Venusaur is a pick. Scizor is banned (not an original Pokémon), so only Scyther is one
-  assert.ok(pool.some((e) => e.key === 'basep-13' && e.kind === 'line' && e.size === 6)); assert.ok(pool.some((e) => e.key === 'base2-10' && e.kind === 'basic')); assert.ok(!pool.some((e) => Object.keys(e.cards).some((id) => DB[id].name === 'Scizor')));
+  // promos are allowed like any other set: Mega Drain Venusaur is a pick. the promos' Johto Pokémon are banned (not original Pokémon), so no Scizor or Entei, and Scyther is a pick of its own
+  assert.ok(pool.some((e) => e.key === 'basep-13' && e.kind === 'line' && e.size === 6)); assert.ok(pool.some((e) => e.key === 'base2-10' && e.kind === 'basic')); assert.ok(!pool.some((e) => Object.keys(e.cards).some((id) => ['Scizor', 'Entei', 'Suicune', 'Ho-oh', 'Celebi', 'Pichu', 'Togepi'].includes(DB[id].name))));
   assert.ok(validateDeck({ cards: { 'basep-33': 1 } }, DEFAULT_RULES, DB).some((x) => x.bad && /Scizor is banned/.test(x.m)));
   for (let seed = 1; seed <= 25; seed++) {
     const d = botDraft(DB, seed, 0.5, DEFAULT_RULES);
@@ -1035,6 +1035,10 @@ test('Claude-Rank covers every league draft pick exactly once', async () => {
   assert.equal(pool.find((e) => e.name === CLAUDE_RANK[0]).rank, 1);
   // a pick that brings another pick with it never ranks below it
   const rank = (k) => CLAUDE_RANK.indexOf(k);
-  assert.ok(!keys.includes('Scizor'), 'Scizor is banned, so it is not a pick'); assert.ok(keys.includes('Scyther (Jungle)'));
-  assert.ok(rank('Charizard') < rank('Charmeleon')); assert.ok(rank('Dark Alakazam') < rank('Dark Kadabra'));
+  for (const n of ['Scizor', 'Entei', 'Suicune', 'Ho-oh', 'Celebi', 'Marill', 'Pichu', 'Hitmontop', 'Misdreavus', 'Unown [J]']) assert.ok(!keys.includes(n), n + ' is banned, so it is not a pick');
+  assert.ok(keys.includes('Scyther (Jungle)')); assert.ok(keys.includes('Mew (Promo 8)'), 'Mew is an original Pokémon');
+  // only the last Pokémon of a line is a pick: the middle stages come with it
+  for (const n of ['Charmeleon', 'Dark Kadabra', 'Haunter (Fossil)', 'Kabuto', "Erika's Gloom (Gym Heroes 45)"]) assert.ok(!keys.includes(n), n + ' evolves, so it is not a pick');
+  assert.ok(rank('Charizard') === 0 && keys.includes('Gengar') && keys.includes('Kabutops') && keys.includes("Blaine's Mankey"));
+  assert.ok(pool.every((e) => e.next.length === 0), 'nothing in the pool evolves further');
 });

@@ -25,7 +25,8 @@ let PT = null;
 const V = { tab: 'overview', q: '', type: '', stage: '', avail: 'open', sort: 'rank', season: null, tradeWith: '', give: new Set(), get: new Set(), note: '', busy: false, moveName: '' };
 let POOL = null, BYNAME = null, PRE = null, FREE = null, BASE = null;
 // FREE: Colorless Pokémon, usable by everyone and never drafted.
-// BASE: Basic Pokémon that evolve into something; never drafted, playable through whatever they evolve into.
+// BASE: Pokémon that evolve into something (Basics and middle stages alike); never drafted, playable through whatever they evolve into.
+//       Only the most evolved Pokémon of a line is a pick.
 let clockKey = null;
 let pickSeen = null; // 'season:count' of picks already shown, so only new picks get the reveal
 let champSeen = null; // majors already won when we last looked, so only new winners get the trophy reveal
@@ -61,11 +62,11 @@ const byRank = (a, b) => (a.rank || 1e9) - (b.rank || 1e9) || a.name.localeCompa
 /** The draft pool. A pick is one distinct card: its key is the card name, plus the set (and number, if needed) when one name covers different cards. */
 function pool() {
   if (POOL) return POOL;
-  // name-level facts: evolution links, Colorless, Basics that evolve
+  // name-level facts: evolution links, Colorless, Pokémon that evolve further
   const names = new Map();
   for (const id of Object.keys(PT.CARDS)) {
     const c = PT.CARDS[id];
-    if (c.st !== 'Pokémon' || !SET_NAMES[c.set] || BANNED.has(c.name)) continue; // a banned Pokémon (Scizor) is not a pick
+    if (c.st !== 'Pokémon' || !SET_NAMES[c.set] || BANNED.has(c.name)) continue; // a banned Pokémon (the promos' Johto Pokémon) is not a pick
     let e = names.get(c.name);
     if (!e) names.set(c.name, (e = { name: c.name, cards: [], types: new Set(), stages: new Set(), ev: new Set() }));
     e.cards.push(c); (c.types || []).forEach((t) => e.types.add(t)); e.stages.add(c.sub || 'Basic'); if (c.ev) e.ev.add(c.ev);
@@ -77,7 +78,7 @@ function pool() {
   for (const n of names.keys()) PRE.set(n, walk(n, new Set()));
   FREE = new Set([...names.values()].filter((e) => e.types.size > 0 && [...e.types].every((t) => t === 'Colorless')).map((e) => e.name));
   // (a Basic whose only evolution is a promo, like Scyther with Scizor, stays a pick of its own)
-  BASE = new Set([...names.values()].filter((e) => !FREE.has(e.name) && !e.stages.has('Stage 1') && !e.stages.has('Stage 2') && intoMain.has(e.name)).map((e) => e.name));
+  BASE = new Set([...names.values()].filter((e) => !FREE.has(e.name) && intoMain.has(e.name)).map((e) => e.name));
   // card-level entries
   BYNAME = new Map(); KEYOF = new Map();
   const ord = (c) => SET_ORDER.indexOf(c.set) * 1000 + (parseInt(c.n, 10) || 0);
@@ -107,7 +108,7 @@ function notDraftable(key) {
   const e = BYNAME.get(key);
   if (!e) return 'Unknown Pokémon';
   if (FREE.has(e.base)) return `${e.base} is Colorless, so it's free for everyone and can't be drafted`;
-  if (BASE.has(e.base)) return `${e.base} evolves, so it isn't drafted. Own one of its evolutions to play it`;
+  if (BASE.has(e.base)) return `${e.base} evolves, so it isn't drafted. Own the last Pokémon of its line to play it`;
   return null;
 }
 
@@ -734,7 +735,7 @@ function render(main) {
   if (!l) {
     main.innerHTML = `<div class="lg"><div class="panel" style="max-width:640px;margin:0 auto"><h2>Ranked league</h2>
       <p>A yearly draft where each Pokémon name is its own pick (Charizard, Dark Charizard and Blaine's Charizard are three different picks), one keeper per player, trades, and standings from ranked games.</p>
-      <ul class="small"><li>Pre-evolutions are free: if you own Charizard you can play Charmander and Charmeleon.</li><li>Colorless Pokémon (Chansey, Snorlax, Dragonite…) are free for everyone and aren't in the draft.</li><li>Basic Pokémon that evolve (Charmander, Pikachu, Abra…) aren't in the draft either: own one of their evolutions to play them.</li><li>Trainers and Energy are free for everyone.</li><li>The draft ends when everyone agrees to stop; whatever is left becomes a free agent anyone can claim.</li></ul>
+      <ul class="small"><li>Pre-evolutions are free: if you own Charizard you can play Charmander and Charmeleon.</li><li>Colorless Pokémon (Chansey, Snorlax, Dragonite…) are free for everyone and aren't in the draft.</li><li>Only the most evolved Pokémon of a line is a pick. Pokémon that evolve further (Charmander, Charmeleon, Haunter, Kadabra…) aren't in the draft: own the last Pokémon of their line to play them.</li><li>Trainers and Energy are free for everyone.</li><li>The draft ends when everyone agrees to stop; whatever is left becomes a free agent anyone can claim.</li></ul>
       <p class="small muted">Whoever sets up the league becomes its commissioner.</p>
       <button class="pri" type="button" data-a="create">Set up the league</button></div></div>`;
     bind(main);
@@ -885,7 +886,7 @@ function draftTab(l, s) {
     };
     return `<div class="panel" style="max-width:760px"><div class="scene sunset tall"><span class="scene-cap">The ${esc(s.year)} draft</span></div>
       <h2>${esc(s.year)} draft: getting ready</h2>
-      <p class="small muted">Each Pokémon name is its own pick; Colorless Pokémon are free for everyone, and Basics that evolve come free with their evolutions, so neither is drafted. ${s.snake !== false ? 'Snake order: the order reverses every round.' : 'Same order every round.'} ${s.keepersOn ? 'Keepers are on: your keeper takes your round 1 pick.' : 'No keepers this season.'} The draft keeps going until every player presses “I'm done drafting”.</p>
+      <p class="small muted">Each Pokémon name is its own pick; Colorless Pokémon are free for everyone, and Pokémon that evolve further come free with the last Pokémon of their line, so neither is drafted. ${s.snake !== false ? 'Snake order: the order reverses every round.' : 'Same order every round.'} ${s.keepersOn ? 'Keepers are on: your keeper takes your round 1 pick.' : 'No keepers this season.'} The draft keeps going until every player presses “I'm done drafting”.</p>
       <ol class="lgorder">${order(s).map((u) => `<li><b>${esc(nm(u))}</b>${keeperRow(u)}</li>`).join('')}</ol>
       ${comm ? `<div class="row"><button class="pri" type="button" data-a="startDraft" ${order(s).length < 2 ? 'disabled' : ''}>Start the draft</button><button type="button" data-tab="commish">Order, players &amp; keepers</button></div>${order(s).length < 2 ? '<p class="small muted">Add at least one more player on the Commissioner tab.</p>' : ''}` : `<p class="small muted">Waiting for ${esc(nm(l.commish))} to start the draft.</p>`}
     </div>`;
@@ -1054,7 +1055,7 @@ function rulesTab(l, s) {
     ${sec('', 'The Draft', `<ul>
       ${li(`Snake order, set by the commissioner: the order reverses every round.`)}
       ${li(`Every distinct card is its own pick. Charizard, Dark Charizard and Blaine's Charizard are three picks, and so are cards that share a name but play differently, like <b>Zapdos (Base Set)</b> and <b>Zapdos (Fossil)</b> (${splitNames} names are split into ${split} picks this way). Holo and non-holo prints of the same card are one pick.`)}
-      ${li(`Not in the draft: Colorless Pokémon (free for everyone) and Basic Pokémon that evolve (they come with their evolutions). Promo cards are in, each as its own pick. That leaves <b>${POOL.length}</b> picks.`)}
+      ${li(`Not in the draft: Colorless Pokémon (free for everyone) and Pokémon that evolve further, whether Basic or Stage 1 (they come with the last Pokémon of their line: Gengar brings Gastly and both Haunters). Promo cards are in, each as its own pick, except the Pokémon that aren't original ones (Scizor, Entei, Pichu and the like), which are banned. That leaves <b>${POOL.length}</b> picks.`)}
       ${li(`The draft keeps going until every player presses <b>I'm done drafting</b>. Changing your mind is allowed until everyone has.`)}
       ${li(`The pool is listed by <b>Claude-Rank</b>, the number in the corner of each card: Claude's order for these picks under the league's rules, 1 being the best. It is a guide for anyone who doesn't know the cards yet, not a rule. Change the sort to see the pool another way.`)}
       ${li(`The commissioner can make a pick for the player on the clock, undo the last pick, or end or reopen the draft.`)}
