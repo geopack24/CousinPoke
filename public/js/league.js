@@ -12,6 +12,7 @@
 // Pre-evolutions are free: owning a Pokémon lets you play everything it evolves from. Trainers and Energy are free for everyone.
 import { playTurnChime } from './fx.js';
 import * as sfx from './sfx.js';
+import { CLAUDE_RANK } from './league-ranks.js';
 
 // ?league=test (any short lowercase name) opens a separate practice league; the real one is 'main'.
 const LID = (() => { try { const v = new URLSearchParams(location.search).get('league'); return v && /^[a-z0-9-]{1,24}$/.test(v) ? v : 'main'; } catch (e) { return 'main'; } })();
@@ -20,7 +21,7 @@ const RAR = { 'Rare Holo': 0, Rare: 1, Uncommon: 2, Common: 3 };
 const STAGES = ['Basic', 'Stage 1', 'Stage 2'];
 
 let PT = null;
-const V = { tab: 'overview', q: '', type: '', stage: '', avail: 'open', sort: 'name', season: null, tradeWith: '', give: new Set(), get: new Set(), note: '', busy: false, moveName: '' };
+const V = { tab: 'overview', q: '', type: '', stage: '', avail: 'open', sort: 'rank', season: null, tradeWith: '', give: new Set(), get: new Set(), note: '', busy: false, moveName: '' };
 let POOL = null, BYNAME = null, PRE = null, FREE = null, BASE = null;
 // FREE: Colorless Pokémon, usable by everyone and never drafted.
 // BASE: Basic Pokémon that evolve into something; never drafted, playable through whatever they evolve into.
@@ -31,7 +32,7 @@ const recording = new Set();
 
 export function installLeague(pt) {
   PT = pt;
-  return { render, lobbyPanel, lobbyFeature, onLeague, noteGames, legality, legalNames, keyOf, majorMatch, canSit, majorName, isMember, season, rankedOk, liveDraft, gameChip, tickerHTML };
+  return { render, lobbyPanel, lobbyFeature, onLeague, noteGames, legality, legalNames, keyOf, majorMatch, canSit, majorName, isMember, season, rankedOk, liveDraft, gameChip, tickerHTML, pool, preOf: (base) => { pool(); return [...(PRE.get(base) || [])]; } };
 }
 
 /* ---------- helpers ---------- */
@@ -52,6 +53,8 @@ const SET_ORDER = Object.keys(SET_NAMES);
 /** Same card = same HP, stage, type, evolution, attacks (name, cost, damage) and Pokémon Power names. Holo/non-holo prints match; Base Set and Fossil Zapdos don't. */
 const cardSig = (c) => JSON.stringify([+c.hp || 0, c.sub || '', c.types || [], c.ev || '', (c.atk || []).map((a) => [a.n, a.c, a.d]), (c.pw || []).map((x) => x.n)]);
 let KEYOF = null; // card id -> pick key
+const RANKS = new Map(CLAUDE_RANK.map((k, i) => [k, i + 1])); // pick key -> Claude-Rank (1 is the best pick)
+const byRank = (a, b) => (a.rank || 1e9) - (b.rank || 1e9) || a.name.localeCompare(b.name);
 
 /** The draft pool. A pick is one distinct card: its key is the card name, plus the set (and number, if needed) when one name covers different cards. */
 function pool() {
@@ -86,7 +89,7 @@ function pool() {
       const key = gs.length === 1 ? ne.name : firstSets.filter((x) => x === f.set).length > 1 ? `${ne.name} (${SET_NAMES[f.set]} ${f.n})` : `${ne.name} (${SET_NAMES[f.set]})`;
       const ids = g.map((c) => c.id).sort((x, y) => (RAR[PT.CARDS[x].rar] ?? 4) - (RAR[PT.CARDS[y].rar] ?? 4));
       const types = new Set(f.types || []);
-      const e = { name: key, base: ne.name, ids, rep: ids[0], types, type: [...types][0] || 'Colorless', stage: f.sub || 'Basic', hp: +f.hp || 0, next: [...(into.get(ne.name) || [])].sort() };
+      const e = { name: key, base: ne.name, rank: RANKS.get(key) || 0, ids, rep: ids[0], types, type: [...types][0] || 'Colorless', stage: f.sub || 'Basic', hp: +f.hp || 0, next: [...(into.get(ne.name) || [])].sort() };
       BYNAME.set(key, e);
       for (const id of ids) KEYOF.set(id, key);
     }
@@ -819,7 +822,8 @@ function filteredPool(s) {
     if (q) { const hay = (e.name + ' ' + e.ids.map((id) => { const c = PT.CARDS[id]; return (c.atk || []).map((a) => a.n + ' ' + a.t).join(' ') + ' ' + (c.pw || []).map((p) => p.n + ' ' + p.t).join(' '); }).join(' ')).toLowerCase(); if (!hay.includes(q)) return false; }
     return true;
   });
-  if (V.sort === 'hp') list = list.slice().sort((a, b) => b.hp - a.hp || a.name.localeCompare(b.name));
+  if (V.sort === 'rank') list = list.slice().sort(byRank);
+  else if (V.sort === 'hp') list = list.slice().sort((a, b) => b.hp - a.hp || a.name.localeCompare(b.name));
   else if (V.sort === 'stage') list = list.slice().sort((a, b) => STAGES.indexOf(b.stage) - STAGES.indexOf(a.stage) || a.name.localeCompare(b.name));
   return list;
 }
@@ -832,7 +836,7 @@ function poolGrid(l, s, mode) {
       <input type="text" id="lq" placeholder="Search name, attack or power" value="${esc(V.q)}" style="flex:1;min-width:160px">
       <select id="lavail"><option value="open" ${V.avail === 'open' ? 'selected' : ''}>${mode === 'fa' ? 'Free agents' : 'Still available'}</option><option value="taken" ${V.avail === 'taken' ? 'selected' : ''}>Taken</option><option value="all" ${V.avail === 'all' ? 'selected' : ''}>All Pokémon</option></select>
       <select id="lstage"><option value="">Any stage</option>${STAGES.map((x) => `<option ${V.stage === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
-      <select id="lsort"><option value="name" ${V.sort === 'name' ? 'selected' : ''}>A–Z</option><option value="stage" ${V.sort === 'stage' ? 'selected' : ''}>Evolved first</option><option value="hp" ${V.sort === 'hp' ? 'selected' : ''}>Most HP</option></select>
+      <select id="lsort" title="Claude-Rank is Claude's draft order for the league's rules, best pick first"><option value="rank" ${V.sort === 'rank' ? 'selected' : ''}>Claude-Rank</option><option value="name" ${V.sort === 'name' ? 'selected' : ''}>A–Z</option><option value="stage" ${V.sort === 'stage' ? 'selected' : ''}>Evolved first</option><option value="hp" ${V.sort === 'hp' ? 'selected' : ''}>Most HP</option></select>
     </div>
     <div class="filters"><div class="chips">${TYPES.map((t) => `<button type="button" class="tag ty ${V.type === t ? 'on' : ''}" data-ltype="${t}"><i style="background:${TCOL[t]}"></i>${t}</button>`).join('')}</div></div>`;
   const tiles = list.map((e) => {
@@ -844,7 +848,7 @@ function poolGrid(l, s, mode) {
       else if (mode === 'fa' && member) btn = `<button class="sec sm" type="button" data-claim="${esc(e.name)}">Claim</button>`;
     }
     const pre = [...(PRE.get(e.base) || [])];
-    return `<div class="tile ltile${owner ? ' taken' : ''}${owner === me() ? ' mine' : ''}" style="--tc:${TCOL[e.type] || '#ffcb05'}"><div class="cd click" style="${PT.cardStyle(e.rep)}" data-view="${e.rep}" role="img" aria-label="${esc(e.name)}">${owner ? `<span class="own">${esc(nm(owner))}</span>` : ''}</div>
+    return `<div class="tile ltile${owner ? ' taken' : ''}${owner === me() ? ' mine' : ''}" style="--tc:${TCOL[e.type] || '#ffcb05'}"><div class="cd click" style="${PT.cardStyle(e.rep)}" data-view="${e.rep}" role="img" aria-label="${esc(e.name)}">${e.rank ? `<span class="crk" title="Claude-Rank ${e.rank} of ${POOL.length}">${e.rank}</span>` : ''}${owner ? `<span class="own">${esc(nm(owner))}</span>` : ''}</div>
       <div class="nm" title="${esc(e.name)}">${esc(e.name)}</div>
       <div class="meta small muted">${typeDot(e.type)}${e.stage}${e.ids.length > 1 ? ` · <span class="vers">${e.ids.map((id, k) => `<a href="#" data-view="${id}" title="${esc(PT.CARDS[id].set)}">v${k + 1}</a>`).join(' ')}</span>` : ''}</div>
       ${pre.length ? `<div class="meta small muted" title="Free with this pick">+ ${esc(pre.join(', '))}</div>` : ''}
@@ -1050,6 +1054,7 @@ function rulesTab(l, s) {
       ${li(`Every distinct card is its own pick. Charizard, Dark Charizard and Blaine's Charizard are three picks, and so are cards that share a name but play differently, like <b>Zapdos (Base Set)</b> and <b>Zapdos (Fossil)</b> (${splitNames} names are split into ${split} picks this way). Holo and non-holo prints of the same card are one pick.`)}
       ${li(`Not in the draft: Colorless Pokémon (free for everyone) and Basic Pokémon that evolve (they come with their evolutions). Promo cards are in, each as its own pick. That leaves <b>${POOL.length}</b> picks.`)}
       ${li(`The draft keeps going until every player presses <b>I'm done drafting</b>. Changing your mind is allowed until everyone has.`)}
+      ${li(`The pool is listed by <b>Claude-Rank</b>, the number in the corner of each card: Claude's order for these picks under the league's rules, 1 being the best. It is a guide for anyone who doesn't know the cards yet, not a rule. Change the sort to see the pool another way.`)}
       ${li(`The commissioner can make a pick for the player on the clock, undo the last pick, or end or reopen the draft.`)}
     </ul>`)}
     ${sec('', 'Your Roster: What You Can Play', `<ul>

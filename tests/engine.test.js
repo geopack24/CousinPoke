@@ -1022,3 +1022,17 @@ test('Arena reward: a swap replaces a pick of the same size, and a size the deck
   const four = { [hitmonchan]: 4, [potion]: 1 }; assert.deepEqual(swapOuts(DB, four, hitmonchan).map((u) => u.id), [], 'a fifth Hitmonchan is not allowed');
   const one = { [hitmonchan]: 1, [potion]: 1 }; assert.deepEqual(swapOuts(DB, one, N['PlusPower']).map((u) => u.id), [potion], 'the only Basic stays');
 });
+
+test('Claude-Rank covers every league draft pick exactly once', async () => {
+  const { installLeague } = await import('../public/js/league.js');
+  const { CLAUDE_RANK } = await import('../public/js/league-ranks.js');
+  const pool = installLeague({ CARDS: DB, S: {}, uid: () => 'x', esc: (s) => s, nameOf: () => '' }).pool();
+  const keys = pool.map((e) => e.name);
+  assert.deepEqual(keys.filter((k) => !CLAUDE_RANK.includes(k)), [], 'picks with no rank');
+  assert.deepEqual(CLAUDE_RANK.filter((k) => !keys.includes(k)), [], 'ranked names that are not picks');
+  assert.equal(new Set(CLAUDE_RANK).size, CLAUDE_RANK.length, 'no pick is ranked twice');
+  assert.equal(pool.find((e) => e.name === CLAUDE_RANK[0]).rank, 1);
+  // a pick that brings another pick with it never ranks below it
+  const rank = (k) => CLAUDE_RANK.indexOf(k);
+  assert.ok(rank('Scizor') < rank('Scyther (Jungle)')); assert.ok(rank('Charizard') < rank('Charmeleon')); assert.ok(rank('Dark Alakazam') < rank('Dark Kadabra'));
+});

@@ -511,6 +511,7 @@ table.lgt tr.me td{background:var(--panel-2)}
 .lgrid .ltile .vers a{color:inherit}
 .lgrid .ltile.taken .cd{filter:grayscale(.85) brightness(.8)}
 .lgrid .ltile.mine .cd{filter:none;outline:3px solid var(--accent);outline-offset:-3px;border-radius:8px}
+.ltile .cd .crk{position:absolute;left:4px;top:4px;min-width:22px;padding:1px 5px;border-radius:10px;background:rgba(0,0,0,.78);color:#ffcb05;font-size:11px;font-weight:800;text-align:center;line-height:16px;box-shadow:0 0 0 1px rgba(255,203,5,.55)}
 .ltile .cd .own{position:absolute;left:4px;right:4px;bottom:6px;background:rgba(0,0,0,.75);color:#fff;font-size:11px;font-weight:800;text-align:center;border-radius:4px;padding:2px}
 .tydot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:0}
 .boardwrap{max-height:70vh;overflow:auto}
@@ -656,7 +657,13 @@ async function api(method,path,body,timeoutMs){
   if(!r.ok&&!(r.status===409&&d&&d.conflict)){const err=new Error((d&&d.message)||('HTTP '+r.status));err.code=(d&&d.error)||r.status;throw err}
   return d;
 }
-function initIdentity(){const qp=new URLSearchParams(location.search).get('pid');if(qp&&/^p_[a-z0-9]{8,}$/.test(qp)){uid=qp;S.name=ls.get('name:'+qp,'')||'';return}uid=ls.get('pid',null);if(!uid||!/^p_[a-z0-9]{8,}$/.test(uid)){uid='p_'+rid()+rid();ls.set('pid',uid)}S.name=ls.get('name','')}
+/* An invite link (?join=<player id>) makes this device that player for good: the commissioner can add someone to the
+   league before they have ever opened the site, then send them the link. The name comes from the player record. */
+function initIdentity(){const Q=new URLSearchParams(location.search);const jn=Q.get('join');
+  if(jn&&/^p_[a-z0-9]{8,}$/.test(jn)){const cur=ls.get('pid',null);
+    if(cur!==jn&&(!ls.get('name','')||confirm('This invite link signs this device in as a different player. Switch to that player?'))){ls.set('pid',jn);ls.set('name','');ls.set('pinSet',false)}
+    try{history.replaceState(null,'',location.pathname)}catch(e){}}
+  const qp=jn?null:Q.get('pid');if(qp&&/^p_[a-z0-9]{8,}$/.test(qp)){uid=qp;S.name=ls.get('name:'+qp,'')||'';return}uid=ls.get('pid',null);if(!uid||!/^p_[a-z0-9]{8,}$/.test(uid)){uid='p_'+rid()+rid();ls.set('pid',uid)}S.name=ls.get('name','')}
 async function savePlayerName(n,quiet){S.name=n;ls.set('name',n);renderHeader();try{await api('PUT','players/'+uid,{data:{name:n,updatedAt:Date.now()}})}catch(e){if(!quiet)toast('Could not save name ('+(e.code||'error')+')')}}
 function nameOf(id){if(!id)return 'Empty';if(id===uid&&S.name)return S.name;const p=S.players[id];if(p&&p.name)return p.name;return 'Player'}
 let syncTimer=null,syncing=false;const lastSig={};
@@ -670,6 +677,7 @@ async function sync(){
     if(!S.online){S.online=true;changed=true;setOnline(true)}
     const sig=k=>JSON.stringify(d[k]);
     if(d.players&&sig('players')!==lastSig.players){lastSig.players=sig('players');S.players=d.players;changed=true}
+    if(!S.name&&ls.get('pid',null)===uid&&S.players[uid]&&S.players[uid].name){S.name=S.players[uid].name;ls.set('name',S.name);renderHeader();changed=true}
     if(d.decks&&sig('decks')!==lastSig.decks){lastSig.decks=sig('decks');S.decks=d.decks;changed=true}
     if(d.games&&sig('games')!==lastSig.games){lastSig.games=sig('games');S.games=d.games;changed=true}
     if(d.arena&&sig('arena')!==lastSig.arena){lastSig.arena=sig('arena');S.arena=d.arena;if(S.screen==='arena'||S.screen==='lobby')changed=true}
