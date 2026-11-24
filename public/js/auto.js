@@ -370,11 +370,16 @@ async function revealPlayed(items, doc) {
 /* ---------- a Colossal Pokémon's attacks ----------
    Its name and the attack's name slam onto the table, the giant rears up and lunges, and the table shakes when it lands. */
 const bossSpec = (doc, name) => { const c = C(doc.state.boss.cid); return ((c.boss && c.boss.attacks) || []).find((x) => x.name === name) || {}; };
+/** A Colossal Pokémon's biggest attack: the one that costs the most Energy (the stronger of two that cost the same). */
+const bossFinisher = (doc) => { const all = (C(doc.state.boss.cid).boss || {}).attacks || []; let top = null; for (const x of all) if (!top || (x.cost || 0) > (top.cost || 0) || ((x.cost || 0) === (top.cost || 0) && (x.dmg || 0) > (top.dmg || 0))) top = x; return top && (top.cost || 0) > 0 ? top.name : null; };
+/** Its theme song, played when that attack comes: music/colossal-gyarados.mp3 if there is one, otherwise the Pokémon's own track (music/gyarados.mp3). */
+function bossTheme(doc) { const full = C(doc.state.boss.cid).name || ''; const plain = full.replace(/^Colossal /, ''); playPokemonMusic(full, 12).then((ok) => ok || playPokemonMusic(plain, 12)).catch(() => {}); }
 /** Announce the attack and hold it on screen: who is attacking, with what, and what it will do. Nothing on the table
  *  has changed yet when this is shown (the computer's turn calls it before the move is applied). */
 async function bossAnnounce(atk, doc) {
   const board = boardEl(); const a = bossSpec(doc, atk.name); const big = (a.cost || 0) >= 3 || (a.dmg || 0) >= 60;
   sfx.play(big ? 'boss.roar' : 'boss.growl');
+  if (bossFinisher(doc) === atk.name) bossTheme(doc);
   if (!board || !fxEnabled()) { await new Promise((r) => setTimeout(r, 600)); return; }
   const hold = big ? 1900 : 1500; const life = hold + 1500;
   const fig = board.querySelector('.bossfig'); if (fig) { fig.classList.add('rearing'); setTimeout(() => fig.classList.remove('rearing'), hold); }

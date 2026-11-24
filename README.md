@@ -102,7 +102,7 @@ Under 700px wide the table switches to a compact layout that fits one phone scre
 
 When both players are ready and the first turn begins, `public/js/music.js` plays an original four-channel chiptune battle intro (two pulse waves, triangle bass, noise drums) for 10 seconds and fades it out. To use your own track instead, put a file named `battle.mp3` in `public/`; if it exists the game plays it with the same fade. The lab has a button to preview either.
 
-Each Pokémon can have its own track too: drop `charizard.mp3` (or `.ogg`, `.wav`, `.m4a`, `.aac`) into `public/music/` and it plays for 10 seconds, then fades, whenever a Charizard becomes a player's Active Pokémon. File names are the card name in lowercase with punctuation and spaces as dashes (`blaines-charizard.mp3`, `mr-mime.mp3`, `nidoran-f.mp3`); `public/music/README.txt` has the rule and the lab shows the exact name for any card.
+In the Arena a Colossal Pokémon's track plays when it uses its biggest attack (`colossal-gyarados.mp3` if present, otherwise `gyarados.mp3`). Each Pokémon can have its own track too: drop `charizard.mp3` (or `.ogg`, `.wav`, `.m4a`, `.aac`) into `public/music/` and it plays for 10 seconds, then fades, whenever a Charizard becomes a player's Active Pokémon. File names are the card name in lowercase with punctuation and spaces as dashes (`blaines-charizard.mp3`, `mr-mime.mp3`, `nidoran-f.mp3`); `public/music/README.txt` has the rule and the lab shows the exact name for any card.
 
 ## Attack animations
 

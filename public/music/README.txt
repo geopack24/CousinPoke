@@ -13,6 +13,9 @@ Versions share the plain species' file unless they have their own: Blaine's Char
 When that Pokémon becomes a player's Active Pokémon, its track plays for about 10 seconds and fades out, on both players' screens.
 The animation lab (fx-lab.html) shows the exact file name for whichever attacker you pick.
 
+In the Arena, a Colossal Pokémon's track plays when it uses its biggest attack (the one that costs the most Energy).
+It uses the Pokémon's own file (gyarados.mp3), or a separate one if you add it: colossal-gyarados.mp3.
+
 Event music: confusion.mp3 plays when a Pokémon becomes Confused (about 10 seconds, then a fade).
 victory.mp3 plays when someone wins (about 30 seconds, then a fade) in place of the built-in win jingle.
 
