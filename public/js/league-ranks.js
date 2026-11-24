@@ -14,10 +14,12 @@
 // The keys are the draft's pick names. A pick missing from this list sorts last; tests/engine.test.js keeps the list complete.
 export const CLAUDE_SCORE = {
   // 85 and up: the picks decks are built around, and the ones that shut those decks down
-  Charizard: 99, 'Dark Vileplume': 96, Aerodactyl: 95, 'Zapdos (Base Set)': 93, Blastoise: 92, "Blaine's Arcanine": 89,
-  "Rocket's Zapdos": 88, Alakazam: 87, Muk: 85,
+  // (after the commissioner's read of the league's own games: Rain Dance and Energy Trans are better here than anywhere, and
+  //  Dark Vileplume is a Stage 2 that a whole deck has to be built around, with its own Trainers switched off too)
+  Charizard: 99, Blastoise: 97, Aerodactyl: 95, 'Zapdos (Base Set)': 93, 'Venusaur (Base Set)': 91, "Blaine's Arcanine": 89,
+  'Dark Vileplume': 88, Alakazam: 87, Muk: 85, "Rocket's Zapdos": 85,
   // 75 to 84: strong attackers and engines
-  'Mr. Mime': 84, 'Venusaur (Base Set)': 83, 'Arcanine (Base Set)': 82, Ninetales: 81, Hitmonchan: 81, "Giovanni's Nidoking": 80,
+  'Mr. Mime': 84, 'Arcanine (Base Set)': 82, Ninetales: 81, Hitmonchan: 81, "Giovanni's Nidoking": 80,
   'Electabuzz (Base Set)': 80, 'Machamp (Base Set)': 79, Gengar: 78, Poliwrath: 78, "Lt. Surge's Raichu (Gym Heroes)": 78,
   "Erika's Victreebel": 77, 'Mewtwo (Promo 3)': 77, Gyarados: 77, 'Scyther (Jungle)': 76, Dugtrio: 76, Golduck: 76,
   "Giovanni's Machamp": 76, "Rocket's Mewtwo": 75, "Sabrina's Gengar (Gym Challenge)": 75,
