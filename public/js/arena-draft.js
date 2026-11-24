@@ -204,6 +204,24 @@ export function applySwap(db, cards, inKey, outId, rules) {
   return swapped(cards, e, u);
 }
 
+/* A basic Energy can be taken at any swap offer instead of one of the three cards, as in the draft. It takes the place of
+   one single card (not a line, and not another basic Energy), and the deck must keep a Basic Pokémon. */
+const without = (cards, u) => { const next = { ...(cards || {}) }; next[u.cid] = (next[u.cid] || 0) - 1; if (next[u.cid] <= 0) delete next[u.cid]; return next; };
+/** The single cards a basic Energy could replace (one entry per distinct card). */
+export function energySwapOuts(db, cards, rules, units) {
+  const seen = new Set(); const out = [];
+  for (const u of units || deckUnits(db, cards, rules)) {
+    const c = db[u.cid]; if (u.size !== 1 || seen.has(u.id) || !c || (c.st === 'Energy' && c.sub === 'Basic')) continue; seen.add(u.id);
+    if (basicsIn(without(cards, u), db) >= 1) out.push(u);
+  }
+  return out;
+}
+/** Swap a basic Energy in for the single card `outId`: one more of the type the deck's Pokémon use most (returns the new drafted cards). */
+export function applyEnergySwap(db, cards, outId, rules) {
+  const u = energySwapOuts(db, cards, rules).find((x) => x.id === outId); if (!u) throw new Error("That swap isn't allowed");
+  const next = without(cards, u); const id = energyId(db, Object.keys(energySplit(db, next))[0]); next[id] = (next[id] || 0) + 1; return next;
+}
+
 /** Split the 18 basic Energy between the types the drafted Pokémon use (by the coloured symbols in their attack costs). */
 export function energySplit(db, cards, total = ARENA.energy) {
   const w = {};

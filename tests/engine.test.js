@@ -1143,3 +1143,19 @@ test('Arena: if the same attack Knocks Out the Colossal Pokémon and gives it it
   const r = apply(g, { type: 'attack', index: 1, seat: 'a', seed: 1, answers: [] }, DB);
   assert.ok(!r.error && !r.prompt, r.error); assert.equal(r.state.winner, 'a'); assert.ok(r.state.log.some((l) => /has fallen/.test(l.m)));
 });
+
+test('Arena: a basic Energy can be swapped in between rounds, for one single card that is not a basic Energy', async () => {
+  const { energySwapOuts, applyEnergySwap, energySplit } = await import('../public/js/arena-draft.js');
+  const fire = N['Fire Energy'];
+  // a Charizard line (6 cards), two Hitmonchan, a PlusPower, and one Fire Energy drafted earlier
+  const cards = { [N['Charmander']]: 2, [N['Charmeleon']]: 2, [N['Charizard']]: 2, [N['Hitmonchan']]: 2, [N['PlusPower']]: 1, [fire]: 1 };
+  const outs = energySwapOuts(DB, cards, DEFAULT_RULES).map((u) => DB[u.cid].name).sort();
+  assert.deepEqual(outs, ['Hitmonchan', 'PlusPower'], 'not the evolution line, and not the Energy already there');
+  const next = applyEnergySwap(DB, cards, N['PlusPower'], DEFAULT_RULES);
+  assert.equal(next[N['PlusPower']], undefined); assert.equal(draftedCount(next), draftedCount(cards), 'the deck stays the same size');
+  assert.equal(energyTaken(DB, next), 2); assert.equal(next[cardIdOfEnergy(Object.keys(energySplit(DB, next))[0])], 2, "of the type the deck's Pokémon use most");
+  assert.throws(() => applyEnergySwap(DB, cards, N['Charizard'], DEFAULT_RULES), /isn't allowed/);
+  // the last Basic Pokémon can't be given up for it
+  assert.deepEqual(energySwapOuts(DB, { [N['Hitmonchan']]: 1, [N['PlusPower']]: 1 }, DEFAULT_RULES).map((u) => DB[u.cid].name), ['PlusPower']);
+});
+const cardIdOfEnergy = (type) => N[type + ' Energy'];
