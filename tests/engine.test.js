@@ -1117,3 +1117,21 @@ test('the promos printed in the e-Reader frame are out everywhere, by card id: t
   const keys = installLeague({ CARDS: DB, S: {}, uid: () => 'x', esc: (s) => s, nameOf: () => '' }).pool().map((e) => e.name);
   assert.ok(keys.includes('Rapidash') && !keys.includes('Rapidash (Promo)') && !keys.includes('Rapidash (Jungle)'));
 });
+
+test('Arena: Energy Removal and Super Energy Removal can be pointed at a lit Energy Crystal as well as at the boss', () => {
+  const g = giveEnergy(bossGame(98, { active: { c: N['Chansey'], en: [N['Fire Energy']] }, hand: [N['Energy Removal'], N['Super Energy Removal']] }), 3);
+  const er = g.p.a.hand[0].id, ser = g.p.a.hand[1].id; const lit = g.p.b.bench.filter((x) => x.flags.charged).map((x) => x.id);
+  // play a Trainer, answering "which of their Pokémon" with `pick` and every other prompt with its first option
+  const play = (card, pick) => { let a = { type: 'playTrainer', card, seat: 'a', seed: 1, answers: [] }; for (let i = 0; i < 8; i++) { const r = apply(g, a, DB); assert.ok(!r.error, r.error); if (!r.prompt) return r.state; a = { ...a, answers: [...a.answers, [/^(erMon|serTheirs)$/.test(r.prompt.id) ? pick : r.prompt.options[0].key]] }; } throw new Error('prompt loop'); };
+  // Energy Removal: the boss and its three lit crystals are all choices (an empty crystal is not)
+  const ask = apply(g, { type: 'playTrainer', card: er, seat: 'a', seed: 1, answers: [] }, DB);
+  assert.equal(ask.prompt.id, 'erMon'); assert.deepEqual(ask.prompt.options.map((o) => o.key).sort(), [g.p.b.active.id, ...lit].sort());
+  // a crystal loses its Energy and stays on the Bench
+  let s = play(er, lit[1]);
+  assert.equal(nrg(s), 2); assert.equal(s.p.b.active.en.length, 2); assert.equal(s.p.b.bench.length, 5);
+  assert.equal(s.p.b.bench.find((x) => x.id === lit[1]).flags.charged, false, 'the crystal that was picked is the one that went dark');
+  // picking the boss still works the old way
+  s = play(er, g.p.b.active.id); assert.equal(nrg(s), 2); assert.equal(s.p.b.active.en.length, 2);
+  // Super Energy Removal on a crystal takes that Energy and one more, for one of your own
+  s = play(ser, lit[0]); assert.equal(nrg(s), 1); assert.equal(s.p.b.active.en.length, 1); assert.equal(s.p.a.active.en.length, 0);
+});

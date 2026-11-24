@@ -2,7 +2,7 @@
 // ctx API: see engine.js makeCtx. `m` is the attacking Pokémon, `T` the current turn number.
 import { energyTypesOf, nameOf, monHP, hasFx, runAttack, evolutionNameMatches, towerLocked, energyIs } from '../engine.js';
 import { findMon, mons, pullCard, removeMon, monCards, P, other, toMon } from '../state.js';
-import { countWater } from './helpers.js';
+import { countWater, litCrystals, drainCrystal } from './helpers.js';
 
 const T = (ctx) => ctx.g.turnNo;
 const hasType = (ctx, e, type) => (ctx.g.rules.energyTextAnyType ? true : energyIs(ctx.db, e, type, ctx.g.rules));
@@ -217,7 +217,12 @@ export const base1 = {
   'base1-79': { canPlay: ({ g, seat }) => (mons(P(g, seat)).some((m) => m.en.length) && mons(P(g, other(seat))).some((m) => m.en.length) ? true : 'Needs energy on both sides'), trainer: (ctx) => {
     const mine = ctx.chooseMon('Discard an Energy from which of your Pokémon?', ownPokemon(ctx).filter((m) => m.en.length), { id: 'serMine' })[0]; const mm = findMon(ctx.g, mine).m;
     const mc = ctx.chooseCards('Which Energy to discard?', mm.en, { id: 'serMyCard' }); ctx.discardEnergy(mm, mm.en.filter((e) => mc.includes(e.id)));
-    const theirs = ctx.chooseMon("Choose the opponent's Pokémon", mons(ctx.opp).filter((m) => m.en.length), { id: 'serTheirs' })[0]; const tm = findMon(ctx.g, theirs).m;
+    const theirs = ctx.chooseMon("Choose the opponent's Pokémon", mons(ctx.opp).filter((m) => m.en.length).concat(litCrystals(ctx, ctx.opp)), { id: 'serTheirs' })[0];
+    if (drainCrystal(ctx, ctx.opp, theirs)) { // the Arena: a lit crystal was picked. Its Energy goes, and one more crystal's with it (up to 2)
+      const more = litCrystals(ctx, ctx.opp)[0]; const two = !!more && drainCrystal(ctx, ctx.opp, more.id);
+      ctx.log(`Super Energy Removal: ${two ? '2 crystals lose their Energy' : "that crystal's Energy is gone"}`); return;
+    }
+    const tm = findMon(ctx.g, theirs).m;
     const tc = ctx.chooseCards('Discard up to 2 Energy', tm.en, { min: 1, max: 2, id: 'serTheirCards' }); ctx.discardEnergy(tm, tm.en.filter((e) => tc.includes(e.id)));
   } },
   'base1-80': { canPlay: ({ g, seat }) => (mons(P(g, seat)).length ? true : 'No Pokémon in play'), trainer: (ctx) => { const tgt = ctx.chooseMon('Attach Defender to…', ownPokemon(ctx), { id: 'defender' })[0]; const m = findMon(ctx.g, tgt).m; m.tools.push(ctx.card); m.fx.push({ k: 'defender', src: 'Defender', card: ctx.card.id, until: T(ctx) + 1 }); ctx.log(`Defender on ${nameOf(ctx.db, m.c)}`); return true; } },
@@ -239,7 +244,9 @@ export const base1 = {
   } },
   'base1-90': { canPlay: ({ g, seat }) => (mons(P(g, seat)).some((m) => m.en.length && m.dmg) ? true : 'Needs a damaged Pokémon with Energy'), trainer: (ctx) => { const tgt = ctx.chooseMon('Super Potion on which Pokémon?', ownPokemon(ctx).filter((m) => m.en.length && m.dmg), { id: 'superPotion' })[0]; const m = findMon(ctx.g, tgt).m; ctx.requireDiscardEnergy(m, 1, null, 'Discard 1 Energy for Super Potion'); ctx.heal(m, 40); } },
   'base1-91': { trainer: (ctx) => { ctx.draw(ctx.seat, 2); } },
-  'base1-92': { canPlay: ({ g, seat }) => (mons(P(g, other(seat))).some((m) => m.en.length) ? true : 'No energy on their side'), trainer: (ctx) => { const tgt = ctx.chooseMon("Choose the opponent's Pokémon", mons(ctx.opp).filter((m) => m.en.length), { id: 'erMon' })[0]; const m = findMon(ctx.g, tgt).m; const k = ctx.chooseCards('Discard which Energy?', m.en, { id: 'erCard' }); ctx.discardEnergy(m, m.en.filter((e) => k.includes(e.id))); } },
+  'base1-92': { canPlay: ({ g, seat }) => (mons(P(g, other(seat))).some((m) => m.en.length) ? true : 'No energy on their side'), trainer: (ctx) => { const tgt = ctx.chooseMon("Choose the opponent's Pokémon", mons(ctx.opp).filter((m) => m.en.length).concat(litCrystals(ctx, ctx.opp)), { id: 'erMon' })[0];
+    if (drainCrystal(ctx, ctx.opp, tgt)) { ctx.log("Energy Removal: that crystal's Energy is gone"); return; } // the Arena: picking a lit crystal works as well as picking the boss
+    const m = findMon(ctx.g, tgt).m; const k = ctx.chooseCards('Discard which Energy?', m.en, { id: 'erCard' }); ctx.discardEnergy(m, m.en.filter((e) => k.includes(e.id))); } },
   'base1-93': { canPlay: ({ g, seat }) => (P(g, other(seat)).bench.length && P(g, other(seat)).active ? true : 'Opponent has no Benched Pokémon'), trainer: (ctx) => { const k = ctx.chooseMon("Choose the opponent's Benched Pokémon", ctx.opp.bench, { id: 'gust' })[0]; ctx.switchActive(ctx.oppSeat, k, 'Gust of Wind'); } },
   'base1-94': { canPlay: ({ g, seat }) => (mons(P(g, seat)).some((m) => m.dmg) ? true : 'No damaged Pokémon'), trainer: (ctx) => { const tgt = ctx.chooseMon('Potion on which Pokémon?', ownPokemon(ctx).filter((m) => m.dmg), { id: 'potion' })[0]; ctx.heal(findMon(ctx.g, tgt).m, 20); } },
   'base1-95': { canPlay: ({ g, seat }) => (P(g, seat).active && P(g, seat).bench.length ? true : 'Nothing to switch with'), trainer: (ctx) => { const k = ctx.chooseMon('Switch with which Benched Pokémon?', ctx.me.bench, { id: 'switch' })[0]; ctx.switchActive(ctx.seat, k, 'Switch'); } },

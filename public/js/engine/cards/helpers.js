@@ -36,6 +36,14 @@ export const discardDefenderEnergy = (n) => ({ effect: (ctx) => { ctx.damage(n);
 /** The Pokémon that count as being on a player's Bench. A Colossal Pokémon's Bench is its Energy Crystals, and only the
  *  ones holding Energy count as Pokémon (every crystal can still be picked as a target). */
 export const benched = (ctx, p) => p.bench.filter((x) => !(ctx.db[x.c] || {}).bossPart || x.flags.charged !== false);
+/** A Colossal Pokémon's Energy Crystals that hold Energy. An Energy effect may point at one of them instead of at the boss:
+ *  on the table the Energy sits behind the crystal, so that is where a player reaches for it. */
+export const litCrystals = (ctx, p) => p.bench.filter((x) => (ctx.db[x.c] || {}).bossPart && x.flags.charged !== false);
+/** Take the Energy out of a lit crystal (the crystal itself stays). False if `id` isn't one. */
+export function drainCrystal(ctx, p, id) {
+  const x = litCrystals(ctx, p).find((m) => m.id === id); if (!x || !p.active || !p.active.en.length) return false;
+  x.flags.charged = false; ctx.discardEnergy(p.active, [p.active.en[p.active.en.length - 1]]); return true;
+}
 export const benchSnipe = (n, snipe) => ({ effect: (ctx) => { if (n) ctx.damage(n); if (ctx.opp.bench.length) { const k = ctx.chooseMon(`Choose a Benched Pokémon to take ${snipe}`, ctx.opp.bench, { id: 'snipe' })[0]; ctx.benchDamageOne(k, snipe); } } });
 /** Heal self by the damage dealt (Leech Life style); `half` rounds half up to 10. */
 export const drain = (n, half) => ({ effect: (ctx, m) => { const dealt = ctx.damage(n); const heal = half ? Math.ceil(dealt / 20) * 10 : dealt; if (heal) ctx.heal(m, heal); } });
