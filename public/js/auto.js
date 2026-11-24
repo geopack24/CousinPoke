@@ -10,6 +10,7 @@ import { playBattleIntro, playPokemonMusic, playEventMusic, warmMusic } from './
 import * as sfx from './sfx.js';
 import { BOT_UID, BOT_DECKS, botDeckCards, botAction, botAnswer, key as botKey } from './bot.js';
 import { nextBossAttack, bossCrystals } from './engine/boss.js';
+import { sideClasses, coinClass } from './shop.js';
 
 let PT = null;           // bridge from index.html
 let promptOpen = null;   // id of the prompt modal currently shown
@@ -115,6 +116,10 @@ function showRescue(e, me) {
     setTimeout(step, 700);
   });
 }
+/** The Arena document of the player in a seat: it holds what they bought in the Token Shop and have equipped. */
+const shopDoc = (g, seat) => { const u = g && g.seats && g.seats[seat] ? g.seats[seat].uid : null; return u ? (PT.S.arena || {})[u] || null : null; };
+/** The coin a flip is made with: the flipping player's own, if they have one from the shop. */
+const coinFor = (f) => { const d = PT.S.game; const g = d && d.state; const seat = (f && f.seat) || (d ? mySeat(d) : null); return g && seat ? coinClass(shopDoc(g, seat)) : ''; };
 function clickCoins(flips, opts = {}) {
   return new Promise((resolve) => {
     const wrap = document.createElement('div'); wrap.className = 'coinflip';
@@ -122,7 +127,7 @@ function clickCoins(flips, opts = {}) {
     const render = () => {
       const f = flips[i]; const label = opts.title || (f && f.label ? (FLIP_LABELS[f.label] || f.label) : 'Coin flip');
       wrap.innerHTML = `<div class="cf-box"><div class="cf-title">${esc(label)}${flips.length > 1 ? ` · coin ${Math.min(i + 1, flips.length)} of ${flips.length}` : ''}</div>
-        <button type="button" class="cf-coin${opts.auto ? ' auto' : ''}" aria-label="${opts.auto ? 'The coin flips on its own' : 'Flip the coin'}"${opts.auto ? ' tabindex="-1"' : ''}><span class="cf-face">?</span></button>
+        <button type="button" class="cf-coin ${coinFor(f || flips[flips.length - 1])}${opts.auto ? ' auto' : ''}" aria-label="${opts.auto ? 'The coin flips on its own' : 'Flip the coin'}"${opts.auto ? ' tabindex="-1"' : ''}><span class="cf-face">?</span></button>
         <div class="cf-hint">${opts.auto ? 'Your opponent’s flip. It flips on its own.' : 'Tap the coin to flip'}</div>
         <div class="cf-results">${results.map((h) => `<span class="${h ? 'h' : 't'}">${h ? 'H' : 'T'}</span>`).join('')}</div>
         ${flips.length - i > 2 ? '<button type="button" class="sm cf-all">Flip the rest</button>' : ''}</div>`;
@@ -505,7 +510,7 @@ export function render(main, doc) {
     const handCards = own ? p.hand.slice().sort((x, y) => (HORD[C(x.c).st] ?? 1) - (HORD[C(y.c).st] ?? 1) || C(x.c).name.localeCompare(C(y.c).name)) : p.hand;
     const hand = own ? `<div class="z handz" style="align-items:stretch"><span class="zlbl">${compact ? `Hand · ${p.hand.length} · drag to play` : `Your hand · ${p.hand.length} · drag a card onto a Pokémon or the bench, or tap it for options`}</span><div class="hand ${compact ? 'strip' : ''}" data-handzone="${seat}">${handCards.map((c) => PT.cardHTML(c.c, SC.hand, `data-hand="${c.id}"`, (legal.some((a) => a.card === c.id) ? 'click can' : 'click') + (drawFlying.has(c.id) ? ' incoming' : ''))).join('') || '<span class="small muted">empty</span>'}</div></div>` : '';
     const live = g.phase === 'main' && !g.winner && ((pending && pending.seat === seat) || (!pending && g.turn === seat));
-    const cls = `side ${own ? 'mine' : ''} ${live ? 'live' : (g.phase === 'main' && !g.winner ? 'idle' : '')}`;
+    const cls = `side ${own ? 'mine' : ''} ${live ? 'live' : (g.phase === 'main' && !g.winner ? 'idle' : '')} ${sideClasses(shopDoc(g, seat))}`; // + the player's play mat and card sleeves
     // a Prize is waiting: say so in the middle of the player's side (it can come mid-turn against a boss), and let a tap on it take one
     const prizeCall = prizeClick ? `<div class="prizecall" data-prize="0" data-seat="${seat}" role="button" tabindex="0"><b>🎁 Take a Prize card</b><span>${pending.n > 1 ? `${pending.n} to take · ` : ''}tap here, or one of your Prizes</span></div>` : '';
     return isTop ? `<div class="${cls}">${name}${rail}${field}</div>` : `<div class="${cls}">${name}${prizeCall}${field}${rail}${hand}</div>`;
@@ -694,7 +699,7 @@ async function botStep() {
   const doc = PT.S.game; if (!doc || !doc.state) return; const bs = botSeat(doc); if (!bs || !botNeedsToAct(doc, bs)) return;
   const g = doc.state; if (botSkipTurn !== g.turnNo) { botSkip.clear(); botSkipTurn = g.turnNo; }
   let action;
-  if (doc.inflight) { const inf = doc.inflight; action = { ...inf.action, answers: [...(inf.action.answers || []), botAnswer(inf.prompt, g, bs, PT.CARDS)] }; }
+  if (doc.inflight) { const inf = doc.inflight; action = { ...inf.action, answers: [...(inf.action.answers || []), botAnswer(inf.prompt, g, bs, PT.CARDS, inf.action)] }; }
   else {
     const a = botAction(g, bs, PT.CARDS, botSkip);
     if (!a) { if (g.turn === bs && g.phase === 'main' && !g.pending.length) action = { type: 'endTurn', seat: bs, seed: randomSeed(), answers: [] }; else return; }
@@ -704,7 +709,7 @@ async function botStep() {
     const r = apply(doc.state, action, PT.CARDS);
     if (r.error) { console.warn('computer: refused', r.error, action); botSkip.add(botKey(action)); maybeRunBot(doc); return; }
     if (r.prompt) {
-      if (r.prompt.seat === bs) { action = { ...action, answers: [...action.answers, botAnswer(r.prompt, doc.state, bs, PT.CARDS)] }; continue; }
+      if (r.prompt.seat === bs) { action = { ...action, answers: [...action.answers, botAnswer(r.prompt, doc.state, bs, PT.CARDS, action)] }; continue; }
       doc.inflight = { action, prompt: r.prompt }; await PT.saveGame(doc); PT.render(); return; // the human has to answer
     }
     // a Colossal Pokémon's attack is announced first, while the table still shows how things stood

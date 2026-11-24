@@ -536,6 +536,7 @@ table.dboard th.me{color:var(--fg)}
 </style>
 <link rel="stylesheet" href="hype.css">
 <link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="shop.css">
 <link rel="icon" type="image/png" href="art/favicon-64.png">
 <link rel="apple-touch-icon" href="art/icon-180.png">
 <link rel="preload" as="image" href="art/arena.webp">
@@ -673,7 +674,7 @@ async function sync(){
   if(document.hidden&&S.screen!=='game'&&!(LG()&&LG().liveDraft())){syncSoon(15000);return}
   syncing=true;let changed=false;
   try{
-    const d=await api('POST','sync',{pid:uid,lobby:S.screen!=='game',game:S.screen==='game'?S.gameId:null,gv:S.game?S.game.version:null,league:1,lid:LEAGUE_ID,lv:S.league?S.league.version:null,arena:(S.screen!=='game'||(S.game&&S.game.arena))?1:0});
+    const d=await api('POST','sync',{pid:uid,lobby:S.screen!=='game',game:S.screen==='game'?S.gameId:null,gv:S.game?S.game.version:null,league:1,lid:LEAGUE_ID,lv:S.league?S.league.version:null,arena:(S.screen!=='game'||(S.game&&S.game.arena)||!Object.keys(S.arena||{}).length)?1:0});
     if(!S.online){S.online=true;changed=true;setOnline(true)}
     const sig=k=>JSON.stringify(d[k]);
     if(d.players&&sig('players')!==lastSig.players){lastSig.players=sig('players');S.players=d.players;changed=true}
@@ -899,14 +900,15 @@ function newGameModal(preset){
     <label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px"><input type="radio" name="gmode" value="manual"><span><b>Tabletop</b><br><span class="small muted">The table only moves cards and counts damage. You apply every effect yourselves.</span></span></label>
     ${(()=>{const mm=LG()?LG().majorMatch():'The league is still loading';const ok=mm&&mm.ok;return `<label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px"><input type="radio" name="gmode" value="ranked" ${ok?'':'disabled'} ${ok&&preset==='ranked'?'checked':''}><span><b>Major match</b><br><span class="small muted">${ok?`${esc(mm.name)} · ${esc(mm.label)}: you vs ${esc(nameOf(mm.opp))}. Standard league rules, decks checked against your rosters, and the winner goes into the bracket.`:esc(mm)+'.'}</span></span></label>`})()}
     <label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px"><input type="radio" name="gmode" value="bot"><span><b>Practice against the computer</b><br><span class="small muted">Automated rules, with the computer in the other seat. Good for testing a deck.</span></span></label>
-    <div id="botdeckrow" style="margin:0 0 12px 26px;display:none"><label class="lbl" for="botdeck">The computer plays</label><select id="botdeck" style="width:100%">${Object.entries((window.AUTO&&window.AUTO.BOT_DECKS)||{}).map(([k,d])=>`<option value="${k}">${esc(d.name)}</option>`).join('')}${S.decks.map(d=>`<option value="${esc(d.id)}">${esc(d.name)} (your deck)</option>`).join('')}</select></div>
+    <div id="botdeckrow" style="margin:0 0 12px 26px;display:none"><label class="lbl" for="botdeck">The computer plays</label><select id="botdeck" style="width:100%"><option value="random">A surprise deck (one of its own, at random)</option>${Object.entries((window.AUTO&&window.AUTO.BOT_DECKS)||{}).map(([k,d])=>`<option value="${k}">${esc(d.name)}</option>`).join('')}${S.decks.map(d=>`<option value="${esc(d.id)}">${esc(d.name)} (your deck)</option>`).join('')}</select></div>
     <p id="rkrules" class="small muted" style="display:${preset==='ranked'&&LG()&&LG().majorMatch().ok?'':'none'}">Major matches always use the standard league rules.</p><div id="rulesec" style="display:${preset==='ranked'&&LG()&&LG().majorMatch().ok?'none':''}"><div class="lbl" style="margin-bottom:6px">Rules</div>${rulesForm(DEFAULT_RULES)}</div>`,`<button class="pri" id="gok" type="button">Create table</button>`,m=>{m.querySelector('#gname').focus();m.querySelectorAll('input[name=gmode]').forEach(r=>r.addEventListener('change',()=>{const md=(m.querySelector('input[name=gmode]:checked')||{}).value;m.querySelector('#botdeckrow').style.display=md==='bot'?'block':'none';m.querySelector('#rulesec').style.display=md==='ranked'?'none':'';m.querySelector('#rkrules').style.display=md==='ranked'?'':'none'}));m.querySelector('#gok').onclick=async()=>{let mode=(m.querySelector('input[name=gmode]:checked')||{}).value||'auto';const mm=mode==='ranked'&&LG()?LG().majorMatch():null;const ranked=!!(mm&&mm.ok);if(mode==='ranked'&&!ranked){toast(typeof mm==='string'?mm:'That major match is no longer available');return}if(mode==='ranked')mode='auto';const name=m.querySelector('#gname').value.trim()||(ranked?`${mm.name} · ${mm.label}`:`${S.name||'Someone'}'s table`);const rules=ranked?clone(DEFAULT_RULES):readRulesForm(m);const botDeck=mode==='bot'?m.querySelector('#botdeck').value:null;if(mode==='bot')mode='auto';const id=rid();closeModal();try{let seatB={uid:ranked?mm.opp:null,deckId:null,deckName:null};if(botDeck){seatB=await prepareBotSeat(botDeck)}await api('PUT','games/'+id,{data:{name,mode,host:uid,createdAt:Date.now(),updatedAt:Date.now(),status:'lobby',rules,seats:{a:{uid,deckId:null,deckName:null},b:seatB},...(ranked?{ranked:{season:mm.season,major:mm.major,game:mm.game,label:mm.label,a:mm.a,b:mm.b}}:{}),state:null,log:botDeck?[{t:Date.now(),m:'Practice table: the computer is in seat B. Pick your deck and press Start.'}]:[],v:0}});openGame(id)}catch(e){toast('Could not create table ('+(e.code||'error')+')')}}});
 }
 /** Make sure the computer's player record and the chosen deck exist, then describe seat B. */
 async function prepareBotSeat(deckKey){
   const A=window.AUTO;if(!A)throw new Error('engine not loaded');
   try{await api('PUT','players/'+A.BOT_UID,{data:{name:'Computer',updatedAt:Date.now()}})}catch(e){}
-  if(A.BOT_DECKS&&A.BOT_DECKS[deckKey]){const cards=A.botDeckCards(CARDS,deckKey);const count=Object.values(cards).reduce((a,b)=>a+b,0);await api('PUT','decks/'+deckKey,{data:{owner:A.BOT_UID,name:A.BOT_DECKS[deckKey].name,cards,count,updatedAt:Date.now()}});return{uid:A.BOT_UID,deckId:deckKey,deckName:A.BOT_DECKS[deckKey].name}}
+  const surprise=deckKey==='random';if(surprise){const ks=Object.keys(A.BOT_DECKS||{});deckKey=ks[Math.floor(Math.random()*ks.length)]}
+  if(A.BOT_DECKS&&A.BOT_DECKS[deckKey]){const cards=A.botDeckCards(CARDS,deckKey);const count=Object.values(cards).reduce((a,b)=>a+b,0);await api('PUT','decks/'+deckKey,{data:{owner:A.BOT_UID,name:A.BOT_DECKS[deckKey].name,cards,count,updatedAt:Date.now()}});return{uid:A.BOT_UID,deckId:deckKey,deckName:surprise?'Computer: surprise deck':A.BOT_DECKS[deckKey].name}}
   const d=S.decks.find(x=>x.id===deckKey);if(!d)throw new Error('deck');return{uid:A.BOT_UID,deckId:d.id,deckName:d.name}
 }
 async function joinGame(id){

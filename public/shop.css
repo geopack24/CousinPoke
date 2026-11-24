@@ -1,0 +1,160 @@
+/* The Token Shop and the cosmetics it sells (see js/shop.js). Everything here is drawn with gradients: no image files. */
+
+/* ================= play mats: a player's side of the table ================= */
+.side[class*="mat-"]{background-color:#111;outline:1px solid rgba(255,255,255,.14);outline-offset:-1px}
+/* Inferno: lava glow under drifting embers */
+.side.mat-inferno{
+  background-image:
+    radial-gradient(2px 2px at 14px 22px,#ffd27a,transparent 70%),radial-gradient(1.5px 1.5px at 70px 90px,#ff9d3c,transparent 70%),radial-gradient(2.5px 2.5px at 110px 40px,#ffb347,transparent 70%),
+    radial-gradient(ellipse 60% 80% at 15% 110%,rgba(255,120,0,.55),transparent 60%),radial-gradient(ellipse 55% 90% at 85% 115%,rgba(255,50,0,.55),transparent 60%),radial-gradient(ellipse 50% 60% at 50% 120%,rgba(255,190,60,.4),transparent 60%),
+    linear-gradient(165deg,#1d0400,#5a1000 48%,#210400);
+  background-size:140px 140px,170px 170px,210px 210px,200% 100%,200% 100%,160% 100%,100% 100%;
+  animation:matEmbers 7s linear infinite,matLava 9s ease-in-out infinite alternate;outline-color:rgba(255,140,40,.5)}
+@keyframes matEmbers{to{background-position:0 -140px,0 -170px,0 -210px,var(--l1,0) 0,var(--l2,100%) 0,50% 0,0 0}}
+@keyframes matLava{from{--l1:0%;--l2:100%}to{--l1:60%;--l2:30%}}
+/* The Abyss: deep water, light bands crossing, bubbles rising */
+.side.mat-abyss{
+  background-image:
+    radial-gradient(3px 3px at 30px 40px,rgba(200,240,255,.55),transparent 70%),radial-gradient(2px 2px at 120px 110px,rgba(200,240,255,.4),transparent 70%),
+    repeating-linear-gradient(115deg,transparent 0 46px,rgba(120,220,255,.13) 60px,transparent 78px),repeating-linear-gradient(65deg,transparent 0 60px,rgba(80,170,255,.12) 78px,transparent 100px),
+    radial-gradient(ellipse 80% 70% at 50% -20%,rgba(90,200,255,.45),transparent 70%),linear-gradient(180deg,#053560,#021a3a 60%,#010a1c);
+  background-size:160px 160px,230px 230px,300% 300%,300% 300%,100% 100%,100% 100%;
+  animation:matAbyss 14s linear infinite;outline-color:rgba(90,200,255,.5)}
+@keyframes matAbyss{to{background-position:0 -160px,0 -230px,-560px 0,480px 0,0 0,0 0}}
+/* Thunderhead: driving rain, and a lightning flash every few seconds */
+.side.mat-storm{
+  background-image:
+    linear-gradient(180deg,rgba(210,225,255,.75),rgba(170,190,255,.15)),
+    repeating-linear-gradient(104deg,transparent 0 13px,rgba(200,215,255,.16) 13px 14px),repeating-linear-gradient(101deg,transparent 0 31px,rgba(200,215,255,.1) 31px 33px),
+    radial-gradient(ellipse 70% 60% at 25% 0%,rgba(120,110,190,.5),transparent 70%),radial-gradient(ellipse 60% 55% at 80% 5%,rgba(70,90,160,.5),transparent 70%),linear-gradient(180deg,#1a1c33,#0c0e1e);
+  background-size:0 0,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%;background-repeat:no-repeat,repeat,repeat,no-repeat,no-repeat,no-repeat;
+  animation:matRain .5s linear infinite,matFlash 6.5s steps(1) infinite;outline-color:rgba(170,180,255,.55)}
+@keyframes matRain{to{background-position:0 0,-28px 112px,-66px 264px,0 0,0 0,0 0}}
+@keyframes matFlash{0%,100%{background-size:0 0,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%}71%{background-size:100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%}72.5%{background-size:0 0,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%}74%{background-size:100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%}76.5%{background-size:0 0,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%}}
+/* Deep Space: three depths of stars over a drifting nebula */
+.side.mat-galaxy{
+  background-image:
+    radial-gradient(1.6px 1.6px at 20px 30px,#fff,transparent 70%),radial-gradient(1.2px 1.2px at 90px 120px,#cfe0ff,transparent 70%),radial-gradient(1px 1px at 50px 80px,#ffe9c9,transparent 70%),
+    radial-gradient(ellipse 45% 70% at 20% 30%,rgba(170,60,255,.5),transparent 70%),radial-gradient(ellipse 50% 60% at 80% 70%,rgba(0,190,220,.4),transparent 70%),radial-gradient(ellipse 40% 50% at 55% 20%,rgba(255,70,160,.35),transparent 70%),
+    linear-gradient(180deg,#07041c,#0d0630 55%,#040212);
+  background-size:150px 150px,230px 230px,110px 110px,200% 200%,200% 200%,200% 200%,100% 100%;
+  animation:matStars 40s linear infinite,matNebula 18s ease-in-out infinite alternate;outline-color:rgba(190,120,255,.55)}
+@keyframes matStars{to{background-position:-150px 0,-230px 0,-110px 0,var(--n1,0 0),var(--n2,100% 100%),var(--n3,50% 0),0 0}}
+@keyframes matNebula{from{--n1:0% 0%;--n2:100% 100%;--n3:50% 0%}to{--n1:60% 40%;--n2:40% 60%;--n3:20% 60%}}
+/* Prism: holographic foil that sweeps through every colour */
+.side.mat-prism{
+  background-image:
+    repeating-linear-gradient(125deg,rgba(255,255,255,.07) 0 2px,transparent 2px 9px),
+    linear-gradient(115deg,rgba(255,0,128,.42),rgba(255,160,0,.4) 16%,rgba(255,255,80,.4) 32%,rgba(0,230,140,.4) 48%,rgba(0,180,255,.42) 64%,rgba(140,80,255,.42) 80%,rgba(255,0,128,.42)),
+    radial-gradient(ellipse 60% 70% at 50% 50%,rgba(255,255,255,.14),transparent 70%),linear-gradient(180deg,#15151f,#0b0b12);
+  background-size:100% 100%,300% 100%,100% 100%,100% 100%;animation:matPrism 6s linear infinite;outline-color:rgba(255,255,255,.55)}
+@keyframes matPrism{to{background-position:0 0,300% 0,0 0,0 0}}
+@property --l1{syntax:'<percentage>';inherits:false;initial-value:0%}@property --l2{syntax:'<percentage>';inherits:false;initial-value:100%}
+@property --n1{syntax:'<position>';inherits:false;initial-value:0% 0%}@property --n2{syntax:'<position>';inherits:false;initial-value:100% 100%}@property --n3{syntax:'<position>';inherits:false;initial-value:50% 0%}
+
+/* ================= card sleeves: the backs of a player's cards ================= */
+[class*="sleeve-"] .cd.back{background-color:#111;background-repeat:no-repeat;box-shadow:0 1px 3px rgba(0,0,0,.5),inset 0 0 0 calc(7px*var(--s)) rgba(0,0,0,.28)}
+/* the emblems, drawn once as tiny SVGs */
+.sleeve-gold .cd.back{--em:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 6l12 30 32 2-25 21 8 32-27-18-27 18 8-32L6 38l32-2z' fill='%237a5200' stroke='%23fff3b0' stroke-width='3'/%3E%3C/svg%3E");
+  background-image:var(--em),linear-gradient(110deg,transparent 35%,rgba(255,255,255,.85) 50%,transparent 65%),repeating-linear-gradient(90deg,rgba(255,255,255,.08) 0 1px,transparent 1px 3px),linear-gradient(135deg,#8a5a00,#ffd95a 30%,#b97f00 55%,#ffe98a 78%,#8a5a00);
+  background-size:52% auto,250% 100%,100% 100%,100% 100%;background-position:center,150% 0,0 0,0 0;animation:slShine 2.6s ease-in-out infinite}
+@keyframes slShine{to{background-position:center,-150% 0,0 0,0 0}}
+.sleeve-neon .cd.back{--em:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M58 4L20 56h24l-6 40 42-56H54z' fill='%2300f0ff' stroke='%23ff2bd6' stroke-width='4' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image:var(--em),repeating-linear-gradient(0deg,rgba(0,240,255,.5) 0 1px,transparent 1px calc(22px*var(--s))),repeating-linear-gradient(90deg,rgba(255,43,214,.5) 0 1px,transparent 1px calc(22px*var(--s))),radial-gradient(circle at 50% 50%,rgba(0,240,255,.35),transparent 65%),linear-gradient(180deg,#0a0420,#02010a);
+  background-size:50% auto,100% 100%,100% 100%,100% 100%,100% 100%;background-position:center,0 0,0 0,0 0,0 0;background-repeat:no-repeat,repeat,repeat,no-repeat,no-repeat;
+  animation:slGrid 1.2s linear infinite,slPulse 1.8s ease-in-out infinite alternate}
+@keyframes slGrid{to{background-position:center,0 calc(22px*var(--s)),calc(22px*var(--s)) 0,0 0,0 0}}
+@keyframes slPulse{from{box-shadow:0 0 4px rgba(0,240,255,.5),inset 0 0 0 calc(7px*var(--s)) rgba(0,0,0,.28)}to{box-shadow:0 0 14px rgba(255,43,214,.85),inset 0 0 0 calc(7px*var(--s)) rgba(0,0,0,.28)}}
+.sleeve-scale .cd.back{--em:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 6l34 22v36L50 94 16 64V28z' fill='%23083b22' stroke='%23b8ffd0' stroke-width='3'/%3E%3Cpath d='M50 24l18 12v20L50 74 32 56V36z' fill='%2334d17a'/%3E%3C/svg%3E");
+  background-image:var(--em),linear-gradient(115deg,transparent 40%,rgba(190,255,220,.6) 50%,transparent 60%),radial-gradient(circle at 50% 0,transparent 58%,rgba(0,0,0,.45) 60%,#1c8a4c 62%,#0f5a30 100%),radial-gradient(circle at 50% 0,transparent 58%,rgba(0,0,0,.45) 60%,#22a35a 62%,#0c4a27 100%);
+  background-size:50% auto,300% 100%,calc(36px*var(--s)) calc(30px*var(--s)),calc(36px*var(--s)) calc(30px*var(--s));background-position:center,160% 0,0 0,calc(18px*var(--s)) calc(15px*var(--s));background-repeat:no-repeat,no-repeat,repeat,repeat;
+  animation:slScale 3.2s ease-in-out infinite}
+@keyframes slScale{to{background-position:center,-160% 0,0 0,calc(18px*var(--s)) calc(15px*var(--s))}}
+.sleeve-nova .cd.back{--em:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 2l9 39 39 9-39 9-9 39-9-39-39-9 39-9z' fill='%23fff' stroke='%23ffd0ff' stroke-width='2'/%3E%3C/svg%3E");
+  background-image:var(--em),radial-gradient(circle,#fff 0,rgba(255,220,120,.9) 10%,rgba(255,80,200,.75) 26%,rgba(90,60,255,.55) 44%,transparent 62%),radial-gradient(1.2px 1.2px at 30% 20%,#fff,transparent 70%),radial-gradient(1px 1px at 75% 70%,#fff,transparent 70%),radial-gradient(1.2px 1.2px at 20% 80%,#fff,transparent 70%),linear-gradient(180deg,#120428,#04010f);
+  background-size:44% auto,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%;background-position:center;animation:slNova 2.2s ease-in-out infinite}
+@keyframes slNova{0%,100%{background-size:40% auto,70% 52%,100% 100%,100% 100%,100% 100%,100% 100%}50%{background-size:56% auto,210% 160%,100% 100%,100% 100%,100% 100%,100% 100%}}
+.sleeve-ember .cd.back{--em:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M52 4c6 22 30 30 26 58-3 20-18 32-30 32S20 82 20 62c0-14 8-20 12-32 6 8 6 14 10 16 2-16 2-28 10-42z' fill='%23ffd23c' stroke='%23fff' stroke-width='3'/%3E%3Cpath d='M50 50c4 10 14 14 12 26-1 9-7 14-13 14s-13-5-13-14c0-8 6-10 8-16 2 4 3 6 4 6 0-6 0-10 2-16z' fill='%23ff5a1f'/%3E%3C/svg%3E");
+  background-image:var(--em),radial-gradient(ellipse 45% 55% at 25% 105%,rgba(255,220,90,.95),rgba(255,110,0,.75) 45%,transparent 70%),radial-gradient(ellipse 50% 70% at 60% 110%,rgba(255,170,40,.95),rgba(255,60,0,.7) 45%,transparent 70%),radial-gradient(ellipse 40% 50% at 90% 105%,rgba(255,230,120,.9),rgba(255,90,0,.7) 45%,transparent 70%),linear-gradient(180deg,#160202,#3a0800 60%,#7a1a00);
+  background-size:46% auto,200% 100%,200% 100%,200% 100%,100% 100%;background-position:center 40%,0 0,100% 0,40% 0,0 0;animation:slFire 1.6s ease-in-out infinite alternate}
+@keyframes slFire{to{background-position:center 36%,60% 0,20% 0,90% 0,0 0}}
+
+/* ================= coins: the click-to-flip coin ================= */
+.cf-coin[class*="coin-"]{background-repeat:no-repeat;background-position:center;text-shadow:0 1px 0 rgba(255,255,255,.35),0 2px 6px rgba(0,0,0,.55)}
+.cf-coin[class*="coin-"] .cf-face{position:relative;z-index:1}
+.cf-coin.coin-crown{--em:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M12 74l-6-44 24 20 20-34 20 34 24-20-6 44z' fill='%23a86a00' fill-opacity='.55'/%3E%3Crect x='14' y='78' width='72' height='9' rx='3' fill='%23a86a00' fill-opacity='.55'/%3E%3C/svg%3E");
+  background-image:var(--em),conic-gradient(from 0deg,#fff6c2,#ffcf3a,#b97f00,#ffe98a,#c99100,#fff6c2);background-size:62% auto,100% 100%;border-color:#8a5a00;color:#4a2f00;box-shadow:0 6px 0 #6b4600,0 0 26px rgba(255,205,60,.9),0 10px 20px rgba(0,0,0,.4);animation:coinGlowGold 1.6s ease-in-out infinite alternate}
+@keyframes coinGlowGold{to{box-shadow:0 6px 0 #6b4600,0 0 46px rgba(255,235,140,1),0 10px 20px rgba(0,0,0,.4)}}
+.cf-coin.coin-bolt{--em:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M58 6L22 56h22l-6 38 40-54H56z' fill='%23fff36b' fill-opacity='.7'/%3E%3C/svg%3E");
+  background-image:var(--em),radial-gradient(circle at 35% 28%,#bfe9ff,#2f8bff 45%,#0a2a8a);background-size:60% auto,100% 100%;border-color:#9fd8ff;color:#fff;box-shadow:0 6px 0 #082063,0 0 24px rgba(80,170,255,.95),0 10px 20px rgba(0,0,0,.4);animation:coinGlowBolt .5s steps(2) infinite}
+@keyframes coinGlowBolt{to{box-shadow:0 6px 0 #082063,0 0 44px rgba(190,235,255,1),0 0 4px #fff inset,0 10px 20px rgba(0,0,0,.4)}}
+.cf-coin.coin-ember{--em:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M52 6c6 22 28 30 24 56-3 19-16 30-28 30S22 80 22 62c0-14 8-20 12-32 6 8 6 14 10 16 2-14 1-26 8-40z' fill='%23ffe07a' fill-opacity='.65'/%3E%3C/svg%3E");
+  background-image:var(--em),radial-gradient(circle at 40% 30%,#ffd98a,#ff6a1a 40%,#7a1200 80%);background-size:58% auto,100% 100%;border-color:#3a0d00;color:#fff3d6;box-shadow:0 6px 0 #2a0800,0 0 28px rgba(255,110,20,.95),0 10px 20px rgba(0,0,0,.4);animation:coinGlowEmber 1.1s ease-in-out infinite alternate}
+@keyframes coinGlowEmber{to{box-shadow:0 6px 0 #2a0800,0 0 50px rgba(255,190,60,1),0 10px 20px rgba(0,0,0,.4);filter:brightness(1.12)}}
+.cf-coin.coin-moon{--em:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M66 10a42 42 0 1 0 24 62A34 34 0 0 1 66 10z' fill='%235a6ea8' fill-opacity='.55'/%3E%3C/svg%3E");
+  background-image:var(--em),radial-gradient(circle at 35% 28%,#fff,#cfd8f5 45%,#7f8ec2);background-size:60% auto,100% 100%;border-color:#e9eeff;color:#1d2a55;box-shadow:0 6px 0 #4d5a8c,0 0 26px rgba(190,205,255,.9),0 10px 20px rgba(0,0,0,.4);animation:coinGlowMoon 2.4s ease-in-out infinite alternate}
+@keyframes coinGlowMoon{to{box-shadow:0 6px 0 #4d5a8c,0 0 52px rgba(225,232,255,1),0 10px 20px rgba(0,0,0,.4)}}
+.cf-coin.coin-prism{--em:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 6l40 34-40 54L10 40z' fill='%23fff' fill-opacity='.4' stroke='%23fff' stroke-opacity='.7' stroke-width='3'/%3E%3Cpath d='M10 40h80M32 40L50 6l18 34-18 54z' fill='none' stroke='%23fff' stroke-opacity='.7' stroke-width='3'/%3E%3C/svg%3E");
+  background-image:var(--em),conic-gradient(from var(--pr,0deg),#ff3d7f,#ffb13d,#f9ff5a,#3dffa0,#3dc8ff,#8f6bff,#ff3d7f);background-size:60% auto,100% 100%;border-color:#fff;color:#fff;box-shadow:0 6px 0 #5a5a7a,0 0 30px rgba(255,255,255,.85),0 10px 20px rgba(0,0,0,.4);animation:coinPrism 2.4s linear infinite}
+@property --pr{syntax:'<angle>';inherits:false;initial-value:0deg}
+@keyframes coinPrism{to{--pr:360deg}}
+/* tails keeps the coin's own metal, a shade darker, so the two faces still read differently */
+.cf-coin[class*="coin-"].tails{filter:saturate(.75) brightness(.82)}
+.cf-coin[class*="coin-"].spin{animation:cfspin .7s ease-in-out}
+
+/* ================= the shop page ================= */
+.shop{display:flex;flex-direction:column;gap:18px}
+.shop-hero{position:relative;overflow:hidden;display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:22px 24px;border-radius:18px;color:#fff;
+  background:radial-gradient(ellipse 70% 120% at 85% 50%,rgba(255,200,61,.28),transparent 70%),linear-gradient(120deg,#2a0b4f,#0d1b4d 55%,#06283f);box-shadow:0 0 0 1px rgba(255,200,61,.45),0 14px 40px rgba(0,0,0,.45)}
+.shop-hero h1{margin:2px 0 6px;font-size:40px;line-height:1;background:linear-gradient(90deg,#fff3b0,#ffcb05 30%,#ff8a3d 55%,#ff5fd2 80%,#fff3b0);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shopTitle 5s linear infinite;filter:drop-shadow(0 2px 0 rgba(0,0,0,.45))}
+@keyframes shopTitle{to{background-position:300% 0}}
+.shop-hero p{margin:0;max-width:520px;color:#e6e2ff}.shop-hero>div:not(.shop-rays){position:relative;z-index:1}
+.shop-rays{position:absolute;right:-140px;top:50%;width:560px;height:560px;margin-top:-280px;border-radius:50%;background:repeating-conic-gradient(rgba(255,214,90,.2) 0 9deg,transparent 9deg 18deg);-webkit-mask:radial-gradient(circle,#000 10%,transparent 68%);mask:radial-gradient(circle,#000 10%,transparent 68%);animation:shopSpin 30s linear infinite}
+@keyframes shopSpin{to{transform:rotate(360deg)}}
+.shop-purse{display:grid;grid-template-columns:auto auto;align-items:center;column-gap:10px;padding:12px 20px;border-radius:16px;background:rgba(8,6,20,.72);border:1px solid rgba(255,200,61,.7);box-shadow:0 0 26px rgba(255,200,61,.35);text-align:left}
+.shop-purse>span{grid-row:span 2;font-size:34px;animation:shopBob 1.8s ease-in-out infinite alternate}@keyframes shopBob{to{transform:translateY(-5px) rotate(8deg)}}
+.shop-purse b{font-family:var(--display);font-weight:400;font-size:34px;line-height:1;color:var(--gold,#ffcb05)}
+.shop-purse em{font-style:normal;font:900 11px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:#e9dcb8}
+.shop-purse small{grid-column:1/-1;margin-top:6px;color:#b9b4d6;font-size:12px}
+.shop-rowhead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 2px 8px}.shop-rowhead h2{margin:0}.shop-rowhead p{margin:0}
+.shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
+.shop-item{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 12px 14px;border-radius:16px;text-align:center;background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.14);transition:transform .18s,box-shadow .18s,border-color .18s}
+.shop-item:hover{transform:translateY(-4px) scale(1.015);box-shadow:0 14px 30px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.25)}
+.shop-item.can{border-color:rgba(255,200,61,.75);animation:shopCan 1.6s ease-in-out infinite alternate}@keyframes shopCan{to{box-shadow:0 0 26px rgba(255,200,61,.55)}}
+.shop-item.owned{border-color:rgba(126,231,135,.5)}.shop-item.on{border-color:#7ee787;box-shadow:0 0 0 2px rgba(126,231,135,.55),0 0 26px rgba(126,231,135,.35)}
+.shop-item h3{margin:4px 0 0;font-size:17px}.shop-item p{margin:0 0 4px;min-height:2.6em;color:var(--muted,#b9b4d6)}
+.shop-tag{position:absolute;top:8px;right:8px;z-index:2;padding:2px 9px;border-radius:999px;font:900 10px/1.6 var(--body);letter-spacing:.1em;text-transform:uppercase;background:rgba(0,0,0,.7);color:#cfeccf;border:1px solid rgba(126,231,135,.6)}
+.shop-tag.on{background:#7ee787;color:#06280b}
+.shop-look{all:unset;cursor:zoom-in;display:block;width:100%;border-radius:12px;overflow:hidden}.shop-look:focus-visible{outline:3px solid var(--accent,#ffcb05)}
+.shop-prev{height:132px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:radial-gradient(ellipse at 50% 40%,rgba(255,255,255,.1),rgba(0,0,0,.35));overflow:hidden}
+.shop-prev.shop-mat{padding:0}.shop-prev.shop-mat .side{width:100%;height:100%;border-radius:12px;display:flex;align-items:center;justify-content:center}
+.shop-matrow{display:flex;gap:8px;align-items:center}.shop-slot{width:38px;height:52px;border-radius:5px;border:1.5px dashed rgba(255,255,255,.4);background:rgba(0,0,0,.22)}
+.shop-fan{display:flex;align-items:center;justify-content:center}.shop-fan .cd{margin:0 -14px;transform:rotate(calc((var(--i) - 1)*11deg)) translateY(calc((var(--i) - 1)*(var(--i) - 1)*6px));transition:transform .25s}
+.shop-item:hover .shop-fan .cd{transform:rotate(calc((var(--i) - 1)*17deg)) translateY(calc((var(--i) - 1)*(var(--i) - 1)*9px - 4px))}
+.shop-coin .cf-coin{width:92px;height:92px;border-width:5px;pointer-events:none;cursor:default}
+.shop-coin .cf-coin.demo{animation-name:var(--none)}
+.shop-coin{perspective:500px}.shop-coin .cf-coin{transform-style:preserve-3d}
+.shop-item .shop-coin .cf-coin{transition:transform .9s cubic-bezier(.2,.7,.2,1)}.shop-item:hover .shop-coin .cf-coin{transform:rotateY(720deg) translateY(-6px)}
+.shop-buy{min-width:120px;font-size:15px}.shop-need{color:var(--muted,#b9b4d6)}
+.shop-back{align-self:flex-start}
+/* the Arena page's way in */
+.ar-wallet{cursor:pointer;font:inherit;color:inherit}.ar-wallet .ar-shopcta{margin-left:6px;padding:2px 9px;border-radius:999px;background:linear-gradient(90deg,#ffcb05,#ff8a3d);color:#2a1200;font:900 10.5px/1.7 var(--body);letter-spacing:.1em;text-transform:uppercase;animation:shopCan 1.6s ease-in-out infinite alternate}
+.shop-door{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:space-between;padding:14px 18px;border-radius:16px;color:#fff;background:linear-gradient(110deg,#3a0f66,#12256b 55%,#0a3a55);box-shadow:0 0 0 1px rgba(255,200,61,.5),0 0 30px rgba(255,200,61,.18);overflow:hidden;position:relative}
+.shop-door h2{margin:0 0 2px}.shop-door p{margin:0;color:#e6e2ff}.shop-door .shop-doorprev{display:flex;gap:10px;align-items:center}.shop-door .shop-prev{height:74px;width:74px;background:none}.shop-door .shop-coin .cf-coin{width:60px;height:60px;border-width:4px}.shop-door .shop-coin .cf-face{display:none}
+.shop-door .shop-prev.shop-mat{width:110px}.shop-door .shop-slot{display:none}
+
+/* the moment you buy something */
+.shop-unlock{position:fixed;inset:0;z-index:1400;display:flex;align-items:center;justify-content:center;background:rgba(4,2,14,.86);animation:shopFade .25s ease-out}
+@keyframes shopFade{from{opacity:0}}
+.shop-unlock .su-box{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px;padding:26px 30px;text-align:center;color:#fff;max-width:min(92vw,460px)}
+.shop-unlock .su-rays{position:absolute;left:50%;top:44%;width:760px;height:760px;margin:-380px 0 0 -380px;border-radius:50%;background:repeating-conic-gradient(rgba(255,214,90,.34) 0 8deg,transparent 8deg 16deg);-webkit-mask:radial-gradient(circle,#000 8%,transparent 64%);mask:radial-gradient(circle,#000 8%,transparent 64%);animation:shopSpin 14s linear infinite,suGrow .7s cubic-bezier(.2,1.4,.3,1) both}
+@keyframes suGrow{from{transform:scale(.1);opacity:0}}
+.shop-unlock .su-item{position:relative;animation:suPop .7s cubic-bezier(.2,1.6,.3,1) .12s both}.shop-unlock .shop-prev{width:min(78vw,340px);height:210px;box-shadow:0 0 0 2px rgba(255,214,90,.8),0 0 60px rgba(255,214,90,.55)}
+.shop-unlock .shop-coin .cf-coin{width:140px;height:140px}
+@keyframes suPop{from{transform:scale(.2) rotate(-14deg);opacity:0}}
+.shop-unlock h2{position:relative;margin:8px 0 0;font-size:34px;background:linear-gradient(90deg,#fff3b0,#ffcb05,#ff8a3d,#fff3b0);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shopTitle 2.4s linear infinite}
+.shop-unlock p{position:relative;margin:0;color:#e6e2ff}.shop-unlock button{position:relative;margin-top:8px}
+.shop-unlock .su-spark{position:absolute;left:50%;top:44%;width:10px;height:10px;border-radius:50%;background:var(--c,#ffcb05);box-shadow:0 0 12px var(--c,#ffcb05);animation:suSpark 1.1s ease-out var(--d,0s) both}
+@keyframes suSpark{from{transform:translate(-50%,-50%) scale(1);opacity:1}to{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(.2);opacity:0}}
+@media (max-width:700px){.shop-hero{padding:16px}.shop-hero h1{font-size:30px}.shop-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}.shop-prev{height:110px}.shop-purse b{font-size:26px}}
+@media (prefers-reduced-motion:reduce){.side[class*="mat-"],[class*="sleeve-"] .cd.back,.cf-coin[class*="coin-"],.shop-rays,.shop-hero h1,.shop-item.can,.shop-purse>span,.shop-unlock .su-rays{animation:none!important}}

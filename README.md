@@ -38,7 +38,15 @@ Tables created in "auto" mode run a rules engine (`public/js/engine/`) with scri
 
 ## Practice against the computer
 
-New table → "Practice against the computer" puts a computer opponent in seat B with one of three built-in decks (Haymaker, Rain Dance, Charizard) or any of your own decks. It plays with the same rules engine. On its turn it tries each legal move on a copy of the game, plays the turn out (each attack averaged over a few coin flips of its own, never the real ones), scores the board (prizes, damage, energy where it is useful, evolutions, knockout threats, hand and deck sizes; it never looks at your hand) and keeps the best line. Its moves run in your browser one at a time, so you see every animation. `public/js/bot.js` holds the policy; prompts it cannot reason about get a sensible default answer.
+New table → "Practice against the computer" puts a computer opponent in seat B with a surprise deck, one of its nine built-in decks by name (Charizard, Rain Dance, Haymaker, Thunderstorm, Do the Wave, Machamp, Blaine's Arcanine, Mewtwo and Gengar, Venusaur and Nidoking), or any of your own decks. The built-in decks are written for the house rules: Double Colorless everywhere, plenty of draw, at least 11 Basics.
+
+It plays through the same rules engine as a person (`public/js/bot.js`). For every move it could make it tries the move on a copy of the game, finishes the turn the best way from there, gives the other player their best attack back, and scores what is left: prizes, damage as progress towards a prize, Energy where it is useful, and who Knocks Out whom next. Choices inside a move (which Pokémon to hit, which Energy to remove, what to search for) are tried out the same way. It never looks at the other player's hand, and it tries moves with practice coins, not the real flip.
+
+`node tools/bot-match.mjs --games 60` plays the computer against itself across its decks and prints the results by deck; `--b path/to/other-bot.js` plays two versions against each other (each pair of games swaps seats on the same shuffle), which is how to tell whether a change made it better.
+
+## The Token Shop
+
+Arena runs pay Cousin Tokens, and the shop on the Arena page spends them: five play mats, five sets of card sleeves and five coins, 1,250 Tokens each (five perfect runs). A mat covers your side of the table, sleeves are the backs of your cards, and the coin is the one you flip; the other player sees all three. `public/js/shop.js` has the catalogue and the buy and equip rules, `public/shop.css` draws everything with gradients (no image files), and what a player owns and has equipped lives in their Arena document (`owned`, `equip`), which every page already receives.
 
 ## The Arena (single player)
 
@@ -94,7 +102,7 @@ Under 700px wide the table switches to a compact layout that fits one phone scre
 
 When both players are ready and the first turn begins, `public/js/music.js` plays an original four-channel chiptune battle intro (two pulse waves, triangle bass, noise drums) for 10 seconds and fades it out. To use your own track instead, put a file named `battle.mp3` in `public/`; if it exists the game plays it with the same fade. The lab has a button to preview either.
 
-Each Pokémon can have its own track too: drop `charizard.mp3` (or `.ogg`, `.wav`, `.m4a`) into `public/music/` and it plays for 10 seconds, then fades, whenever a Charizard becomes a player's Active Pokémon. File names are the card name in lowercase with punctuation and spaces as dashes (`blaines-charizard.mp3`, `mr-mime.mp3`, `nidoran-f.mp3`); `public/music/README.txt` has the rule and the lab shows the exact name for any card.
+Each Pokémon can have its own track too: drop `charizard.mp3` (or `.ogg`, `.wav`, `.m4a`, `.aac`) into `public/music/` and it plays for 10 seconds, then fades, whenever a Charizard becomes a player's Active Pokémon. File names are the card name in lowercase with punctuation and spaces as dashes (`blaines-charizard.mp3`, `mr-mime.mp3`, `nidoran-f.mp3`); `public/music/README.txt` has the rule and the lab shows the exact name for any card.
 
 ## Attack animations
 

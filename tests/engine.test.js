@@ -1045,3 +1045,41 @@ test('Claude-Rank covers every league draft pick exactly once', async () => {
   assert.ok(rank('Charizard') === 0 && keys.includes('Gengar') && keys.includes('Kabutops') && keys.includes("Blaine's Mankey"));
   assert.ok(pool.every((e) => e.next.length === 0), 'nothing in the pool evolves further');
 });
+
+test('the computer answers prompts that need a combination: it uses Fire Spin, which wants Energy worth 2', async () => {
+  const bot = await import('../public/js/bot.js');
+  let h = setup({ a: { active: { c: N['Charizard'], en: Array(4).fill(N['Fire Energy']) }, deck: [N['Bill'], N['Bill']] }, b: { active: { c: N['Chansey'], dmg: 30 }, bench: [{ c: N['Pikachu'] }], deck: [N['Bill'], N['Bill']] } });
+  const a = bot.botAction(h, 'a', DB);
+  assert.equal(a.type, 'attack', 'it attacks rather than passing');
+  let action = { ...a, seat: 'a', seed: 3, answers: [] }; let r;
+  for (let i = 0; i < 8; i++) { r = apply(h, action, DB); assert.ok(!r.error, r.error); if (!r.prompt) break; action = { ...action, answers: [...action.answers, bot.botAnswer(r.prompt, h, r.prompt.seat || 'a', DB, action)] }; }
+  assert.ok(r.state.log.some((l) => /used Fire Spin/.test(l.m)) && r.state.log.some((l) => /Chansey was Knocked Out/.test(l.m)), 'Fire Spin landed and took the Knock Out');
+  assert.equal(r.state.p.a.active.en.length, 2, 'and two Energy were discarded');
+});
+
+test("the computer's own decks are legal 60-card decks with at least 11 Basic Pokémon", async () => {
+  const bot = await import('../public/js/bot.js');
+  assert.ok(Object.keys(bot.BOT_DECKS).length >= 9);
+  for (const k of Object.keys(bot.BOT_DECKS)) {
+    const cards = bot.botDeckCards(DB, k);
+    assert.deepEqual(validateDeck({ cards }, DEFAULT_RULES, DB).filter((x) => x.bad).map((x) => x.m), [], k);
+    const basics = Object.entries(cards).filter(([id]) => DB[id].st === 'Pokémon' && DB[id].sub === 'Basic').reduce((n, [, x]) => n + x, 0);
+    assert.ok(basics >= 11, `${k} has ${basics} Basics`);
+  }
+});
+
+test('the Token Shop: five of each kind at 1,250, bought with Tokens, shown only when owned', async () => {
+  const shop = await import('../public/js/shop.js');
+  for (const k of ['mat', 'sleeve', 'coin']) assert.equal(shop.SHOP.filter((x) => x.kind === k).length, 5, k);
+  assert.ok(shop.SHOP.every((x) => x.price === 1250 && x.price === 5 * ARENA_REWARDS[ARENA.wins]), 'five perfect runs each');
+  const d = { tokens: 2600 };
+  assert.throws(() => shop.equip(d, 'mat', 'mat-prism'), /don't own/);
+  shop.buy(d, 'mat-prism'); shop.buy(d, 'coin-bolt');
+  assert.equal(d.tokens, 100); assert.deepEqual(d.owned, ['mat-prism', 'coin-bolt']);
+  assert.throws(() => shop.buy(d, 'sleeve-gold'), /1150 more/); assert.throws(() => shop.buy(d, 'mat-prism'), /already own/);
+  assert.equal(shop.sideClasses(d), 'mat-prism'); assert.equal(shop.coinClass(d), 'coin-bolt');
+  shop.equip(d, 'mat', null); assert.equal(shop.sideClasses(d), '');
+  // a look someone doesn't own (or that doesn't exist) is never shown
+  assert.deepEqual(shop.lookOf({ owned: [], equip: { mat: 'mat-inferno', coin: 'coin-nope' } }), {});
+  assert.equal(shop.sideClasses(null), ''); assert.equal(shop.coinClass(undefined), '');
+});

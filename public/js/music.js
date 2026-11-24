@@ -104,8 +104,7 @@ export function parseTime(v) {
 async function prefetchStartTracks() {
   for (const key of Object.keys(startTimes || {})) {
     if (!parseTime(startTimes[key])) continue;
-    const url = key === 'battle' ? 'battle.mp3' : `music/${key}.mp3`;
-    if (await fileExists(url)) seekableUrl(url).catch(() => {});
+    for (const ext of key === 'battle' ? ['mp3'] : ['mp3', 'ogg', 'wav', 'm4a', 'aac']) { const url = key === 'battle' ? 'battle.mp3' : `music/${key}.${ext}`; if (await fileExists(url)) { seekableUrl(url).catch(() => {}); break; } }
   }
 }
 /** Read the start-time list early (the page calls this once audio is unlocked) so tracks are ready when needed. */
@@ -156,7 +155,7 @@ export async function playPokemonMusic(cardName, seconds = 10) {
 export async function playEventMusic(name, seconds = 10) { return playTrack(`music/${name}`, seconds); }
 async function playTrack(base, seconds) {
   let url = null;
-  for (const ext of ['mp3', 'ogg', 'wav', 'm4a']) { if (await fileExists(`${base}.${ext}`)) { url = `${base}.${ext}`; break; } }
+  for (const ext of ['mp3', 'ogg', 'wav', 'm4a', 'aac']) { if (await fileExists(`${base}.${ext}`)) { url = `${base}.${ext}`; break; } }
   if (!url) return false;
   stopMusic(); const a = audio(); if (!a) return false; const { ctx, master } = a;
   const out = ctx.createGain(); out.gain.value = 0.55; out.connect(master);
