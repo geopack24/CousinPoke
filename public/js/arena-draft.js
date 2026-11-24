@@ -25,7 +25,8 @@ const NOT_IN_DRAFT = new Set(['Rainbow Energy', 'Bill',
   'Mr. Mime', 'Clefable', "Sabrina's Jynx", 'Jynx', "Sabrina's Hypno", // (the last two: damage for every damage counter on the Defending Pokémon)
   // Trainers that hinge on the opponent's choice, which a boss can't sensibly make
   'Challenge!', "Lt. Surge's Treaty", "Misty's Wish",
-  'Devolution Spray']); // (marked "remove" in George's rarity sheet)
+  'Devolution Spray', // (marked "remove" in George's rarity sheet)
+  'Warp Point']); // (a boss can't be switched, so it was a free Switch; George's report)
 
 /** Card signature: reprints (same name, HP, attacks, powers) count as one card. */
 const sig = (c) => JSON.stringify([c.name, c.hp, c.sub, (c.atk || []).map((a) => [a.n, a.d, (a.c || []).length]), c.pw ? c.pw.n : null]);

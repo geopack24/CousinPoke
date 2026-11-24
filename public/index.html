@@ -297,8 +297,8 @@ textarea{width:100%;min-height:60px;resize:vertical}
 .counters .ctr b{font-variant-numeric:tabular-nums}
 .counters .ctr.pile{cursor:pointer}
 .board .z.handz{align-self:stretch} /* full row width, so a long hand scrolls inside the strip instead of widening the page */
-.hand.strip{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;padding:6px 4px 10px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
-.hand.strip .cd{scroll-snap-align:center}
+.hand.strip{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;padding:6px 10px 10px;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+/* (no scroll snapping: with cards snapping to the centre, the first and last cards could never be brought fully into view) */
 .logpane.compact{position:static;max-height:none}
 .logpane.compact .entries{display:none}
 .logpane.compact.open .entries{display:flex;max-height:40vh}

@@ -971,12 +971,12 @@ table.lgt tr.lead td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
 .eslot .ecard{height:calc(330px*var(--es));filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
 .eslot.dark .ecard,.eslot.gone .ecard{height:calc(175px*var(--es));filter:none}
 .eslot .mon{margin:calc(-155px*var(--es)) 0 0;position:relative;z-index:1}
-.eslot .mon .cd,.eslot .dimc .cd{background-color:transparent;box-shadow:none;border-radius:0}
+.eslot.dark .mon{margin-top:0}
+.eslot.dark .mon .cd{filter:saturate(.1) brightness(.8);opacity:.75} /* an unlit crystal: grey, but still a target */
+.eslot .mon .cd{background-color:transparent;box-shadow:none;border-radius:0}
 .eslot.on .mon .cd{filter:drop-shadow(0 0 5px var(--ec)) drop-shadow(0 2px 3px rgba(0,0,0,.65))}
 .eslot .mon .hp{left:50%;top:auto;bottom:-11px;transform:translateX(-50%);font-size:9px;padding:0 4px;white-space:nowrap}
 .eslot .mon .dmg{display:none}
-.eslot.dark .dimc{position:relative;line-height:0;opacity:.5;filter:saturate(0) brightness(.85)}
-.eslot.dark .dimd{position:absolute;top:-4px;right:-8px;min-width:16px;height:16px;padding:0 3px;border-radius:999px;display:grid;place-items:center;font-size:10px;font-weight:800;line-height:1;color:#fff;background:#7a2a24}
 .eslot.gone .egap{box-sizing:border-box;width:86%;height:calc(238px*var(--es));display:grid;place-items:center;text-align:center;font-size:8px;line-height:1.1;opacity:.55;border:1px dashed rgba(255,255,255,.35);border-radius:6px}
 .eslot .ecard.epop{animation:epop .85s cubic-bezier(.2,1.5,.4,1)}
 @media (max-width:700px){.eslot .mon .hp{font-size:8px;padding:0 3px;bottom:-10px}.eslot.gone .egap{font-size:7px}}
