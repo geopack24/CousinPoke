@@ -106,16 +106,23 @@ const stageOf = (b) => b.stage || b.n;
 const STAGES = () => Math.max(1, ...BOSSES.map(stageOf));
 /** The Colossal Pokémon a run faces after `wins` wins. */
 function bossAt(r, wins) {
+  // a fight that has started keeps its boss, whatever the list of bosses for that stage becomes meanwhile
+  if (r && wins === r.wins && r.gameId) {
+    const g = (PT.S.game && PT.S.game.id === r.gameId ? PT.S.game : null) || (PT.S.games || []).find((x) => x.id === r.gameId);
+    const n = r.gameBoss || (g && g.arena && g.arena.boss); const b = n && BOSSES.find((x) => x.n === n); if (b) return b;
+  }
   const stage = Math.min(wins, STAGES() - 1) + 1; const opts = BOSSES.filter((b) => stageOf(b) === stage); if (!opts.length) return BOSSES[BOSSES.length - 1];
   let h = ((((r && r.seed) || 1) >>> 0) ^ Math.imul(stage, 2654435761)) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822519) >>> 0; h ^= h >>> 13;
-  return opts[h % opts.length];
+  return opts[(h >>> 0) % opts.length]; // (>>> 0: the last xor leaves a signed number, and a negative remainder would pick nothing)
 }
 const bossName = (r, wins) => 'Colossal ' + bossAt(r, wins).name;
 /** The ladder of stages. The bosses already beaten are ticked off and the next one is shown; the rest stay face down
  *  until you reach them. Tap a revealed one to read its attacks. */
 function ladderHTML(r, playing) {
   const wins = r ? r.wins : 0;
-  return `<div class="ar-ladder">${Array.from({ length: STAGES() }, (_, i) => { const b = bossAt(r, i); return (r && (i < wins || (i === wins && playing))
+  // bosses already beaten are the ones this run actually met (its game titles), not what the stage would pick today
+  const won = ((r && r.games) || []).filter((x) => x.won).map((x) => BOSSES.find((b) => 'Colossal ' + b.name === x.title));
+  return `<div class="ar-ladder">${Array.from({ length: STAGES() }, (_, i) => { const b = (i < wins && won[i]) || bossAt(r, i); return (r && (i < wins || (i === wins && playing))
     ? `<button type="button" class="ar-boss ${i < wins ? 'beaten' : 'now'}" data-view="${bossId(b.n)}" title="Colossal ${esc(b.name)}: ${b.hp} HP">
       <span class="ab-card">${PT.cardHTML(bossId(b.n), 0.24)}${i < wins ? '<span class="ab-tick">✓</span>' : ''}</span><b>${esc(b.name)}</b><small>${b.hp} HP</small></button>`
     : `<div class="ar-boss hidden" title="Boss ${i + 1}: revealed when you reach it"><span class="ab-card">${PT.backHTML(0.24)}<span class="ab-q">?</span></span><b>???</b><small>Boss ${i + 1}</small></div>`); }).join('')}</div>`;
@@ -136,7 +143,7 @@ async function battle() {
   doc.status = 'playing'; doc.startedAt = Date.now();
   try { await PT.api('PUT', 'games/' + id, { data: doc }); } catch (e) { PT.toast('Could not create the game (' + (e.code || 'error') + ')'); return; }
   const prev = (r.games[r.games.length - 1] || {}).id;
-  const ok = await mutate((d) => { if (!d.run || d.run.id !== r.id || d.run.gameId) return false; d.run.gameId = id; });
+  const ok = await mutate((d) => { if (!d.run || d.run.id !== r.id || d.run.gameId) return false; d.run.gameId = id; d.run.gameBoss = boss.n; });
   if (!ok) { PT.api('DELETE', 'games/' + id).catch(() => {}); return; }
   if (prev) PT.api('DELETE', 'games/' + prev).catch(() => {}); // the finished table isn't needed any more
   PT.openGame(id);
@@ -155,7 +162,7 @@ async function record(gid, won) {
   const ok = await mutate((d) => {
     const r = d.run; if (!r || r.status !== 'play' || r.gameId !== gid || r.games.some((x) => x.id === gid)) return false;
     r.games.push({ id: gid, title: bossName(r, r.wins), won, at: Date.now() });
-    if (won) r.wins++; else r.losses++; r.gameId = null;
+    if (won) r.wins++; else r.losses++; r.gameId = null; delete r.gameBoss;
     if (r.wins >= ARENA.wins || (!won && r.losses >= ARENA.losses)) finishRun(d);
     else if (won) r.swap = swapStep(r, r.wins, 0);
     after = clone(r);
